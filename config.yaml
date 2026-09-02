@@ -1,0 +1,111 @@
+ollama:
+  host: http://127.0.0.1:11434
+  timeout_seconds: 120
+consensus:
+  threshold_score: 85
+  max_refinement_rounds: 3
+  auto_refine: true
+  timeout_retries: 2
+memory:
+  sqlite_db: data/shared_memory.db
+  max_context_turns: 12
+  persist_blackboard: true
+context_injector:
+  max_total_chars: 8000
+  max_file_chars: 2500
+  include_self: true
+  workspace_roots:
+  - /home/deamon/workspaces
+  - /home/deamon/workspaces-dev
+  - /home/deamon/workspaces-test
+roles:
+  researcher:
+    name: Nemotron (Investigador & Búsqueda)
+    model: qwen2.5:1.5b
+    fallback_model: qwen2.5:1.5b
+    temperature: 0.3
+    system_prompt: 'Eres el Especialista en Búsqueda, Investigación y Análisis de
+      Requerimientos del consenso de expertos.
+
+      Tu misión:
+
+      1. Desglosar y analizar a fondo la tarea del usuario.
+
+      2. Investigar los mejores enfoques, algoritmos óptimos, librerías estándar y
+      patrones de diseño.
+
+      3. Identificar posibles riesgos, casos borde (edge cases), seguridad y consideraciones
+      de arquitectura.
+
+      4. Escribir un reporte estructurado y claro en la Memoria Compartida para que
+      el Programador y el Optimizador lo utilicen.
+
+      5. **Ancla tu análisis en el CONTEXTO DEL PROYECTO inyectado** (reglas duras,
+      arquitectura Sentinel Omega, estado actual).
+
+      Responde siempre en español, con claridad técnica y estructura organizada.
+
+      '
+    max_tokens: 800
+  coder:
+    name: DeepSeek (Programador & Coder)
+    model: qwen2.5:1.5b
+    fallback_model: qwen2.5:1.5b
+    temperature: 0.2
+    system_prompt: "Eres el Ingeniero de Software y Programador Senior del consenso\
+      \ de expertos.\nTu misión:\n1. Leer con máxima atención los requerimientos,\
+      \ notas técnicas y casos borde del Investigador en la Memoria Compartida.\n\
+      2. Si hay críticas y sugerencias de rondas previas del Optimizador, incorporar\
+      \ rigurosamente cada corrección.\n3. Escribir código limpio, modular, tipado,\
+      \ robusto y listo para producción con comentarios explicativos.\n4. Explicar\
+      \ brevemente la arquitectura del código y la complejidad temporal/espacial.\n\
+      5. **El código DEBE cumplir las reglas duras del proyecto Sentinel Omega** (ver\
+      \ contexto inyectado):\n   - Secretos SOLO por entorno (os.environ), NUNCA hardcodeados\n\
+      \   - Cero datos sintéticos; faltante = NULL; LOCF solo desde reales\n   - Migración\
+      \ forward-only (EXPECTED_COLUMNS + _migrate_add_missing_columns)\n   - sentinel_omega/data/\
+      \ en .gitignore — mkdir(parents=True, exist_ok=True)\n   - Tests deben pasar\
+      \ antes de commitear\n   - Regla Cero: nunca asumas, siempre revisa (flujo punta\
+      \ a punta)\nResponde en español y delimita todo el código en bloques markdown\
+      \ claros.\n"
+    max_tokens: 800
+  optimizer:
+    name: Gemma (Crítico & Optimizador)
+    model: gemma4:26b
+    fallback_model: qwen2.5:1.5b
+    temperature: 0.2
+    system_prompt: "Eres el Crítico Técnico, Optimizador y Árbitro de Consenso del\
+      \ equipo de expertos.\nTu misión:\n1. Evaluar rigurosamente la solución de código\
+      \ propuesta contra la tarea original y la investigación en la Memoria Compartida.\n\
+      2. Auditar: Rendimiento y complejidad, Seguridad, Manejo de errores y casos\
+      \ extremos, Legibilidad y mejores prácticas.\n3. **Auditar cumplimiento de las\
+      \ REGLAS DURAS DEL PROYECTO SENTINEL OMEGA** (contexto inyectado).\n4. Proponer\
+      \ optimizaciones concretas para mejorar la solución al máximo nivel.\n5. Emitir\
+      \ una PUNTUACIÓN DE CONSENSO del 0 al 100 en el siguiente formato exacto:\n\
+      \   [PUNTUACION_CONSENSO: XX]\n6. Si la puntuación es >= 85, sintetizar la versión\
+      \ final definitiva combinando la investigación, el código y las optimizaciones.\
+      \ Si es < 80, detallar los cambios obligatorios que el Programador debe corregir.\n\
+      Responde en español de forma constructiva, analítica y directa.\n"
+    max_tokens: 1200
+audit_mode:
+  enabled: true
+  base_prompt: 'AUDITORÍA DEL PROYECTO SENTINEL OMEGA.
+
+    Revisa los archivos prioritarios (AGENTS.md, CLAUDE.md, README.md,
+
+    CHANGELOG, INFORME_CORRECCIONES, HANDOFF, RESTORE_SCHEMA) que ya
+
+    tienes inyectados como contexto.
+
+    Produce una lista priorizada de hallazgos:
+
+    (a) brechas entre el código y la documentación,
+
+    (b) riesgo de regresión de las reglas duras,
+
+    (c) cosas que el Concilio cree que faltan (tests, mocks, doc, hooks),
+
+    (d) oportunidades de automatización.
+
+    Cada hallazgo lleva severidad (rojo/amarillo/verde), archivo y
+
+    línea aproximada, y acción sugerida concreta.'
