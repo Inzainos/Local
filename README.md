@@ -1,5 +1,9 @@
 # Home Workspace — /home/deamon/
 
+> Rama `local/home-bridge` del monorepo [`Inzainos/Local`](https://github.com/Inzainos/Local). Ver también `local/concilio`, `local/padron`, `local/sentinel-omega` y `local/watchdog`.  
+> Origen local: `/home/deamon` en WSL2 Kali (**deamon** / X-Deamon). Licencia: [MIT](LICENSE).
+
+
 Repositorio base para **todos los proyectos** en el home de `deamon` (WSL2 Kali Linux).  
 Contiene tres proyectos principales (+ nodo móvil DeamonX en el ecosistema Concilio/Sentinel):
 
