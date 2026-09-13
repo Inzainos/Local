@@ -1,5 +1,9 @@
 # Padrón de Afiliados - Sistema de Control Electoral
 
+> Rama `local/padron` del monorepo [`Inzainos/Local`](https://github.com/Inzainos/Local). Ver también `local/home-bridge`, `local/concilio`, `local/sentinel-omega` y `local/watchdog`.  
+> Origen local: `/home/deamon/padron_afiliados_app` en WSL2 Kali (**deamon** / X-Deamon). Licencia: [MIT](LICENSE).
+
+
 Sistema para la gestión y análisis del padrón de afiliados con dashboard interactivo en Streamlit.
 
 ## Estructura del Proyecto
