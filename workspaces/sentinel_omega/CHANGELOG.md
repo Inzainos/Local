@@ -1,3 +1,8 @@
+## 2026-09-13 ? Auditor?a GitHub (Agente-C)
+
+- Doc: `docs/AUDIT_GITHUB_20260913.md` (H1?H6 + decisiones pendientes).
+- Push `Inzainos/Local` rama `local/sentinel-omega`: cero secretos; remediaci?n H1?H4/H6 en hold hasta GO Capit?n.
+
 ## 2026-09-13 — Duelo launcher cerrado, watchdog/ops, Schumann/Alfa2 tests
 
 - **Fixed:** `sentinel-omega-scheduler` disabled — dejaba de matar al launcher de `sentinel-omega` (alertas Telegram desbloqueadas). Watchdog ya no re-enable el scheduler.
