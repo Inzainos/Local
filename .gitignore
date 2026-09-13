@@ -12,3 +12,9 @@ __pycache__/
 *.log
 .DS_Store
 .streamlit/
+
+# Skills que Streamlit instala dentro del venv. Son symlinks a
+# venv/lib/python3.13/site-packages/streamlit/.agents/skills/, así que
+# versionarlos deja el clon con enlaces rotos hasta crear el entorno.
+.agents/skills/developing-with-streamlit
+.claude/skills/developing-with-streamlit

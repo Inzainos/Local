@@ -5,6 +5,22 @@ Todos los cambios notables de este proyecto se documentan en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-09-13 - H4: symlinks de skills fuera del control de versiones
+
+### Fixed
+- `.agents/skills/developing-with-streamlit` y `.claude/skills/developing-with-streamlit`
+  eran symlinks a `venv/lib/python3.13/site-packages/streamlit/.agents/skills/`.
+  Como `venv/` está en `.gitignore`, quedaban **rotos en cualquier clon limpio**
+  hasta crear el entorno con Streamlit instalado. Verificado en un checkout
+  fresco: ambos apuntaban a nada.
+- Se quitan del índice y se añaden al `.gitignore`. Siguen funcionando en local
+  cuando el venv existe; simplemente dejan de viajar en el repo.
+
+### Notes
+- Hallazgo H4 de la auditoría del monorepo (2026-09-13). El análogo en
+  `local/sentinel-omega` se cerró en `b639aa8`; esta rama quedó pendiente por no
+  tener agente asignado en la tabla de owners.
+
 ## [1.0.0] - 2026-09-02
 
 ### Agregado
