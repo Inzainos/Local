@@ -1,12 +1,31 @@
-## 2026-09-13 ? H2/H3/H4 classify (Agente-C)
-- Nested ONNX ?canon ? `_archive/20260913/models_nested/`; loki nested id?ntico borrado
-- Baks/hex obsolete borrados; schema tar ? `_archive/20260913/schema/`
+## 2026-09-13 — H2/H3/H4 classify (Agente-C)
+- Nested ONNX ≠canon → `_archive/20260913/models_nested/`; loki nested idéntico borrado
+- Baks/hex obsolete borrados; schema tar → `_archive/20260913/schema/`
 - Symlink venv/streamlit eliminado
 
-## 2026-09-13 ? Auditor?a GitHub (Agente-C)
+## 2026-09-13 — Relevo de Agente-C (sin créditos): cierre de H3/H4
 
-- Doc: `docs/AUDIT_GITHUB_20260913.md` (H1?H6 + decisiones pendientes).
-- Push `Inzainos/Local` rama `local/sentinel-omega`: cero secretos; remediaci?n H1?H4/H6 en hold hasta GO Capit?n.
+- **H3 cerrado.** El glob `*.bak*` de `b639aa8` no alcanzó dos variantes del
+  launcher porque su nombre no casa con ese patrón. Archivadas en
+  `_archive/20260913/launchers/`: `launcher_fixed.py` (38 999 B) y
+  `launcher.py.broken-2026-09-10` (31 566 B). Ninguna es duplicado del vigente
+  `launcher.py` (39 441 B), así que se archivan en vez de borrarse, mismo
+  criterio que se aplicó a los ONNX anidados.
+- **Encoding corregido.** `docs/AUDIT_GITHUB_20260913.md` se había escrito en
+  ASCII y perdió 36 caracteres (acentos y rayas como `?`). Reescrito en UTF-8
+  sin cambiar contenido, y con las columnas de Estado de H2/H3/H4 actualizadas.
+  Las líneas de este CHANGELOG de la entrada anterior, igual.
+- **Documentado el incidente `/data`** en la auditoría: el mismo glob borró
+  copias `data/*.db.bak*` del árbol vivo (nunca versionadas, git no las tiene).
+  DB canónica `integrity_check=ok`. Riesgo residual: un solo snapshot de 873 MB
+  = sin historia de restauración.
+- `_archive/20260913/README.md` ampliado con qué hay dentro y cómo revertir.
+- Sin tocar: Actions, licencia y `estado/` siguen en hold.
+
+## 2026-09-13 — Auditoría GitHub (Agente-C)
+
+- Doc: `docs/AUDIT_GITHUB_20260913.md` (H1–H6 + decisiones pendientes).
+- Push `Inzainos/Local` rama `local/sentinel-omega`: cero secretos; remediación H1–H4/H6 en hold hasta GO Capitán.
 
 ## 2026-09-13 — Duelo launcher cerrado, watchdog/ops, Schumann/Alfa2 tests
 
