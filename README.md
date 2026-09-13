@@ -79,14 +79,15 @@ no se modifica desde aquí; lo que sigue está documentado en cada rama, no resu
 
 | # | Rama | Asunto | Estado |
 |---|------|--------|--------|
-| 1 | `local/sentinel-omega` | Workflows en `workspaces/.github/workflows/` — GitHub solo lee `.github/workflows/` en la raíz, así que hoy no corre ningún CI (`bandit`, `codeql`, `copy-delta-to-snt`, `roy-vigilante`). Los `schedule:` además solo disparan desde la rama por defecto | Documentado |
+| 1 | `local/sentinel-omega` | Los 4 workflows no se ejecutan. Están en `workspaces/.github/workflows/` y GitHub solo lee `.github/workflows/` en la raíz. Moverlos no bastaría: `bandit`/`codeql` disparan sobre `main`, que solo tiene este índice; `roy-vigilante` depende de un `schedule:`, que solo dispara desde la rama por defecto; y `copy-delta-to-snt` exige una rama `origin/jupyter-setup` inexistente aquí y copia a otro repo. Fueron escritos para el repo `workspaces` original | **Documentado en `AGENTS.md`** (ya no promete serverless). Los archivos se conservan: retirar escáneres de seguridad es decisión humana |
 | 2 | `local/sentinel-omega` | Árbol de modelos duplicado | **Resuelto en `b639aa8`** (Agente-C): los 6 ONNX anidados + su `models_meta.json` se movieron a `_archive/20260913/models_nested/` (renames `R100`, byte a byte idénticos) y `loki_unificado_rf.onnx` se borró por ser el mismo blob `e27bb4b` que el canónico. Quedan 7 ONNX en `sentinel_omega/models/`. Diagnóstico previo: el canónico es `sentinel_omega/models/` (meta del 2026-09-13T09:05Z, alfa1 n=1388 / beta1 n=2082 / omega n=2726). El anidado `sentinel_omega/sentinel_omega/models/` es copia congelada del 2026-09-11T00:20Z (n=1303 / 1997 / 2556). El `path` absoluto de **ambos** meta apunta al de primer nivel, igual que el `base_dir` por defecto de `config/onnx_config.py`. Falta decidir si se borra la copia |
 | 3 | `local/sentinel-omega` | Respaldos manuales versionados | **Resuelto.** `b639aa8` sacó 40 archivos y archivó el tarball `_SCHEMA_PARTS_BACKUP_PRE_FIX.tar.gz`; `e70e462` archivó los 2 que el glob `*.bak*` no alcanzó por su nombre (`launcher.py.broken-2026-09-10`, `launcher_fixed.py`) en `_archive/20260913/launchers/` |
 | 4 | `local/padron`, `local/sentinel-omega` | Symlinks de skills apuntando dentro de `venv/`/`.venv/` (gitignorado): rotos en cualquier clon | **Resuelto.** El de `sentinel-omega` en `b639aa8`; los dos de `local/padron` en `49caaac`, fuera del índice y añadidos al `.gitignore` con el motivo escrito. El symlink `sentinel_omega/sentinel_omega/data → ../data` se conserva a propósito: resuelve bien |
 | 5 | `local/sentinel-omega` | `estado/` crece por ejecución (1117 de 1677 archivos, 67% de la rama). Evaluar retención o Git LFS | Documentado |
-| 6 | `local/sentinel-omega` | `LICENSE` de raíz dice MIT y `workspaces/sentinel_omega/pyproject.toml` dice `Proprietary — Fractal Core Research` | Documentado |
+| 6 | `local/sentinel-omega` | `LICENSE` de raíz (y `workspaces/LICENSE`) dicen MIT mientras `workspaces/sentinel_omega/pyproject.toml` dice `Proprietary — Fractal Core Research` | **Pendiente: decisión del autor.** Cambiar un `LICENSE` es acto legal, no mantenimiento |
 | 7 | — | El remoto no tiene tags. Las dos ramas de snapshot deberían serlo | **Bloqueado:** el push de `refs/tags/*` se deniega con HTTP 403 desde esta sesión (los pushes a `refs/heads/*` sí pasan). Hay que crearlos desde la katana |
-| 8 | `local/sentinel-omega` | `_archive/20260913/` es material conservado a propósito (ONNX anidados + tarball de schema), no basura. Su `README.md` explica qué hay dentro | Informativo |
+| 8 | `local/sentinel-omega` | `_archive/20260913/` es material conservado a propósito (ONNX anidados, tarball de schema, variantes del launcher), no basura. Su `README.md` explica qué hay dentro y cómo revertir | Informativo |
+| 9 | `local/sentinel-omega` | Dos cosas importables se llaman `sentinel_omega`: el directorio de proyecto (tiene `__init__.py`) y el paquete anidado que declara el `egg-info`. Es la causa de que los modelos se duplicaran | **Pendiente: requiere correr la suite.** Ver nota abajo |
 
 ### Tags pendientes
 
@@ -101,3 +102,19 @@ git push origin concilio-2.2.6 deamonx-bridge-v1.0.0
 
 Las ramas `local/concilio-2.2.6-20260913` y `local/deamonx-bridge-v1.0.0` se
 conservan tal cual: los tags no las reemplazan hasta que se decida borrarlas.
+
+### Nota sobre la deuda #9 — por qué no se tocó
+
+El diagnóstico inicial fue "quitar el `__init__.py` del directorio de proyecto".
+Es más sutil que eso: desde Python 3.3, un directorio **sin** `__init__.py` sigue
+siendo importable como *namespace package* (PEP 420). Quitarlo no elimina el
+nombre; lo degrada a porción de namespace, que pierde precedencia frente a un
+paquete regular encontrado después en `sys.path`. Si el paquete está instalado
+como editable (`pip install -e .`, que es lo que sugiere el `egg-info`), el
+destino apunta de vuelta al mismo árbol y el arreglo puede no cambiar nada.
+
+Verificarlo exige correr los ~420 tests con las dependencias reales instaladas
+(`numpy`, `scipy`, `pandas`, `onnxruntime`), que no están disponibles en el
+entorno donde se hizo esta auditoría. Por eso queda pendiente en vez de
+empujarse a ciegas: es un cambio de una línea con capacidad de romper imports
+en todo el sistema.
