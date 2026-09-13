@@ -8,18 +8,30 @@ Monorepo índice de sistemas locales en WSL Kali (**deamon** / X-Deamon).
 
 | Rama | Sistema | Origen local | Archivos |
 |------|---------|--------------|----------|
-| `local/home-bridge` | Home bridge / DeamonX móvil | `/home/deamon` (README, AGENTS, CHANGELOG, `bridge/`, docs DeamonX) | 11 |
-| `local/concilio` | Consensus / Concilio expert agent | `/home/deamon/consensus-expert-agent` | 58 |
-| `local/padron` | Padrón de afiliados (Streamlit) | `/home/deamon/padron_afiliados_app` | 11 |
-| `local/sentinel-omega` | Sentinel Ω (workspaces) | `/home/deamon/workspaces` | 1677 |
-| `local/watchdog` | Watchdog — monitor de seguridad por cron | `/watchdog` (Kali) | 40 |
+| `local/home-bridge` | Home bridge / DeamonX móvil | `/home/deamon` (README, AGENTS, CHANGELOG, `bridge/`, docs DeamonX) | 13 |
+| `local/concilio` | Consensus / Concilio expert agent | `/home/deamon/consensus-expert-agent` | 59 |
+| `local/padron` | Padrón de afiliados (Streamlit) | `/home/deamon/padron_afiliados_app` | 10 |
+| `local/sentinel-omega` | Sentinel Ω (workspaces) | `/home/deamon/workspaces` | 1643 |
+| `local/watchdog` | Watchdog — monitor de seguridad por cron | `/watchdog` (Kali) | 42 |
 
-### Ramas de snapshot (equivalen a un tag, no reciben trabajo nuevo)
+Conteos medidos el 2026-09-13 sobre `home-bridge@b80548b`, `concilio@c11df3f`,
+`padron@49caaac`, `sentinel-omega@a0bb343` y `watchdog@358f2ee`. Cambian con cada
+push: `git ls-tree -r --name-only origin/<rama> | wc -l` da el valor vigente.
 
-| Rama | Equivale a | Nota |
-|------|------------|------|
-| `local/concilio-2.2.6-20260913` | `local/concilio` | Mismo commit exacto (`f4abb65`); sin diferencias |
-| `local/deamonx-bridge-v1.0.0` | subconjunto de `local/home-bridge` | Solo `bridge/` + `docs/`; `home-bridge` añade README/AGENTS/CHANGELOG |
+### Ramas de snapshot
+
+Nacieron como cortes congelados de otra rama, con nombre de versión. **Ya no lo
+están:** ambas recibieron commits después de creadas, así que hoy no representan
+ni un tag ni el estado vigente de su sistema.
+
+| Rama | Nació como | Estado al 2026-09-13 |
+|------|------------|----------------------|
+| `local/concilio-2.2.6-20260913` | corte de `local/concilio` en `f4abb65` | Ahí sigue, pero `local/concilio` avanzó a `c11df3f`. Difieren en `README.md`, `CHANGELOG.md` y `LICENSE`: el snapshot es anterior a todos |
+| `local/deamonx-bridge-v1.0.0` | subconjunto de `local/home-bridge` (`bridge/` + `docs/`) | Avanzó a `562634e`: le añadieron `docs/AUDIT_GITHUB_20260913.md` y un `CHANGELOG.md`. Ya no es un subconjunto estricto |
+
+Si la intención era tener tags, conviene crearlos (ver deuda #7) y dejar de
+empujar a estas ramas — cada commit nuevo las aleja de ser el corte que su
+nombre promete.
 
 ## Uso rápido
 
@@ -64,18 +76,26 @@ archivo de raíz; `local/concilio-2.2.6-20260913` conserva `README.md`, `AGENTS.
 
 ## Qué NO se sube
 
-- Secretos: no hay `.env`, `*.pem`, `*.key` ni `id_rsa` en ninguna rama. Solo `.env.example`
-  (en `concilio`, `watchdog` y `sentinel-omega/workspaces/deploy`).
+- Secretos: no hay `.env`, `*.pem`, `*.key` ni `id_rsa` en ninguna rama. Solo
+  `.env.example`: uno en `concilio`, uno en `watchdog`, y **dos** en
+  `sentinel-omega` (`workspaces/deploy/.env.example` y
+  `workspaces/sentinel_omega/.env.example`).
 - Bases de datos binarias (`*.db`, `*.sqlite`) y entornos virtuales (`venv/`, `.venv/`).
   Solo se versiona el DDL (`schema.sql`, `schema_parts/`).
 
-`local/sentinel-omega` **sí** incluye los modelos `.onnx` entrenados (14 archivos,
-~780 KB el mayor) porque el pipeline los carga directo desde el árbol.
+`local/sentinel-omega` **sí** incluye los modelos `.onnx` entrenados porque el
+pipeline los carga directo desde el árbol. Tras el archivado de la deuda #2, en
+`a0bb343` hay 13: **7 vigentes** en `sentinel_omega/models/` (los que el sistema
+usa, `beta2_atmospheric_cnn.onnx` el mayor con ~780 KB) y 6 conservados en
+`_archive/20260913/models_nested/`.
 
 ## Deuda conocida
 
-Estado al 2026-09-13. Las ramas reflejan el árbol de la máquina Kali y su contenido
-no se modifica desde aquí; lo que sigue está documentado en cada rama, no resuelto.
+Estado al 2026-09-13. La columna **Estado** dice en qué punto está cada uno: los
+hay resueltos, parciales, bloqueados, pendientes de tu decisión y uno meramente
+informativo. Se conservan los resueltos para que quede el rastro de qué se hizo
+y dónde. De los 9, **4 siguen abiertos** (#1, #5, #6, #9), uno está bloqueado
+(#7) y uno es informativo (#8).
 
 | # | Rama | Asunto | Estado |
 |---|------|--------|--------|
