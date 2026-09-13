@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Concilio — Mini App</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: var(--tg-theme-bg-color, #0f172a);
+      --fg: var(--tg-theme-text-color, #e2e8f0);
+      --hint: var(--tg-theme-hint-color, #94a3b8);
+      --btn: var(--tg-theme-button-color, #2563eb);
+      --btn-fg: var(--tg-theme-button-text-color, #fff);
+      --card: #1e293b;
+      --ok: #34d399;
+      --warn: #fbbf24;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg); color: var(--fg); padding: 16px; line-height: 1.4;
+    }
+    h1 { font-size: 1.15rem; margin: 0 0 12px; }
+    .grid { display: grid; gap: 12px; }
+    .card {
+      background: var(--card); border-radius: 12px; padding: 14px;
+      border: 1px solid rgba(148,163,184,.25);
+    }
+    .card h2 { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em;
+      color: var(--hint); margin: 0 0 8px; }
+    .metric { font-size: 1.05rem; font-weight: 600; }
+    .muted { color: var(--hint); font-size: .85rem; }
+    .row { display: flex; justify-content: space-between; gap: 8px; margin: 4px 0; }
+    a.button, button {
+      display: inline-block; background: var(--btn); color: var(--btn-fg);
+      border: 0; border-radius: 10px; padding: 10px 14px; text-decoration: none;
+      font-weight: 600; cursor: pointer; margin-top: 8px;
+    }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: .75rem; background: rgba(52,211,153,.15); color: var(--ok); }
+    .pill.warn { background: rgba(251,191,36,.15); color: var(--warn); }
+    .links a { display: block; margin: 6px 0; color: #93c5fd; }
+    #err { color: #f87171; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Concilio Status</h1>
+  <p class="muted">Reporte seguro (sin secretos). Digest horario siempre; inmediato solo sin precedentes.</p>
+  <div id="err"></div>
+  <div class="grid" id="cards">
+    <div class="card"><h2>Cargando…</h2><div class="muted">Consultando /api/mini/status</div></div>
+  </div>
+  <div class="card links">
+    <h2>Enlaces</h2>
+    <a id="dash" href="#" target="_blank" rel="noopener">Dashboard Consenso</a>
+    <a href="#" id="sentinel-dash" onclick="return false;">Dashboard Sentinel (placeholder)</a>
+    <p class="muted">Cuando tengas HTTPS publico, ponlo en TELEGRAM_WEBAPP_URL.</p>
+  </div>
+  <button type="button" onclick="loadStatus()">Actualizar</button>
+
+  <script>
+    const tg = window.Telegram && window.Telegram.WebApp;
+    if (tg) { tg.ready(); tg.expand(); }
+
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      })[c]);
+    }
+
+    async function loadStatus() {
+      const cards = document.getElementById('cards');
+      const err = document.getElementById('err');
+      err.textContent = '';
+      try {
+        let d;
+        try {
+          const res = await fetch('/api/mini/status', { cache: 'no-store' });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          d = await res.json();
+        } catch (e1) {
+          const [h, a] = await Promise.all([
+            fetch('/api/concilio/health', { cache: 'no-store' }),
+            fetch('/api/alerts/stats', { cache: 'no-store' })
+          ]);
+          if (!h.ok) throw e1;
+          const health = await h.json();
+          const alerts = a.ok ? await a.json() : {};
+          d = {
+            concilio: {
+              threshold: health.consensus_threshold ?? 85,
+              sequential: (health.concilio||{}).sequential,
+              worker_model: (health.concilio||{}).worker_model,
+              arbiter_model: (health.concilio||{}).arbiter_model,
+              sessions_count: health.sessions_count,
+              last_session: null
+            },
+            ollama: { loaded: (health.concilio||{}).loaded_now || [], unloaded_note: 'via /api/concilio/health' },
+            alert_queue: alerts,
+            dashboard_url: 'http://127.0.0.1:8000'
+          };
+        }
+        const c = d.concilio || {};
+        const o = d.ollama || {};
+        const q = d.alert_queue || {};
+        const last = c.last_session || {};
+        const loaded = (o.loaded || []);
+        const unloadPill = loaded.length
+          ? '<span class="pill warn">modelos cargados</span>'
+          : '<span class="pill">unloaded / idle</span>';
+        cards.innerHTML = `
+          <div class="card">
+            <h2>Concilio</h2>
+            <div class="row"><span>Umbral</span><span class="metric">${esc(c.threshold ?? 85)}</span></div>
+            <div class="row"><span>Secuencial</span><span>${c.sequential ? 'si' : 'no'}</span></div>
+            <div class="row"><span>Worker</span><span>${esc(c.worker_model)}</span></div>
+            <div class="row"><span>Arbitro</span><span>${esc(c.arbiter_model)}</span></div>
+            <div class="row"><span>Sesiones</span><span class="metric">${esc(c.sessions_count ?? 0)}</span></div>
+          </div>
+          <div class="card">
+            <h2>Ultima sesion .concilio</h2>
+            <div class="muted">${esc(last.session_id || '—')}</div>
+            <div>${esc(last.task || '(sin task)')}</div>
+            <div class="row"><span>Ronda</span><span>${esc(last.round ?? '—')}</span></div>
+            <div class="row"><span>Score</span><span>${last.score != null ? esc(last.score) + '/100' : '—'}</span></div>
+          </div>
+          <div class="card">
+            <h2>Ollama</h2>
+            <div>${unloadPill}</div>
+            <div class="muted">${esc(o.unloaded_note || '')}</div>
+            <div class="muted">${loaded.length ? esc(loaded.join(', ')) : 'ninguno en VRAM'}</div>
+          </div>
+          <div class="card">
+            <h2>Cola alertas</h2>
+            <div class="row"><span>Pendientes</span><span class="metric">${esc(q.size ?? '—')}</span></div>
+            <div class="row"><span>Enviados</span><span>${esc(q.total_sent ?? '—')}</span></div>
+            <div class="row"><span>Fallidos</span><span>${esc(q.total_failed ?? '—')}</span></div>
+          </div>
+          <div class="card">
+            <h2>Politica</h2>
+            <div>Digest horario: <b>siempre</b></div>
+            <div>Inmediato: <b>solo sin precedentes</b></div>
+          </div>`;
+        const dash = document.getElementById('dash');
+        if (d.dashboard_url) {
+          dash.href = d.dashboard_url;
+          dash.textContent = 'Dashboard Consenso';
+        }
+      } catch (e) {
+        err.textContent = 'No se pudo cargar estado: ' + e.message +
+          '\nSirve via web_ui (python main.py --web) o uvicorn web_ui:app';
+        cards.innerHTML = '<div class="card"><h2>Offline</h2><div class="muted">Placeholders de estado</div>' +
+          '<div class="row"><span>Umbral</span><span class="metric">85</span></div>' +
+          '<div class="row"><span>Secuencial</span><span>si</span></div></div>';
+      }
+    }
+    loadStatus();
+  </script>
+</body>
+</html>

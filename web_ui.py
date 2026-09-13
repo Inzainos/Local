@@ -6,6 +6,7 @@ from pydantic import BaseModel
 import json
 import asyncio
 import os
+from pathlib import Path
 import time
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
@@ -14,6 +15,9 @@ from engine.orchestrator import ConsensusOrchestrator
 from memory.shared_context import SharedMemory
 
 app = FastAPI(title="Consenso de Expertos Ollama")
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 orchestrator = ConsensusOrchestrator(config_path="config.yaml")
 shared_memory = SharedMemory(db_path=orchestrator.db_path)
@@ -338,6 +342,77 @@ def task_status(job_id: str):
 def health():
     return {"status": "ok", "ollama_host": orchestrator.ollama_host}
 
+
+
+# ─── Telegram Mini App (static) ────────────────────────────────
+# reuse STATIC_DIR defined at module load
+_STATIC_DIR = STATIC_DIR
+
+
+@app.get("/mini", response_class=HTMLResponse)
+def mini_app_page():
+    """Telegram Mini App shell — status cards + dashboard placeholders."""
+    mini = _STATIC_DIR / "mini.html"
+    if not mini.is_file():
+        return HTMLResponse(
+            "<h1>mini.html missing</h1><p>Create static/mini.html</p>",
+            status_code=404,
+        )
+    return HTMLResponse(mini.read_text(encoding="utf-8"))
+
+
+@app.get("/api/mini/status")
+def mini_status():
+    """Safe JSON for Mini App — no .env secrets."""
+    try:
+        from telegram_bot import status_payload_json
+
+        return status_payload_json()
+    except Exception as e:
+        import yaml
+        from alert_queue import alert_queue
+
+        cfg_path = Path(__file__).resolve().parent / "config.yaml"
+        cfg = {}
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+        except Exception:
+            pass
+        consensus = cfg.get("consensus") or {}
+        concilio = cfg.get("concilio") or {}
+        sdir = Path(__file__).resolve().parent / (
+            (concilio.get("sessions_dir") or "data/sessions")
+        )
+        sessions = list(sdir.glob("*.concilio")) if sdir.is_dir() else []
+        try:
+            q = alert_queue.get_stats()
+            q["file_path"] = Path(str(q.get("file_path", ""))).name
+        except Exception:
+            q = {"error": "unavailable"}
+        return {
+            "ok": False,
+            "error": str(e)[:120],
+            "concilio": {
+                "threshold": consensus.get("threshold_score", 85),
+                "sequential": bool(concilio.get("sequential", True)),
+                "worker_model": concilio.get("worker_model"),
+                "arbiter_model": concilio.get("arbiter_model"),
+                "sessions_count": len(sessions),
+                "last_session": None,
+            },
+            "ollama": {"loaded": [], "unloaded_note": "fallback"},
+            "alert_queue": q,
+            "dashboard_url": os.environ.get(
+                "CONSENSUS_DASHBOARD_URL", "http://127.0.0.1:8000"
+            ),
+            "webapp_url": "",
+            "alert_policy": {
+                "hourly_digest": "always",
+                "immediate": "unprecedented_only",
+            },
+        }
+
+
 def start_server(host: str = None, port: int = 8000):
     import os
     if host is None:
@@ -347,6 +422,56 @@ def start_server(host: str = None, port: int = 8000):
     print(f"🚀 Servidor Web de Consenso de Expertos iniciado en http://localhost:{port}")
     uvicorn.run(app, host=host, port=port)
 
+
+
+
+@app.get("/api/concilio/health")
+def concilio_health_api():
+    """Public health for miniapp /status — no tokens or .env."""
+    info = orchestrator.health()
+    sessions_dir = (info.get("concilio") or {}).get("sessions_dir") or str(STATIC_DIR.parent / "data" / "sessions")
+    try:
+        n = len(list(Path(sessions_dir).glob("*.concilio"))) if Path(sessions_dir).is_dir() else 0
+    except Exception:
+        n = 0
+    # Strip potentially noisy injector metadata; keep models/threshold/sequential
+    return {
+        "status": "ok",
+        "consensus_threshold": info.get("consensus_threshold", 85),
+        "sessions_count": n,
+        "concilio": {
+            "sequential": (info.get("concilio") or {}).get("sequential"),
+            "worker_model": (info.get("concilio") or {}).get("worker_model"),
+            "arbiter_model": (info.get("concilio") or {}).get("arbiter_model"),
+            "loaded_now": (info.get("concilio") or {}).get("loaded_now"),
+            "inject_sentinel_architecture": (info.get("concilio") or {}).get("inject_sentinel_architecture"),
+        },
+        "agents": {
+            role: {
+                "name": (info.get("agents") or {}).get(role, {}).get("name"),
+                "model": (info.get("agents") or {}).get(role, {}).get("model"),
+                "available": (info.get("agents") or {}).get(role, {}).get("available"),
+            }
+            for role in ("researcher", "coder", "optimizer")
+        },
+    }
+
+
+@app.get("/api/alerts/stats")
+def alerts_stats_api():
+    """Alert queue counters for miniapp — paths ok, no secrets."""
+    try:
+        from alert_queue import alert_queue
+        stats = alert_queue.get_stats()
+        return {
+            "size": stats.get("size", 0),
+            "total_enqueued": stats.get("total_enqueued", 0),
+            "total_sent": stats.get("total_sent", 0),
+            "total_failed": stats.get("total_failed", 0),
+            "last_alert": stats.get("last_alert"),
+        }
+    except Exception as exc:
+        return {"error": str(exc), "size": 0}
 
 @app.get("/api/sentinel/health")
 def sentinel_health():

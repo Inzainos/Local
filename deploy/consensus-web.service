@@ -1,0 +1,19 @@
+[Unit]
+Description=Consensus Expert Web UI + Mini App
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=deamon
+Group=deamon
+WorkingDirectory=/home/deamon/consensus-expert-agent
+Environment=HOME=/home/deamon
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-/home/deamon/consensus-expert-agent/.env
+ExecStart=/home/deamon/consensus-expert-agent/.venv/bin/python /home/deamon/consensus-expert-agent/main.py --web --port 8002
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

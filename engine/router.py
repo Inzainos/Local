@@ -1,5 +1,4 @@
 from enum import Enum
-import re
 
 class PipelineType(str, Enum):
     FULL_CONSENSUS_CODING = "FULL_CONSENSUS_CODING"  # Researcher -> Coder -> Optimizer -> Consensus Loop

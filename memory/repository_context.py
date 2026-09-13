@@ -16,11 +16,32 @@ from typing import List, Tuple
 AGENT_ROOT = Path(__file__).resolve().parents[1]
 HOME_ROOT = Path("/home/deamon")
 SENTINEL_ROOT = HOME_ROOT / "workspaces" / "sentinel_omega"
-WORKSPACES_ROOTS: Tuple[Path, ...] = (
-    HOME_ROOT / "workspaces",
+# Prefer remotes first so context injection does not default to live PROD
+# during remaps. Prod remains listed last for optional comparison against
+# live handoffs/docs (override via config.yaml context_injector.workspace_roots).
+DEFAULT_WORKSPACE_ROOTS: Tuple[Path, ...] = (
     HOME_ROOT / "workspaces-dev",
     HOME_ROOT / "workspaces-test",
+    HOME_ROOT / "workspaces",  # prod last
 )
+
+
+def _load_workspace_roots() -> Tuple[Path, ...]:
+    try:
+        import yaml
+        cfg_path = AGENT_ROOT / "config.yaml"
+        if cfg_path.is_file():
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+            roots = (cfg.get("context_injector") or {}).get("workspace_roots") or []
+            parsed = tuple(Path(p) for p in roots if p)
+            if parsed:
+                return parsed
+    except Exception:
+        pass
+    return DEFAULT_WORKSPACE_ROOTS
+
+
+WORKSPACES_ROOTS: Tuple[Path, ...] = _load_workspace_roots()
 
 # Resumen canónico (≤ 2000 chars) — sobrevivirá aunque los archivos del repo
 # cambien o sean ilegibles. Mantén este resumen corto y útil.
@@ -231,13 +252,13 @@ def load_repository_context() -> str:
     sections: List[str] = [CANONICAL_PROJECT_SUMMARY.strip()]
     total = len(sections[0])
 
-    # Espacios prioritarios — PROD primero, luego dev/test si faltan piezas
+    # Espacios prioritarios — remotes primero (dev/test), prod al final
     workspaces_tried: List[Path] = []
     for w in WORKSPACES_ROOTS:
         if w.is_dir():
             workspaces_tried.append(w)
 
-    # Primera pasada: PROD, agregando secciones hasta agotar el presupuesto
+    # Primera pasada: workspaces en orden configurado hasta agotar presupuesto
     used_files: set = set()
     for ws in workspaces_tried:
         for path in _collect_for(ws):

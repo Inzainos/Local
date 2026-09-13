@@ -9,62 +9,42 @@ def main():
     parser = argparse.ArgumentParser(
         description="Sistema Multi-Agente de Consenso de Expertos con Memoria Compartida (Ollama)"
     )
-    parser.add_argument(
-        "--config",
-        type=str,
-        default="config.yaml",
-        help="Ruta al archivo de configuración YAML"
-    )
-    parser.add_argument(
-        "--task",
-        "-t",
-        type=str,
-        default=None,
-        help="Ejecutar una tarea directamente desde la línea de comandos"
-    )
-    parser.add_argument(
-        "--audit",
-        action="store_true",
-        help="Ejecutar auditoría completa del proyecto Sentinel Omega (usa modo AUDIT_PROJECT)"
-    )
-    parser.add_argument(
-        "--focus",
-        type=str,
-        default="",
-        help="Foco adicional para la auditoría (ej: 'tests', 'migraciones', 'secretos')"
-    )
-    parser.add_argument(
-        "--web",
-        action="store_true",
-        help="Iniciar el servidor de interfaz web gráfica"
-    )
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=8000,
-        help="Puerto para el servidor web (default: 8000)"
-    )
-    parser.add_argument(
-        "--host",
-        type=str,
-        default=None,
-        help="Host para web (default: 127.0.0.1; usa 0.0.0.0 para exponer en red)"
-    )
-    parser.add_argument(
-        "--check",
-        action="store_true",
-        help="Verificar estado de Ollama y disponibilidad de modelos"
-    )
+    parser.add_argument("--config", type=str, default="config.yaml", help="Ruta al YAML de configuracion")
+    parser.add_argument("--task", "-t", type=str, default=None, help="Ejecutar una tarea directa")
+    parser.add_argument("--audit", action="store_true", help="Ejecutar auditoria del proyecto")
+    parser.add_argument("--focus", type=str, default="", help="Foco adicional para auditoria")
+    parser.add_argument("--web", action="store_true", help="Iniciar interfaz web")
+    parser.add_argument("--port", type=int, default=8000, help="Puerto web")
+    parser.add_argument("--host", type=str, default=None, help="Host web")
+    parser.add_argument("--check", action="store_true", help="Verificar Ollama y modelos Concilio")
 
     args = parser.parse_args()
 
     if args.check:
-        print("[*] Verificando modelos en Ollama...")
+        print("[*] Verificando Concilio / Ollama...")
         orch = ConsensusOrchestrator(config_path=args.config)
-        print(f"  • {orch.researcher.name} ({orch.researcher.model}): {'✅ Disponible' if orch.researcher.check_availability() else '⚠️ No encontrado'}")
-        print(f"  • {orch.coder.name} ({orch.coder.model}): {'✅ Disponible' if orch.coder.check_availability() else '⚠️ No encontrado'}")
-        print(f"  • {orch.optimizer.name} ({orch.optimizer.model}): {'✅ Disponible' if orch.optimizer.check_availability() else '⚠️ No encontrado'}")
-        sys.exit(0)
+        health = orch.health()
+        conc = health.get("concilio") or {}
+        print(f"  Host: {health.get('ollama_host')}")
+        print(f"  Umbral: {health.get('consensus_threshold')}")
+        print(f"  max_refinement_rounds: {health.get('max_refinement_rounds')}")
+        print(f"  Sesiones: {conc.get('sessions_dir')} (exists={conc.get('sessions_dir_exists')})")
+        print(f"  Sentinel injection: {conc.get('inject_sentinel_architecture', getattr(orch, 'inject_sentinel', False))}")
+        order = conc.get("order") or ["research", "code", "review", "refine?", "synthesis"]
+        print(f"  Orden: {' -> '.join(order)}")
+        for key in ("researcher", "coder", "optimizer"):
+            a = health["agents"][key]
+            flag = "OK" if a["available"] else "MISSING"
+            print(f"  - [{a.get('tier', key)}] {a['name']} ({a['model']}): {flag}")
+        loaded = conc.get("loaded_now") or []
+        print(f"  Modelos cargados ahora: {loaded if loaded else '(ninguno)'}")
+        try:
+            orch.lifecycle.unload_all()
+        except Exception:
+            pass
+        missing = [k for k, a in health["agents"].items() if not a["available"]]
+        sys.exit(1 if missing else 0)
+
 
     if args.web:
         from web_ui import start_server
@@ -83,7 +63,6 @@ def main():
         execute_task(orch, mem, args.task)
         return
 
-    # Modo interactivo por defecto
     interactive_loop(config_path=args.config)
 
 if __name__ == "__main__":

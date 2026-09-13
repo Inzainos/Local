@@ -14,3 +14,17 @@ data/
 # OS
 .DS_Store
 Thumbs.db
+
+# Concilio session DATA (keep directory)
+data/sessions/*
+!data/sessions/.gitkeep
+
+# Concilio session artifacts
+data/sessions/*.concilio
+data/sessions/*.tmp
+
+# Scratch / secrets / backups
+.env.tmp
+*.bak*
+*.broken*
+*.quarantined*
