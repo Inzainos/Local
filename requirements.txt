@@ -1,0 +1,29 @@
+# Padrón de Afiliados - Dependencias Python
+# Generado automáticamente - Actualizar con: pip freeze > requirements.txt
+
+pandas==3.0.5
+streamlit==1.63.0
+scipy==1.18.1
+numpy==2.5.2
+python-dateutil==2.9.0.post0
+altair==6.2.2
+click==8.5.0
+packaging==26.3
+pillow==12.3.0
+pydeck==0.9.3
+protobuf==7.36.1
+pyarrow==25.0.1
+requests==2.34.2
+toml==0.10.2
+typing-extensions==4.16.0
+starlette==1.6.0
+uvicorn==0.52.4
+httptools==0.8.0
+anyio==4.14.2
+python-multipart==0.0.32
+websockets==16.1.1
+itsdangerous==2.2.0
+watchdog==6.0.0
+jinja2==3.1.6
+jsonschema==4.26.0
+narwhals==2.25.0
