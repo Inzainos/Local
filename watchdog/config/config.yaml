@@ -1,0 +1,73 @@
+scan:
+  light_interval_minutes: 15
+  heavy_interval_minutes: 60
+
+network:
+  # Ajustar al CIDR real de tu red (ver `ip route`). Detectado en la sesion de auditoria:
+  local_cidr: "192.168.1.0/24"  # LAN eth1 (was wrongly 10.255.255.0/24 from lo)
+  nmap_top_ports: 200
+  nmap_timeout_seconds: 480
+
+paths:
+  root: "/watchdog"
+  data_dir: "/watchdog/data"
+  quarantine_dir: "/watchdog/data/quarantine"
+  forensics_dir: "/watchdog/data/forensics"
+  db_path: "/watchdog/data/watchdog.db"
+  baseline_dir: "/watchdog/data/baseline"
+  model_path: "/watchdog/data/baseline/model.onnx"
+  log_dir: "/watchdog/logs"
+
+# Rutas excluidas de escaneos de integridad/OS para evitar falsos positivos y
+# tiempos de ejecucion excesivos (lecciones de la auditoria manual previa:
+# chkrootkit tardo 15+ min escaneando node_modules/venvs y marco binarios de
+# pip/streamlit como "Xor.DDoS" solo por no venir de un paquete Debian).
+exclude_paths:
+  - "/watchdog"
+  - "/proc"
+  - "/sys"
+  - "/dev"
+  - "/tmp/claude-*"
+  - "*/node_modules/*"
+  - "*/site-packages/*"
+  - "*/dist-packages/*"
+  - "*/.git/*"
+  - "*/venv/*"
+  - "*/.venv/*"
+  - "*/snt-venv/*"
+  - "/usr/lib/code-oss/*"
+  - "/usr/lib/dradis/*"
+  - "/usr/lib/defectdojo/*"
+
+clamscan_targets:
+  - /home/deamon  # narrowed; avoid /root (sudo+slow). excludes handled in os_scan
+  # excluded dirs via clamscan flags: node_modules,.venv,venv,.git,.cache,.npm,site-packages,dist-packages
+
+policy:
+  # Cuarentena SIEMPRE para cualquier hallazgo confirmado por intel o
+  # heuristica. Borrado automatico SOLO si se cumplen ambas condiciones:
+  auto_delete_min_vt_positives: 15
+  auto_delete_min_vt_total: 70
+  require_otx_confirmation: true
+  quarantine_dir_perms: "000"
+
+intel:
+  vt_enabled: true
+  otx_enabled: true
+  ip_rep_enabled: true
+  cache_ttl_hours: 24
+  request_timeout_seconds: 15
+
+anomaly:
+  min_baseline_samples: 200   # ~2 dias a 15 min/muestra antes de entrenar
+  contamination: 0.02
+
+llm:
+  enabled: false
+  provider: "openrouter"
+  api_base: "https://openrouter.ai/api/v1"
+  model: "anthropic/claude-3.5-sonnet"
+
+notify:
+  telegram_enabled: false
+clamscan_timeout_seconds: 1200

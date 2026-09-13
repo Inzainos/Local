@@ -1,0 +1,14 @@
+.env
+data/*.db
+data/quarantine/*
+!data/quarantine/.gitkeep
+data/forensics/*
+!data/forensics/.gitkeep
+data/baseline/*
+!data/baseline/.gitkeep
+logs/*
+!logs/.gitkeep
+__pycache__/
+*.pyc
+.venv/
+venv/
