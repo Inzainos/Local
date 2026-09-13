@@ -3,6 +3,63 @@
 - Baks/hex obsolete borrados; schema tar → `_archive/20260913/schema/`
 - Symlink venv/streamlit eliminado
 
+## 2026-09-13 — Correcciones de la revisión de Copilot (PR #2)
+
+Ocho hallazgos sobre el script de respaldo y el hook. Todos verificados
+reproduciendo el fallo antes de corregirlo.
+
+### Fixed — `deploy/offbox_backup_db.sh`
+- **`--dry-run` sí escribía.** `mkdir -p "$LOG_DIR"` corría antes de la rama de
+  simulación y `log()` usaba `tee -a`, así que el modo que anunciaba "no se
+  escribe nada" creaba el directorio y añadía 5 líneas al log. Reproducido y
+  corregido: en dry-run no se crea nada y el log va solo a stdout.
+- **Reserva de espacio insuficiente.** Se exigía 1× el tamaño de la DB, pero
+  durante el `gzip` coexisten la copia `.db` y el `.db.gz`. Con justo ese
+  margen, `.backup` terminaba y `gzip` moría por ENOSPC. Ahora exige 2×.
+- **Un `.db.gz` parcial contaba como respaldo válido.** El `trap` solo borraba
+  la copia intermedia `.db`; si `gzip` fallaba a medias, el `.gz` truncado
+  casaba con el patrón de poda y se contaba como disponible — el fallo exacto
+  que este script existe para evitar. Ahora los intermedios llevan sufijo
+  `.tmp` (que no casa con el patrón) y solo se renombran al destino final tras
+  éxito, así que ni un `kill -9` deja un respaldo aparente pero corrupto.
+- **Carrera entre corridas concurrentes.** El sello con segundos no evita que
+  dos invocaciones pasen la comprobación de existencia antes de que la otra
+  escriba. Añadido `flock` exclusivo sobre toda la operación.
+- **La poda por edad no acotaba el disco.** Varias corridas manuales en la
+  misma ventana de 30 días dejaban N snapshots de cientos de MB. Añadido techo
+  por número de copias (`SENTINEL_BACKUP_MAX_COPIES`, 30 por defecto), y la
+  poda ahora corre **antes** de copiar, liberando espacio en vez de limpiar
+  cuando el disco ya se llenó.
+- `deploy/crontab.example` redirigía stdout al mismo archivo donde `log()` ya
+  escribe con `tee`, duplicando cada línea. Quitada la redirección.
+
+### Fixed — `deploy/hooks/pre-commit-utf8`
+- **No detectaba el caso real que lo motivó.** Si un archivo ya tenía algún
+  carácter no-ASCII, el hook lo saltaba entero. Pero el CHANGELOG de Agente-C
+  era exactamente eso: líneas correctas en UTF-8 que recibieron encima líneas
+  mutiladas. Verificado que se le escapaba. Ahora la prosa (`.md`, `.txt`) se
+  revisa siempre; en código se conserva el criterio conservador, porque ahí
+  `re.compile(r"a?b")` es legítimo y daría falso positivo.
+- **La raya tras un dígito se escapaba.** El patrón exigía letra antes del
+  espacio, y el caso real era `2026-09-13 ? Auditoría`. Dígitos incluidos.
+- **`--diff-filter=ACM` excluía renames.** Un archivo renombrado que además
+  recibiera la mutilación pasaba sin revisión. Ahora `ACMR`.
+- **Rutas de instalación rotas.** Decían `deploy/hooks/...` desde la raíz del
+  checkout, donde el hook vive en `workspaces/deploy/hooks/...`, así que el
+  symlink quedaba colgando. Corregidas las tres, con la explicación de por qué
+  el destino se resuelve desde `.git/hooks/`.
+- Documentación del hook alineada con lo que hace ahora.
+
+### Verified
+- Los 6 casos del hook: detecta prosa mixta, raya tras dígito y texto
+  íntegramente mutilado; deja pasar UTF-8 correcto, preguntas legítimas y URLs
+  con query string.
+- `--dry-run` no crea el directorio de logs ni escribe en él.
+- Respaldo → gunzip → `integrity_check=ok` → filas legibles.
+- Poda por exceso con techo de 3: de 6 copias quedan 3 + la nueva.
+- Dos corridas simultáneas: una guarda, la otra se bloquea por cerrojo; un solo
+  `.db.gz` resultante y cero restos `.tmp`.
+
 ## 2026-09-13 — El respaldo de la DB entra al sistema de timers
 
 Hasta hoy `workspaces` no tenía **ningún** job de respaldo: los timers cubrían

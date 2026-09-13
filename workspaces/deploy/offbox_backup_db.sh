@@ -13,21 +13,20 @@
 #      la necesitas. `.backup` usa la API de respaldo en línea de SQLite, que
 #      toma una instantánea coherente aunque haya escrituras en curso.
 #   2. FUERA DEL ÁRBOL QUE SE LIMPIA. El destino vive en /mnt/c (Windows), no
-#      bajo `data/`. Ningún glob de limpieza del proyecto puede alcanzarlo, ni
-#      por accidente ni por patrón mal escrito.
-#   3. HISTORIA. Retención de N días en vez de un solo snapshot, para poder
-#      volver a un punto anterior si una corrupción se detecta tarde.
+#      bajo `data/`. Ningún glob de limpieza del proyecto puede alcanzarlo.
+#   3. HISTORIA ACOTADA. Retención por días **y** por número de copias, para
+#      tener puntos de retorno sin que el destino crezca sin techo.
 #
-# Calcado de watchdog/scripts/offbox_backup.sh, que ya está probado en esta
-# máquina.
+# Calcado de watchdog/scripts/offbox_backup.sh, que ya está probado aquí.
 #
 # Uso:
 #   bash deploy/offbox_backup_db.sh              # respaldo normal
-#   bash deploy/offbox_backup_db.sh --verify     # además, integrity_check de la copia
-#   bash deploy/offbox_backup_db.sh --dry-run    # muestra qué haría, sin escribir
+#   bash deploy/offbox_backup_db.sh --verify     # además, integrity_check
+#   bash deploy/offbox_backup_db.sh --dry-run    # simula; no escribe NADA
 #
-# Cron sugerido (diario 03:45, después del backup de watchdog a las 03:30):
-#   45 3 * * *  bash /home/deamon/workspaces/deploy/offbox_backup_db.sh --verify >> /home/deamon/workspaces/logs/offbox_db.log 2>&1
+# Cron (si no usas el timer systemd). Sin redirección: el script ya escribe su
+# propio log, y redirigir además duplicaría cada línea:
+#   45 3 * * *  bash /home/deamon/workspaces/deploy/offbox_backup_db.sh --verify
 
 set -euo pipefail
 
@@ -37,6 +36,9 @@ WIN_BACKUP_DIR="${SENTINEL_BACKUP_DIR:-/mnt/c/Users/elanz/sentinel-backups}"
 LOG_DIR="${SENTINEL_LOG_DIR:-$ROOT/logs}"
 LOG_FILE="$LOG_DIR/offbox_db.log"
 RETENTION_DAYS="${SENTINEL_BACKUP_RETENTION_DAYS:-30}"
+# Techo duro de copias. La retención por días sola no acota el disco: varias
+# corridas manuales en la misma ventana dejan N snapshots de cientos de MB.
+MAX_COPIAS="${SENTINEL_BACKUP_MAX_COPIES:-30}"
 
 VERIFY=0
 DRY_RUN=0
@@ -49,11 +51,20 @@ for arg in "$@"; do
     esac
 done
 
-mkdir -p "$LOG_DIR"
+# En dry-run no se toca el disco: ni el directorio de logs se crea. Antes sí se
+# creaba y `tee` escribía el log, contradiciendo el "no se escribe nada".
+if [ "$DRY_RUN" -eq 0 ]; then
+    mkdir -p "$LOG_DIR"
+fi
 
 log() {
-    # Siempre a stdout y al log; hora local MX para que cuadre con los reportes.
-    printf '%s [offbox_db] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" | tee -a "$LOG_FILE"
+    local linea
+    linea="$(printf '%s [offbox_db] %s' "$(date '+%Y-%m-%d %H:%M:%S')" "$*")"
+    if [ "$DRY_RUN" -eq 1 ]; then
+        printf '%s\n' "$linea"
+    else
+        printf '%s\n' "$linea" | tee -a "$LOG_FILE"
+    fi
 }
 
 fail() {
@@ -64,69 +75,95 @@ fail() {
 command -v sqlite3 >/dev/null 2>&1 || fail "sqlite3 no está instalado; es obligatorio (no se usa cp a propósito)"
 [ -f "$DB_PATH" ] || fail "no existe la DB en $DB_PATH (ajusta SENTINEL_DB_PATH)"
 
-# Segundos en el sello, no solo minutos: dos corridas en el mismo minuto
-# chocaban de nombre y gzip abortaba dejando un .db sin comprimir en el destino
-# (en producción, 873 MB de basura silenciosa). Detectado en prueba.
 STAMP="$(date +%Y-%m-%d_%H%M%S)"
 DEST_DIR="$WIN_BACKUP_DIR"
-DEST_DB="$DEST_DIR/SENTINEL_OMEGA_PRO_${STAMP}.db"
-DEST_GZ="${DEST_DB}.gz"
+DEST_GZ="$DEST_DIR/SENTINEL_OMEGA_PRO_${STAMP}.db.gz"
+# Los intermedios llevan sufijo `.tmp`, que NO casa con el patrón de poda
+# (`SENTINEL_OMEGA_PRO_*.db.gz`). Así, si el proceso muere de golpe y el trap no
+# alcanza a correr, lo que queda nunca se cuenta como un respaldo válido.
+TMP_DB="$DEST_DIR/SENTINEL_OMEGA_PRO_${STAMP}.db.tmp"
+TMP_GZ="${TMP_DB}.gz"
 
 DB_BYTES="$(stat -c %s "$DB_PATH" 2>/dev/null || echo 0)"
-log "inicio — origen=$DB_PATH ($(numfmt --to=iec "$DB_BYTES" 2>/dev/null || echo "${DB_BYTES}B")) destino=$DEST_GZ retención=${RETENTION_DAYS}d"
+humano() { numfmt --to=iec "$1" 2>/dev/null || echo "${1}B"; }
+
+log "inicio — origen=$DB_PATH ($(humano "$DB_BYTES")) destino=$DEST_GZ retención=${RETENTION_DAYS}d/${MAX_COPIAS} copias"
 
 if [ "$DRY_RUN" -eq 1 ]; then
-    log "DRY-RUN: no se escribe nada. Se habría ejecutado:"
-    log "  sqlite3 \"$DB_PATH\" \".backup '$DEST_DB'\""
-    log "  gzip -9 \"$DEST_DB\""
-    log "  find \"$DEST_DIR\" -name 'SENTINEL_OMEGA_PRO_*.db.gz' -mtime +$RETENTION_DAYS -delete"
+    log "DRY-RUN: no se escribe nada, ni el log. Se habría ejecutado:"
+    log "  sqlite3 \"$DB_PATH\" \".backup '$TMP_DB'\""
+    log "  gzip -9 \"$TMP_DB\"  &&  mv \"$TMP_GZ\" \"$DEST_GZ\""
+    log "  poda: por edad (>${RETENTION_DAYS}d) y por exceso sobre ${MAX_COPIAS} copias"
     exit 0
 fi
 
 mkdir -p "$DEST_DIR" || fail "no se pudo crear $DEST_DIR (¿está montado /mnt/c?)"
 
-if [ -e "$DEST_GZ" ] || [ -e "$DEST_DB" ]; then
-    fail "ya existe un respaldo con ese sello ($DEST_GZ) — no se sobrescribe"
+# Cerrojo exclusivo para toda la operación. El sello con segundos no evita una
+# carrera: dos invocaciones concurrentes pueden pasar cualquier comprobación de
+# existencia antes de que la otra haya creado su archivo.
+LOCK_FILE="$LOG_DIR/.offbox_db.lock"
+exec 9>"$LOCK_FILE"
+if command -v flock >/dev/null 2>&1; then
+    flock -n 9 || fail "ya hay un respaldo en curso (cerrojo $LOCK_FILE)"
 fi
 
-# Si algo falla a media copia, no dejamos el .db intermedio ocupando disco en
-# el destino: en producción son cientos de MB que nadie volvería a mirar.
-limpiar_parcial() {
-    if [ -e "$DEST_DB" ]; then
-        rm -f "$DEST_DB"
-        log "limpieza: se eliminó la copia intermedia incompleta $DEST_DB"
-    fi
+limpiar_parciales() {
+    local restos=0
+    for f in "$TMP_DB" "$TMP_GZ"; do
+        if [ -e "$f" ]; then rm -f "$f"; restos=1; fi
+    done
+    [ "$restos" -eq 1 ] && log "limpieza: se eliminaron los intermedios incompletos de esta corrida"
+    return 0
 }
-trap limpiar_parcial EXIT
+trap limpiar_parciales EXIT
 
-# Espacio libre en destino: exigimos al menos el tamaño de la DB (el gzip
-# quedará por debajo, pero la copia intermedia sin comprimir no).
+[ -e "$DEST_GZ" ] && fail "ya existe un respaldo con ese sello ($DEST_GZ) — no se sobrescribe"
+
+podar() {
+    local motivo_edad motivo_exceso
+    motivo_edad="$(find "$DEST_DIR" -maxdepth 1 -name 'SENTINEL_OMEGA_PRO_*.db.gz' -mtime "+$RETENTION_DAYS" -print -delete | wc -l)"
+    # Por exceso: conserva las MAX_COPIAS más recientes por nombre (el sello es
+    # ordenable lexicográficamente) y borra el resto.
+    motivo_exceso=0
+    while IFS= read -r viejo; do
+        [ -n "$viejo" ] || continue
+        rm -f "$viejo"
+        motivo_exceso=$((motivo_exceso + 1))
+    done < <(find "$DEST_DIR" -maxdepth 1 -name 'SENTINEL_OMEGA_PRO_*.db.gz' | sort | head -n "-$MAX_COPIAS" 2>/dev/null || true)
+    log "poda: $motivo_edad por edad (>${RETENTION_DAYS}d), $motivo_exceso por exceso (>${MAX_COPIAS} copias)"
+}
+
+# Podar ANTES de copiar: libera espacio para el snapshot nuevo en vez de
+# limpiar cuando el disco ya se llenó.
+podar
+
+# Espacio: durante el gzip coexisten la copia `.db` y el `.db.gz`, así que el
+# peor caso es ~2x el tamaño de la DB. Reservar solo 1x dejaba que `.backup`
+# terminara y `gzip` muriera por ENOSPC.
 AVAIL_KB="$(df -Pk "$DEST_DIR" | awk 'NR==2{print $4}')"
-NEED_KB=$(( DB_BYTES / 1024 + 1 ))
-[ "$AVAIL_KB" -ge "$NEED_KB" ] || fail "espacio insuficiente en $DEST_DIR: hay ${AVAIL_KB}KB, se necesitan ${NEED_KB}KB"
+NEED_KB=$(( (DB_BYTES / 1024) * 2 + 1 ))
+[ "$AVAIL_KB" -ge "$NEED_KB" ] || fail "espacio insuficiente en $DEST_DIR: hay $(humano $((AVAIL_KB*1024))), se necesitan $(humano $((NEED_KB*1024))) (2x la DB: copia + comprimido conviven)"
 
-# Copia consistente. NO usar cp: ver el encabezado de este archivo.
 log "copiando con sqlite3 .backup (instantánea coherente, tolera escrituras en curso)"
-sqlite3 "$DB_PATH" ".backup '$DEST_DB'" || fail "sqlite3 .backup falló"
+sqlite3 "$DB_PATH" ".backup '$TMP_DB'" || fail "sqlite3 .backup falló"
 
 if [ "$VERIFY" -eq 1 ]; then
     log "verificando integridad de la copia"
-    RESULT="$(sqlite3 "$DEST_DB" 'PRAGMA integrity_check;' 2>&1 || true)"
+    RESULT="$(sqlite3 "$TMP_DB" 'PRAGMA integrity_check;' 2>&1 || true)"
     if [ "$RESULT" != "ok" ]; then
-        rm -f "$DEST_DB"
         fail "integrity_check de la copia devolvió: $RESULT — copia descartada, el respaldo NO se guardó"
     fi
     log "integrity_check=ok"
 fi
 
-gzip -9 "$DEST_DB" || fail "gzip falló"
-GZ_BYTES="$(stat -c %s "$DEST_GZ" 2>/dev/null || echo 0)"
-log "guardado: $DEST_GZ ($(numfmt --to=iec "$GZ_BYTES" 2>/dev/null || echo "${GZ_BYTES}B"))"
+gzip -9 "$TMP_DB" || fail "gzip falló"
+# Renombrado final: hasta este instante nada en el destino casa con el patrón de
+# poda, así que un fallo jamás deja un respaldo aparente pero corrupto.
+mv "$TMP_GZ" "$DEST_GZ" || fail "no se pudo renombrar $TMP_GZ → $DEST_GZ"
 
-# Poda por retención. Solo toca archivos con nuestro patrón de nombre, nunca
-# un glob abierto — es justamente el error que originó este script.
-PODADOS="$(find "$DEST_DIR" -maxdepth 1 -name 'SENTINEL_OMEGA_PRO_*.db.gz' -mtime "+$RETENTION_DAYS" -print -delete | wc -l)"
-log "poda: $PODADOS respaldo(s) con más de ${RETENTION_DAYS} días eliminados"
+GZ_BYTES="$(stat -c %s "$DEST_GZ" 2>/dev/null || echo 0)"
+log "guardado: $DEST_GZ ($(humano "$GZ_BYTES"))"
 
 RESTANTES="$(find "$DEST_DIR" -maxdepth 1 -name 'SENTINEL_OMEGA_PRO_*.db.gz' | wc -l)"
 log "fin — $RESTANTES respaldo(s) disponibles en $DEST_DIR"
