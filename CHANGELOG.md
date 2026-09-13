@@ -1,3 +1,10 @@
+## [docs] - 2026-09-13 — Auditoría GitHub (Claude/Copilot)
+
+### Notes
+- Auditoría 13-sep en `Inzainos/Local` rama `local/concilio`: **limpio / cero secretos**.
+- `.env`, `.env.tmp`, `*.bak*`, quarantine fuera de git (`.gitignore`).
+- Sin remediación pendiente en esta rama.
+
 ## [2.2.6] - 2026-09-13 — Mini App HTTPS (cloudflared-mini)
 
 ### Added
