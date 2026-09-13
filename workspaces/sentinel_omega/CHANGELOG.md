@@ -3,6 +3,39 @@
 - Baks/hex obsolete borrados; schema tar → `_archive/20260913/schema/`
 - Symlink venv/streamlit eliminado
 
+## 2026-09-13 — Respaldo off-box de la DB + hook anti-mojibake
+
+### Added
+- `deploy/offbox_backup_db.sh` — respaldo consistente de la DB fuera del árbol.
+  Usa `sqlite3 .backup` (API de respaldo en línea), **no `cp`**: copiar una
+  SQLite en caliente con `cp` puede llevarse páginas de dos estados y un WAL
+  desincronizado, produciendo un archivo que abre bien y falla meses después.
+  Destino en `/mnt/c`, fuera del alcance de cualquier glob de limpieza del
+  proyecto — la causa del incidente del 2026-09-13. Retención de 30 días, para
+  tener historia de restauración y no un solo snapshot. Flags `--verify`
+  (integrity_check y descarta la copia si falla) y `--dry-run`. Log en
+  `logs/offbox_db.log`. Calcado de `watchdog/scripts/offbox_backup.sh`.
+  Probado: respaldo → gunzip → `integrity_check=ok` → filas legibles; DB
+  inexistente → exit 1; poda de un respaldo de 40 días; doble corrida no
+  sobrescribe ni deja `.db` a medias.
+- `deploy/hooks/pre-commit-utf8` — rechaza commits con acentos mutilados.
+  Detecta archivos ASCII puro con `?` entre letras/dígitos, que es la firma de
+  un pipeline que no escribió UTF-8. Probado contra el texto real mutilado
+  (bloquea las 4 líneas), contra el mismo texto en UTF-8, contra preguntas
+  legítimas y contra URLs con query string y globs tipo `h0?.hex` (no marca
+  ninguno).
+
+### Fixed
+- `AGENTS.md` ya no promete que `roy-vigilante.yml` corre cada 2 h en GitHub
+  Actions. No corre: los workflows están en `workspaces/.github/workflows/` y
+  GitHub solo lee `.github/workflows/` en la raíz del repositorio. Aunque se
+  movieran seguirían sin servir tal como están escritos — `bandit`/`codeql`
+  disparan sobre `main`, que aquí solo tiene el índice del monorepo;
+  `roy-vigilante` depende de un `schedule:`, que solo dispara desde la rama por
+  defecto; y `copy-delta-to-snt` exige una rama `origin/jupyter-setup` que no
+  existe aquí. Fueron escritos para el repo `workspaces` original. El ciclo de
+  2 h lo sostiene systemd en la Kali. Los workflows se conservan sin tocar.
+
 ## 2026-09-13 — Relevo de Agente-C (sin créditos): cierre de H3/H4
 
 - **H3 cerrado.** El glob `*.bak*` de `b639aa8` no alcanzó dos variantes del

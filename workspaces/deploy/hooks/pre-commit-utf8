@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+"""Hook de pre-commit: rechaza texto con acentos mutilados.
+
+Por qué existe (2026-09-13): el pipeline de escritura de un agente emitió
+ASCII en vez de UTF-8 y convirtió cada carácter no-ASCII en `?`. Quedaron
+"Auditor?a", "Can?nico", "H1?H6", "remediaci?n" en documentación ya
+commiteada, y en dos mensajes de commit que ya no se pueden arreglar sin
+reescribir la historia.
+
+Arreglar los archivos a mano no impide que vuelva a pasar. Esto sí.
+
+Qué detecta: archivos de texto **enteramente ASCII** que contienen `?` en
+posiciones donde un `?` no puede estar en español bien escrito:
+
+    - entre dos letras           →  Auditor?a, id?ntico, remediaci?n
+    - pegado tras letra y espacio, tipo raya  →  `2026-09-13 ? Auditoría`
+    - entre dígitos o siglas     →  H1?H6, 2026?2027
+
+Qué NO detecta (a propósito, para no dar falsos positivos):
+    - `¿...?` de preguntas normales
+    - `?` final de frase
+    - archivos que ya contienen algún carácter no-ASCII (si hay una á o una
+      —, el pipeline sí escribió UTF-8 y cualquier `?` es intencional)
+
+Instalación:
+
+    ln -sf ../../deploy/hooks/pre-commit-utf8 .git/hooks/pre-commit
+    chmod +x deploy/hooks/pre-commit-utf8
+
+O, si ya tienes un pre-commit, añade esta línea dentro:
+
+    python3 deploy/hooks/pre-commit-utf8 || exit 1
+
+Saltarlo en un caso legítimo:  git commit --no-verify
+
+La causa de raíz está en el proceso que escribe, no aquí. Complementa el hook
+con esto en el entorno del agente:
+
+    export PYTHONIOENCODING=utf-8
+    # y en el código:  open(ruta, "w", encoding="utf-8")
+"""
+import re
+import subprocess
+import sys
+
+EXTENSIONES = {".md", ".txt", ".py", ".yml", ".yaml", ".json", ".sh", ".cfg", ".ini", ".toml"}
+
+# Un `?` rodeado de letras o dígitos, o usado como raya entre palabras.
+PATRONES = [
+    (re.compile(r"[A-Za-z]\?[A-Za-z]"), "`?` entre dos letras (acento perdido)"),
+    # Mezcla letra/dígito dentro de un mismo token: H1?H6, 2026?2027, v2?v3.
+    (re.compile(r"[A-Za-z0-9]\?[A-Za-z0-9]"), "`?` dentro de una palabra o rango (raya perdida)"),
+    (re.compile(r"(?<=[a-zA-Z]) \? (?=[a-zA-Z0-9])"), "`?` suelto entre palabras (raya perdida)"),
+    (re.compile(r"[A-Za-z0-9]\?(?=[A-Z][a-z])"), "`?` antes de mayúscula (raya perdida)"),
+]
+
+# Las URLs llevan `?` legítimo en el query string (`pagina.html?id=5`), y los
+# globs de shell lo usan como comodín (`h0?.hex`). Se recortan de la línea
+# antes de buscar, para no marcarlos.
+RUIDO = re.compile(
+    r"""https?://\S+            # enlaces
+      | \bwww\.\S+              # enlaces sin esquema
+      | \S+\?[\w.\-]+=[^\s)\]]* # cualquier token con query string
+      | `[^`]*`                 # código entre backticks: puede tener globs
+    """,
+    re.VERBOSE,
+)
+
+
+def archivos_en_stage():
+    salida = subprocess.run(
+        ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
+        capture_output=True, text=True, check=True,
+    ).stdout
+    return [l for l in salida.splitlines() if l.strip()]
+
+
+def contenido_en_stage(ruta):
+    r = subprocess.run(["git", "show", f":{ruta}"], capture_output=True)
+    return r.stdout if r.returncode == 0 else None
+
+
+def revisar(ruta, crudo):
+    try:
+        texto = crudo.decode("utf-8")
+    except UnicodeDecodeError:
+        return [(0, "el archivo no es UTF-8 válido")]
+
+    # Si ya trae algún no-ASCII, el pipeline escribió bien: nada que revisar.
+    if any(ord(c) > 127 for c in texto):
+        return []
+
+    hallazgos = []
+    for n, linea in enumerate(texto.splitlines(), 1):
+        # Los `?` legítimos (URLs, query strings, globs en código) se sustituyen
+        # por espacios del mismo largo, para no correr las posiciones.
+        limpia = RUIDO.sub(lambda m: " " * len(m.group(0)), linea)
+        for patron, motivo in PATRONES:
+            m = patron.search(limpia)
+            if m:
+                hallazgos.append((n, f"{motivo}: …{linea[max(0, m.start() - 20):m.end() + 20]}…"))
+                break
+    return hallazgos
+
+
+def main():
+    problemas = {}
+    for ruta in archivos_en_stage():
+        if not any(ruta.endswith(e) for e in EXTENSIONES):
+            continue
+        crudo = contenido_en_stage(ruta)
+        if crudo is None:
+            continue
+        hallazgos = revisar(ruta, crudo)
+        if hallazgos:
+            problemas[ruta] = hallazgos
+
+    if not problemas:
+        return 0
+
+    print("\n\033[31mCommit detenido: texto con caracteres mutilados\033[0m\n")
+    for ruta, hallazgos in problemas.items():
+        print(f"  {ruta}")
+        for n, motivo in hallazgos:
+            print(f"    línea {n}: {motivo}")
+    print(
+        "\nEstos archivos son ASCII puro y tienen `?` donde debería ir un acento\n"
+        "o una raya. Suele significar que el proceso que los escribió no usó\n"
+        "UTF-8. Revisa `encoding=\"utf-8\"` en la escritura y PYTHONIOENCODING.\n"
+        "\nSi el `?` es intencional: git commit --no-verify\n"
+    )
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
