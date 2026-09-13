@@ -1,5 +1,9 @@
 # Consenso de Expertos Multi-Modelo — Concilio
 
+> Rama `local/concilio` del monorepo [`Inzainos/Local`](https://github.com/Inzainos/Local). Ver también `local/home-bridge`, `local/padron`, `local/sentinel-omega` y `local/watchdog`.  
+> Origen local: `/home/deamon/consensus-expert-agent` en WSL2 Kali (**deamon** / X-Deamon). Licencia: [MIT](LICENSE).
+
+
 > **Sequential Concilio (2026-09-03):** lightest → medium → heavy → lightest verify; reentrada si score &lt; **85**; máx. 3 rondas. Un modelo Ollama a la vez. `.concilio` = DATA. `inject_sentinel_architecture: false` por defecto.
 
 > **Modelos:** `concilio-worker` / `concilio-arbitro` (aliases `concilio-lightest|medium|heavy` o `sentinel-concilio-*`); bases `qwen2.5:1.5b` + `gemma4:26b`. Crear con `bash scripts/create_concilio_models.sh`.
