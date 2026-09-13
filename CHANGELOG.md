@@ -1,6 +1,32 @@
 # Changelog — Sentinel Omega
 
 
+## [Unreleased] - 2026-09-13 - Metadata de rama: README de raíz
+
+### Added
+- `README.md` de raíz: qué es el sistema, tabla de bots, estructura, comandos y
+  enlaces a `workspaces/README.md` y `AGENTS.md`. Antes era un stub de ocho líneas.
+- Sección **Notas de estructura** con cuatro hallazgos verificados contra el árbol,
+  documentados sin modificar nada:
+  1. **Directorio `models/` canónico = `workspaces/sentinel_omega/models/`.** Su
+     `models_meta.json` es del 2026-09-13T09:05Z con muestras mayores (alfa1 1388,
+     beta1 2082, omega 2726); el anidado `sentinel_omega/sentinel_omega/models/` es
+     del 2026-09-11T00:20Z (1303, 1997, 2556). El campo `path` de ambos meta apunta
+     al mismo destino absoluto `/home/deamon/workspaces/sentinel_omega/models/`, y
+     coincide con el `base_dir` por defecto de `config/onnx_config.py`
+     (`sentinel_omega/models`, relativo al CWD). El anidado es copia congelada.
+  2. Los 4 workflows están en `workspaces/.github/workflows/`, no en la raíz del
+     repositorio: GitHub no los ejecuta. Los `schedule:` además solo disparan desde
+     la rama por defecto.
+  3. `workspaces/.agents/skills/developing-with-streamlit` apunta dentro de `.venv/`
+     (gitignorado): queda roto en checkout limpio.
+  4. `LICENSE` de raíz dice MIT y `pyproject.toml` dice
+     `Proprietary — Fractal Core Research`. Pendiente de resolver.
+
+### Notes
+- Sin cambios en código, modelos ni datos.
+
+
 ## [Unreleased] - 2026-09-03 - Consenso Telegram: digest horario + solo sin precedentes
 
 ### Added
