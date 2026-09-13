@@ -1,0 +1,27 @@
+# Sentinel Omega — Jupyter Requirements
+# Install with: pip install -r sentinel_omega/notebooks/requirements_jupyter.txt
+
+# Core scientific stack
+numpy>=1.24
+scipy>=1.10
+pandas>=2.0
+
+# ML/Inference
+onnxruntime>=1.14       # inference (correr modelos .onnx)
+onnx>=1.14              # builder — necesario para create_mock_onnx_session()
+
+# Visualization
+matplotlib>=3.7
+plotly>=5.15
+seaborn>=0.12
+
+# Jupyter
+jupyter>=1.0
+jupyterlab>=4.0
+ipywidgets>=8.0
+
+# HTTP & APIs
+requests>=2.28
+
+# Utilities
+python-dotenv>=1.0

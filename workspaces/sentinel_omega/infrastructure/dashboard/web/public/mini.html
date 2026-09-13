@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Sentinel Omega — Estado</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: #08090a;
+      --card: #12141a;
+      --ink: #e8eaed;
+      --muted: #8b90a0;
+      --accent: #5e6ad2;
+      --rojo: #ef4444;
+      --naranja: #f59e0b;
+      --verde: #22c55e;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--bg); color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      font-size: 15px;
+    }
+    header {
+      padding: 16px 18px 8px;
+    }
+    header h1 { font-size: 18px; margin: 0 0 4px; font-weight: 600; }
+    header p { margin: 0; color: var(--muted); font-size: 12px; }
+    .grid { padding: 8px 14px 28px; display: grid; gap: 10px; }
+    .card {
+      background: var(--card); border-radius: 12px; padding: 12px 14px;
+      border: 1px solid #1e2230;
+    }
+    .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+    .v { font-size: 22px; font-weight: 600; margin-top: 4px; }
+    .hint { color: var(--muted); font-size: 12px; margin-top: 6px; line-height: 1.35; }
+    .row { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 4px 0; }
+    .row span:first-child { color: var(--muted); }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+    .ok { background: #16351f; color: var(--verde); }
+    .bad { background: #3a1515; color: var(--rojo); }
+    .mid { background: #3a2a10; color: var(--naranja); }
+    a { color: var(--accent); }
+    .err { color: var(--rojo); font-size: 13px; padding: 0 18px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Sentinel Omega</h1>
+    <p>Estado en vivo · no es un pronóstico de sismo ni de lotería</p>
+  </header>
+  <div id="err" class="err" hidden></div>
+  <div class="grid">
+    <div class="card">
+      <div class="k">Fantasma</div>
+      <div class="v" id="fantasma">—</div>
+      <div class="hint">Índice de estrés geofísico (Bz² + viento solar + Schumann). Alto = vigilar, no “va a temblar”.</div>
+    </div>
+    <div class="card">
+      <div class="k">Muro</div>
+      <div class="v" id="muro">—</div>
+      <div class="hint">Cuántas de las 5 barreras de precursores están encendidas.</div>
+    </div>
+    <div class="card">
+      <div class="k">Loop del Padre</div>
+      <div class="v"><span id="loop" class="pill mid">…</span></div>
+      <div class="hint" id="ciclo">último ciclo: n/d</div>
+    </div>
+    <div class="card">
+      <div class="k">Telemetría (última)</div>
+      <div class="row"><span>Bz</span><span id="bz">—</span></div>
+      <div class="row"><span>Viento solar</span><span id="wind">—</span></div>
+      <div class="row"><span>Schumann</span><span id="sch">—</span></div>
+      <div class="row"><span>Kp</span><span id="kp">—</span></div>
+    </div>
+  </div>
+  <script>
+    const tg = window.Telegram && window.Telegram.WebApp;
+    if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
+    const $ = (id) => document.getElementById(id);
+    function nivelClass(v) {
+      if (v == null || Number.isNaN(v)) return "mid";
+      if (v >= 6) return "bad";
+      if (v >= 3) return "mid";
+      return "ok";
+    }
+    async function load() {
+      try {
+        const r = await fetch("/api/overview", { cache: "no-store" });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const d = await r.json();
+        const f = (d.fantasma || {});
+        const fv = f.value;
+        $("fantasma").innerHTML = (fv == null ? "n/d" : Number(fv).toFixed(1))
+          + ' <span class="pill ' + nivelClass(Number(fv)) + '">'
+          + (f.nivel_riesgo || "n/d") + "</span>";
+        const m = d.muro || {};
+        const n = m.walls_active;
+        $("muro").textContent = (n == null ? "n/d" : n) + "/5"
+          + (m.muro_breach ? " · breach" : "");
+        const ciclo = d.ciclo || {};
+        const ts = ciclo.ts || ciclo.timestamp || d.ts;
+        $("ciclo").textContent = "último ciclo: " + (ts ? String(ts) : "n/d");
+        const alive = Boolean(ciclo) && Object.keys(ciclo).length > 0;
+        $("loop").textContent = alive ? "vivo" : "sin pulso";
+        $("loop").className = "pill " + (alive ? "ok" : "bad");
+        $("bz").textContent = f.bz_nT == null ? "—" : Number(f.bz_nT).toFixed(1) + " nT";
+        $("wind").textContent = f.viento_km_s == null ? "—" : Number(f.viento_km_s).toFixed(0) + " km/s";
+        $("sch").textContent = f.schumann_hz == null ? "—" : Number(f.schumann_hz).toFixed(2) + " Hz";
+        $("kp").textContent = f.kp == null ? "—" : String(f.kp);
+        $("err").hidden = true;
+      } catch (e) {
+        $("err").hidden = false;
+        $("err").textContent = "No se pudo leer /api/overview (" + e.message
+          + "). Esta Mini App debe servirse desde el FastAPI del dashboard (HTTPS público).";
+      }
+    }
+    load();
+    setInterval(load, 20000);
+  </script>
+</body>
+</html>

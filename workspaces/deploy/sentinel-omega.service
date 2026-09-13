@@ -1,0 +1,18 @@
+[Unit]
+Description=Sentinel Omega - Precursor Detection Platform (Fractal Core)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=__REPO_DIR__
+EnvironmentFile=__REPO_DIR__/deploy/.env
+ExecStartPre=/bin/rm -f __REPO_DIR__/sentinel_omega/data/sentinel_omega.pid
+ExecStart=__REPO_DIR__/.venv/bin/python sentinel_omega/launcher.py
+Restart=always
+RestartSec=10
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target

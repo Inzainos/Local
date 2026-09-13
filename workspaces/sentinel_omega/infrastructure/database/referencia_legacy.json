@@ -1,0 +1,1896 @@
+{
+  "_nota": "Referencias estadisticas de tablas legacy resumidas y luego dropeadas (aprender de ellas, no cargarlas). El pipeline vivo y el re-entrenamiento usan las tablas tbl_*_raw, que se conservan.",
+  "fact_sismos": {
+    "global": {
+      "n": 424656,
+      "periodo": "2004-2012 (legacy TITAN)",
+      "mag_media": 4.861,
+      "mag_mediana": 4.7,
+      "mag_moda": 4.5,
+      "mag_std": 0.409,
+      "mag_min": 2.5,
+      "mag_max": 9.1,
+      "prof_media_km": 61.9,
+      "prof_mediana_km": 30.0,
+      "distribucion_mag": {
+        "2.5": 17,
+        "3.0": 11,
+        "3.5": 2,
+        "4.0": 806,
+        "4.5": 295782,
+        "5.0": 91746,
+        "5.5": 25406,
+        "6.0": 7646,
+        "6.5": 2204,
+        "7.0": 684,
+        "7.5": 286,
+        "8.0": 54,
+        "8.5": 8,
+        "9.0": 4
+      },
+      "frac_M4.5+": 0.998
+    },
+    "por_nodo": {
+      "1": {
+        "n": 14,
+        "mag_media": 5.207,
+        "mag_max": 7.0
+      },
+      "2": {
+        "n": 691,
+        "mag_media": 4.959,
+        "mag_max": 7.2
+      },
+      "3": {
+        "n": 252,
+        "mag_media": 4.896,
+        "mag_max": 7.2
+      },
+      "4": {
+        "n": 707,
+        "mag_media": 4.978,
+        "mag_max": 7.6
+      },
+      "5": {
+        "n": 4985,
+        "mag_media": 4.828,
+        "mag_max": 8.2
+      },
+      "6": {
+        "n": 77,
+        "mag_media": 4.871,
+        "mag_max": 6.8
+      },
+      "7": {
+        "n": 694,
+        "mag_media": 4.801,
+        "mag_max": 6.8
+      },
+      "8": {
+        "n": 5921,
+        "mag_media": 4.822,
+        "mag_max": 7.7
+      },
+      "9": {
+        "n": 49,
+        "mag_media": 5.267,
+        "mag_max": 7.0
+      },
+      "10": {
+        "n": 4501,
+        "mag_media": 4.816,
+        "mag_max": 8.2
+      },
+      "11": {
+        "n": 5,
+        "mag_media": 4.64,
+        "mag_max": 5.0
+      },
+      "12": {
+        "n": 1919,
+        "mag_media": 4.853,
+        "mag_max": 8.4
+      },
+      "13": {
+        "n": 12599,
+        "mag_media": 4.824,
+        "mag_max": 9.1
+      },
+      "14": {
+        "n": 2002,
+        "mag_media": 4.788,
+        "mag_max": 7.0
+      },
+      "15": {
+        "n": 1978,
+        "mag_media": 4.814,
+        "mag_max": 7.8
+      },
+      "16": {
+        "n": 354,
+        "mag_media": 4.748,
+        "mag_max": 6.3
+      },
+      "17": {
+        "n": 663,
+        "mag_media": 4.782,
+        "mag_max": 7.3
+      },
+      "18": {
+        "n": 7395,
+        "mag_media": 4.825,
+        "mag_max": 8.8
+      },
+      "19": {
+        "n": 4912,
+        "mag_media": 4.888,
+        "mag_max": 8.2
+      },
+      "20": {
+        "n": 298,
+        "mag_media": 4.94,
+        "mag_max": 6.8
+      },
+      "21": {
+        "n": 380,
+        "mag_media": 4.934,
+        "mag_max": 7.8
+      },
+      "22": {
+        "n": 20,
+        "mag_media": 4.789,
+        "mag_max": 5.4
+      },
+      "23": {
+        "n": 2079,
+        "mag_media": 4.745,
+        "mag_max": 7.1
+      },
+      "24": {
+        "n": 452,
+        "mag_media": 4.771,
+        "mag_max": 6.6
+      },
+      "25": {
+        "n": 5872,
+        "mag_media": 4.788,
+        "mag_max": 7.7
+      },
+      "26": {
+        "n": 2023,
+        "mag_media": 4.816,
+        "mag_max": 7.9
+      },
+      "27": {
+        "n": 6865,
+        "mag_media": 4.762,
+        "mag_max": 7.8
+      },
+      "28": {
+        "n": 6,
+        "mag_media": 4.7,
+        "mag_max": 5.0
+      },
+      "29": {
+        "n": 157,
+        "mag_media": 5.011,
+        "mag_max": 6.9
+      },
+      "30": {
+        "n": 56,
+        "mag_media": 4.825,
+        "mag_max": 5.8
+      },
+      "31": {
+        "n": 1049,
+        "mag_media": 4.839,
+        "mag_max": 7.7
+      },
+      "32": {
+        "n": 1627,
+        "mag_media": 4.825,
+        "mag_max": 7.0
+      },
+      "33": {
+        "n": 274,
+        "mag_media": 4.791,
+        "mag_max": 6.8
+      },
+      "34": {
+        "n": 810,
+        "mag_media": 4.754,
+        "mag_max": 5.9
+      },
+      "35": {
+        "n": 1255,
+        "mag_media": 4.807,
+        "mag_max": 7.6
+      },
+      "36": {
+        "n": 5972,
+        "mag_media": 4.824,
+        "mag_max": 8.6
+      },
+      "37": {
+        "n": 5540,
+        "mag_media": 4.786,
+        "mag_max": 7.6
+      },
+      "38": {
+        "n": 3066,
+        "mag_media": 4.815,
+        "mag_max": 9.1
+      },
+      "39": {
+        "n": 9897,
+        "mag_media": 4.843,
+        "mag_max": 8.4
+      },
+      "40": {
+        "n": 20568,
+        "mag_media": 4.809,
+        "mag_max": 8.1
+      },
+      "41": {
+        "n": 11012,
+        "mag_media": 4.867,
+        "mag_max": 8.1
+      },
+      "42": {
+        "n": 3440,
+        "mag_media": 4.855,
+        "mag_max": 8.1
+      },
+      "43": {
+        "n": 24,
+        "mag_media": 4.954,
+        "mag_max": 6.1
+      },
+      "44": {
+        "n": 806,
+        "mag_media": 4.886,
+        "mag_max": 6.3
+      },
+      "45": {
+        "n": 2592,
+        "mag_media": 4.833,
+        "mag_max": 8.0
+      },
+      "46": {
+        "n": 1304,
+        "mag_media": 4.879,
+        "mag_max": 7.1
+      },
+      "47": {
+        "n": 11392,
+        "mag_media": 5.335,
+        "mag_max": 8.0
+      },
+      "49": {
+        "n": 302,
+        "mag_media": 4.841,
+        "mag_max": 7.3
+      },
+      "50": {
+        "n": 1506,
+        "mag_media": 4.88,
+        "mag_max": 6.6
+      },
+      "51": {
+        "n": 162,
+        "mag_media": 4.804,
+        "mag_max": 6.8
+      },
+      "52": {
+        "n": 405,
+        "mag_media": 4.783,
+        "mag_max": 6.0
+      },
+      "53": {
+        "n": 118,
+        "mag_media": 4.765,
+        "mag_max": 6.2
+      },
+      "54": {
+        "n": 435,
+        "mag_media": 4.75,
+        "mag_max": 7.0
+      },
+      "55": {
+        "n": 2330,
+        "mag_media": 4.795,
+        "mag_max": 6.7
+      },
+      "56": {
+        "n": 508,
+        "mag_media": 4.839,
+        "mag_max": 7.9
+      },
+      "57": {
+        "n": 118,
+        "mag_media": 4.789,
+        "mag_max": 6.6
+      },
+      "58": {
+        "n": 434,
+        "mag_media": 4.845,
+        "mag_max": 8.1
+      },
+      "59": {
+        "n": 35087,
+        "mag_media": 4.834,
+        "mag_max": 8.2
+      },
+      "60": {
+        "n": 1034,
+        "mag_media": 4.961,
+        "mag_max": 7.0
+      },
+      "61": {
+        "n": 17,
+        "mag_media": 4.935,
+        "mag_max": 5.5
+      },
+      "62": {
+        "n": 575,
+        "mag_media": 4.901,
+        "mag_max": 6.9
+      },
+      "63": {
+        "n": 5231,
+        "mag_media": 4.84,
+        "mag_max": 8.8
+      },
+      "64": {
+        "n": 42,
+        "mag_media": 5.212,
+        "mag_max": 7.0
+      },
+      "65": {
+        "n": 921,
+        "mag_media": 4.895,
+        "mag_max": 6.8
+      },
+      "66": {
+        "n": 449,
+        "mag_media": 4.885,
+        "mag_max": 6.8
+      },
+      "67": {
+        "n": 570,
+        "mag_media": 4.911,
+        "mag_max": 7.1
+      },
+      "68": {
+        "n": 1497,
+        "mag_media": 4.927,
+        "mag_max": 8.1
+      },
+      "69": {
+        "n": 697,
+        "mag_media": 5.032,
+        "mag_max": 6.7
+      },
+      "70": {
+        "n": 1038,
+        "mag_media": 4.928,
+        "mag_max": 7.8
+      },
+      "71": {
+        "n": 601,
+        "mag_media": 5.06,
+        "mag_max": 6.7
+      },
+      "72": {
+        "n": 1155,
+        "mag_media": 4.902,
+        "mag_max": 7.6
+      },
+      "73": {
+        "n": 6483,
+        "mag_media": 4.842,
+        "mag_max": 8.1
+      },
+      "74": {
+        "n": 325,
+        "mag_media": 4.815,
+        "mag_max": 6.3
+      },
+      "75": {
+        "n": 11,
+        "mag_media": 4.764,
+        "mag_max": 5.5
+      },
+      "4201": {
+        "n": 21,
+        "mag_media": 5.129,
+        "mag_max": 7.1
+      },
+      "4202": {
+        "n": 304,
+        "mag_media": 4.85,
+        "mag_max": 7.4
+      },
+      "4203": {
+        "n": 393,
+        "mag_media": 5.003,
+        "mag_max": 6.7
+      }
+    }
+  },
+  "fact_clima_espacial": {
+    "n": 60442,
+    "periodo": [
+      "1994-01-01T12:00:00+00:00",
+      "nan"
+    ],
+    "kp": {
+      "n": 60442,
+      "media": 0.405,
+      "min": 0.0,
+      "max": 5.0
+    },
+    "bz": {
+      "n": 60442,
+      "media": 0.19,
+      "min": -11.64,
+      "max": 11.76
+    },
+    "viento": {
+      "n": 60442,
+      "media": 71.793,
+      "min": 0.0,
+      "max": 699.9
+    },
+    "densidad": {
+      "n": 60442,
+      "media": 0.998,
+      "min": 0.0,
+      "max": 56.51
+    },
+    "lod_ms": {
+      "n": 0,
+      "media": null,
+      "min": null,
+      "max": null
+    }
+  },
+  "backcast_patterns": {
+    "n": 11698,
+    "por_tipo_precursor": {
+      "Kp:4.7 (Dominante) | VENTANA 72H": {
+        "n": 283,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.007
+      },
+      "Kp:1.2 (Dominante) | VENTANA 72H": {
+        "n": 277,
+        "corr_media": 5.973,
+        "lag_horas_media": 71.8,
+        "confiabilidad_media": 5.973
+      },
+      "Kp:4.5 (Dominante) | VENTANA 72H": {
+        "n": 269,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.007
+      },
+      "Kp:4.6 (Dominante) | VENTANA 72H": {
+        "n": 266,
+        "corr_media": 6.006,
+        "lag_horas_media": 71.9,
+        "confiabilidad_media": 6.006
+      },
+      "Kp:4.8 (Dominante) | VENTANA 72H": {
+        "n": 264,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.007
+      },
+      "Kp:5.0 (Dominante) | VENTANA 72H": {
+        "n": 259,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.007
+      },
+      "Kp:4.4 (Dominante) | VENTANA 72H": {
+        "n": 255,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.007
+      },
+      "Kp:1.3 (Dominante) | VENTANA 72H": {
+        "n": 253,
+        "corr_media": 5.973,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 5.973
+      },
+      "Kp:1.4 (Dominante) | VENTANA 72H": {
+        "n": 239,
+        "corr_media": 5.972,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 5.972
+      },
+      "Kp:1.1 (Dominante) | VENTANA 72H": {
+        "n": 237,
+        "corr_media": 5.968,
+        "lag_horas_media": 71.9,
+        "confiabilidad_media": 5.968
+      },
+      "Kp:1.5 (Dominante) | VENTANA 72H": {
+        "n": 228,
+        "corr_media": 5.971,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 5.971
+      },
+      "Kp:1.6 (Dominante) | VENTANA 72H": {
+        "n": 227,
+        "corr_media": 5.982,
+        "lag_horas_media": 71.7,
+        "confiabilidad_media": 5.982
+      },
+      "Kp:4.9 (Dominante) | VENTANA 72H": {
+        "n": 225,
+        "corr_media": 6.006,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.006
+      },
+      "Kp:4.3 (Dominante) | VENTANA 72H": {
+        "n": 221,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 6.007
+      },
+      "Kp:4.0 (Dominante) | VENTANA 72H": {
+        "n": 218,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.007
+      },
+      "Kp:4.1 (Dominante) | VENTANA 72H": {
+        "n": 202,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.007
+      },
+      "Kp:1.0 (Dominante) | VENTANA 72H": {
+        "n": 202,
+        "corr_media": 5.967,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 5.967
+      },
+      "Kp:1.8 (Dominante) | VENTANA 72H": {
+        "n": 192,
+        "corr_media": 5.982,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 5.982
+      },
+      "Kp:4.2 (Dominante) | VENTANA 72H": {
+        "n": 190,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.007
+      },
+      "Kp:2.1 (Dominante) | VENTANA 72H": {
+        "n": 190,
+        "corr_media": 5.99,
+        "lag_horas_media": 72.2,
+        "confiabilidad_media": 5.99
+      },
+      "Kp:1.9 (Dominante) | VENTANA 72H": {
+        "n": 190,
+        "corr_media": 5.985,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 5.985
+      },
+      "Kp:1.7 (Dominante) | VENTANA 72H": {
+        "n": 184,
+        "corr_media": 5.981,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 5.981
+      },
+      "Kp:3.9 (Dominante) | VENTANA 72H": {
+        "n": 183,
+        "corr_media": 6.007,
+        "lag_horas_media": 71.9,
+        "confiabilidad_media": 6.007
+      },
+      "Kp:2.4 (Dominante) | VENTANA 72H": {
+        "n": 183,
+        "corr_media": 5.993,
+        "lag_horas_media": 72.3,
+        "confiabilidad_media": 5.993
+      },
+      "Kp:2.2 (Dominante) | VENTANA 72H": {
+        "n": 178,
+        "corr_media": 5.991,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 5.991
+      },
+      "Kp:3.8 (Dominante) | VENTANA 72H": {
+        "n": 174,
+        "corr_media": 6.008,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.008
+      },
+      "Kp:2.5 (Dominante) | VENTANA 72H": {
+        "n": 174,
+        "corr_media": 5.997,
+        "lag_horas_media": 71.8,
+        "confiabilidad_media": 5.997
+      },
+      "Kp:3.5 (Dominante) | VENTANA 72H": {
+        "n": 172,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.007
+      },
+      "Kp:0.9 (Dominante) | VENTANA 72H": {
+        "n": 171,
+        "corr_media": 5.967,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 5.967
+      },
+      "Kp:3.6 (Dominante) | VENTANA 72H": {
+        "n": 167,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.007
+      },
+      "Kp:2.3 (Dominante) | VENTANA 72H": {
+        "n": 164,
+        "corr_media": 5.996,
+        "lag_horas_media": 71.8,
+        "confiabilidad_media": 5.996
+      },
+      "Kp:5.1 (Dominante) | VENTANA 72H": {
+        "n": 163,
+        "corr_media": 6.006,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 6.006
+      },
+      "Kp:3.1 (Dominante) | VENTANA 72H": {
+        "n": 161,
+        "corr_media": 6.006,
+        "lag_horas_media": 72.2,
+        "confiabilidad_media": 6.006
+      },
+      "Kp:3.7 (Dominante) | VENTANA 72H": {
+        "n": 159,
+        "corr_media": 6.008,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.008
+      },
+      "Kp:3.4 (Dominante) | VENTANA 72H": {
+        "n": 158,
+        "corr_media": 6.008,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.008
+      },
+      "Kp:3.0 (Dominante) | VENTANA 72H": {
+        "n": 158,
+        "corr_media": 6.003,
+        "lag_horas_media": 71.9,
+        "confiabilidad_media": 6.003
+      },
+      "Kp:2.7 (Dominante) | VENTANA 72H": {
+        "n": 158,
+        "corr_media": 5.995,
+        "lag_horas_media": 71.9,
+        "confiabilidad_media": 5.995
+      },
+      "Kp:3.2 (Dominante) | VENTANA 72H": {
+        "n": 157,
+        "corr_media": 6.007,
+        "lag_horas_media": 71.8,
+        "confiabilidad_media": 6.007
+      },
+      "Kp:5.2 (Dominante) | VENTANA 72H": {
+        "n": 155,
+        "corr_media": 6.006,
+        "lag_horas_media": 71.8,
+        "confiabilidad_media": 6.006
+      },
+      "Kp:2.6 (Dominante) | VENTANA 72H": {
+        "n": 154,
+        "corr_media": 5.999,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 5.999
+      },
+      "Kp:2.9 (Dominante) | VENTANA 72H": {
+        "n": 153,
+        "corr_media": 6.001,
+        "lag_horas_media": 71.7,
+        "confiabilidad_media": 6.001
+      },
+      "Kp:2.0 (Dominante) | VENTANA 72H": {
+        "n": 152,
+        "corr_media": 5.983,
+        "lag_horas_media": 72.3,
+        "confiabilidad_media": 5.983
+      },
+      "Kp:3.3 (Dominante) | VENTANA 72H": {
+        "n": 145,
+        "corr_media": 6.008,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.008
+      },
+      "Kp:2.8 (Dominante) | VENTANA 72H": {
+        "n": 144,
+        "corr_media": 6.003,
+        "lag_horas_media": 72.2,
+        "confiabilidad_media": 6.003
+      },
+      "Kp:0.8 (Dominante) | VENTANA 72H": {
+        "n": 131,
+        "corr_media": 5.958,
+        "lag_horas_media": 71.9,
+        "confiabilidad_media": 5.958
+      },
+      "Kp:5.3 (Dominante) | VENTANA 72H": {
+        "n": 101,
+        "corr_media": 6.006,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.006
+      },
+      "Kp:0.7 (Dominante) | VENTANA 72H": {
+        "n": 85,
+        "corr_media": 5.96,
+        "lag_horas_media": 72.2,
+        "confiabilidad_media": 5.96
+      },
+      "Kp:0.6 (Dominante) | VENTANA 72H": {
+        "n": 76,
+        "corr_media": 5.959,
+        "lag_horas_media": 71.8,
+        "confiabilidad_media": 5.959
+      },
+      "Ly:5.8 (Dominante) | VENTANA 72H": {
+        "n": 67,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.007
+      },
+      "Ly:5.0 (Dominante) | VENTANA 72H": {
+        "n": 61,
+        "corr_media": 6.008,
+        "lag_horas_media": 71.7,
+        "confiabilidad_media": 6.008
+      },
+      "Ly:5.5 (Dominante) | VENTANA 72H": {
+        "n": 58,
+        "corr_media": 6.006,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 6.006
+      },
+      "Ly:4.9 (Dominante) | VENTANA 72H": {
+        "n": 54,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 6.007
+      },
+      "Ly:5.3 (Dominante) | VENTANA 72H": {
+        "n": 52,
+        "corr_media": 6.006,
+        "lag_horas_media": 72.3,
+        "confiabilidad_media": 6.006
+      },
+      "Kp:5.4 (Dominante) | VENTANA 72H": {
+        "n": 52,
+        "corr_media": 6.006,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 6.006
+      },
+      "Ly:5.7 (Dominante) | VENTANA 72H": {
+        "n": 50,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.007
+      },
+      "Ly:5.6 (Dominante) | VENTANA 72H": {
+        "n": 49,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.007
+      },
+      "Ly:5.9 (Dominante) | VENTANA 72H": {
+        "n": 47,
+        "corr_media": 6.006,
+        "lag_horas_media": 71.8,
+        "confiabilidad_media": 6.006
+      },
+      "Ly:6.1 (Dominante) | VENTANA 72H": {
+        "n": 45,
+        "corr_media": 6.006,
+        "lag_horas_media": 71.9,
+        "confiabilidad_media": 6.006
+      },
+      "Ly:2.6 (Dominante) | VENTANA 72H": {
+        "n": 45,
+        "corr_media": 5.992,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 5.992
+      },
+      "Ly:5.1 (Dominante) | VENTANA 72H": {
+        "n": 43,
+        "corr_media": 6.006,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 6.006
+      },
+      "Ly:4.8 (Dominante) | VENTANA 72H": {
+        "n": 43,
+        "corr_media": 6.008,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 6.008
+      },
+      "Ly:4.0 (Dominante) | VENTANA 72H": {
+        "n": 43,
+        "corr_media": 6.007,
+        "lag_horas_media": 71.7,
+        "confiabilidad_media": 6.007
+      },
+      "Ly:3.6 (Dominante) | VENTANA 72H": {
+        "n": 43,
+        "corr_media": 6.004,
+        "lag_horas_media": 71.7,
+        "confiabilidad_media": 6.004
+      },
+      "Ly:3.3 (Dominante) | VENTANA 72H": {
+        "n": 43,
+        "corr_media": 5.995,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 5.995
+      },
+      "Ly:4.6 (Dominante) | VENTANA 72H": {
+        "n": 42,
+        "corr_media": 6.008,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 6.008
+      },
+      "Ly:3.4 (Dominante) | VENTANA 72H": {
+        "n": 42,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.007
+      },
+      "Ly:2.2 (Dominante) | VENTANA 72H": {
+        "n": 42,
+        "corr_media": 5.979,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 5.979
+      },
+      "Ly:2.3 (Dominante) | VENTANA 72H": {
+        "n": 40,
+        "corr_media": 5.983,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 5.983
+      },
+      "Ly:6.0 (Dominante) | VENTANA 72H": {
+        "n": 39,
+        "corr_media": 6.006,
+        "lag_horas_media": 72.3,
+        "confiabilidad_media": 6.006
+      },
+      "Ly:5.4 (Dominante) | VENTANA 72H": {
+        "n": 39,
+        "corr_media": 6.007,
+        "lag_horas_media": 71.9,
+        "confiabilidad_media": 6.007
+      },
+      "Ly:4.3 (Dominante) | VENTANA 72H": {
+        "n": 39,
+        "corr_media": 6.009,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.009
+      },
+      "Ly:2.9 (Dominante) | VENTANA 72H": {
+        "n": 39,
+        "corr_media": 5.992,
+        "lag_horas_media": 71.9,
+        "confiabilidad_media": 5.992
+      },
+      "Kp:5.5 (Dominante) | VENTANA 72H": {
+        "n": 39,
+        "corr_media": 6.007,
+        "lag_horas_media": 71.8,
+        "confiabilidad_media": 6.007
+      },
+      "Ly:3.2 (Dominante) | VENTANA 72H": {
+        "n": 38,
+        "corr_media": 6.003,
+        "lag_horas_media": 72.2,
+        "confiabilidad_media": 6.003
+      },
+      "Ly:3.1 (Dominante) | VENTANA 72H": {
+        "n": 38,
+        "corr_media": 6.003,
+        "lag_horas_media": 71.9,
+        "confiabilidad_media": 6.003
+      },
+      "Ly:2.4 (Dominante) | VENTANA 72H": {
+        "n": 38,
+        "corr_media": 5.989,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 5.989
+      },
+      "Ly:6.2 (Dominante) | VENTANA 72H": {
+        "n": 37,
+        "corr_media": 6.006,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 6.006
+      },
+      "Ly:2.8 (Dominante) | VENTANA 72H": {
+        "n": 37,
+        "corr_media": 5.993,
+        "lag_horas_media": 72.3,
+        "confiabilidad_media": 5.993
+      },
+      "Ly:3.0 (Dominante) | VENTANA 72H": {
+        "n": 36,
+        "corr_media": 5.988,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 5.988
+      },
+      "Ly:4.7 (Dominante) | VENTANA 72H": {
+        "n": 35,
+        "corr_media": 6.008,
+        "lag_horas_media": 71.6,
+        "confiabilidad_media": 6.008
+      },
+      "Ly:4.2 (Dominante) | VENTANA 72H": {
+        "n": 35,
+        "corr_media": 6.008,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.008
+      },
+      "Ly:2.7 (Dominante) | VENTANA 72H": {
+        "n": 35,
+        "corr_media": 5.989,
+        "lag_horas_media": 72.2,
+        "confiabilidad_media": 5.989
+      },
+      "Kp:5.6 (Dominante) | VENTANA 72H": {
+        "n": 34,
+        "corr_media": 6.006,
+        "lag_horas_media": 71.7,
+        "confiabilidad_media": 6.006
+      },
+      "Ly:5.2 (Dominante) | VENTANA 72H": {
+        "n": 33,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 6.007
+      },
+      "Ly:3.7 (Dominante) | VENTANA 72H": {
+        "n": 33,
+        "corr_media": 6.008,
+        "lag_horas_media": 71.8,
+        "confiabilidad_media": 6.008
+      },
+      "Ly:2.1 (Dominante) | VENTANA 72H": {
+        "n": 33,
+        "corr_media": 5.994,
+        "lag_horas_media": 71.9,
+        "confiabilidad_media": 5.994
+      },
+      "Ly:2.0 (Dominante) | VENTANA 72H": {
+        "n": 33,
+        "corr_media": 5.966,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 5.966
+      },
+      "Ly:1.9 (Dominante) | VENTANA 72H": {
+        "n": 33,
+        "corr_media": 5.983,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 5.983
+      },
+      "Ly:3.9 (Dominante) | VENTANA 72H": {
+        "n": 32,
+        "corr_media": 6.008,
+        "lag_horas_media": 71.7,
+        "confiabilidad_media": 6.008
+      },
+      "Ly:3.8 (Dominante) | VENTANA 72H": {
+        "n": 32,
+        "corr_media": 6.008,
+        "lag_horas_media": 71.8,
+        "confiabilidad_media": 6.008
+      },
+      "Ly:3.5 (Dominante) | VENTANA 72H": {
+        "n": 32,
+        "corr_media": 6.006,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 6.006
+      },
+      "Ly:2.5 (Dominante) | VENTANA 72H": {
+        "n": 32,
+        "corr_media": 5.986,
+        "lag_horas_media": 71.7,
+        "confiabilidad_media": 5.986
+      },
+      "Ly:4.5 (Dominante) | VENTANA 72H": {
+        "n": 31,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.4,
+        "confiabilidad_media": 6.007
+      },
+      "Ly:4.4 (Dominante) | VENTANA 72H": {
+        "n": 31,
+        "corr_media": 6.008,
+        "lag_horas_media": 71.8,
+        "confiabilidad_media": 6.008
+      },
+      "Ly:4.1 (Dominante) | VENTANA 72H": {
+        "n": 30,
+        "corr_media": 6.008,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 6.008
+      },
+      "Kp:0.5 (Dominante) | VENTANA 72H": {
+        "n": 30,
+        "corr_media": 5.962,
+        "lag_horas_media": 71.7,
+        "confiabilidad_media": 5.962
+      },
+      "Ly:6.4 (Dominante) | VENTANA 72H": {
+        "n": 29,
+        "corr_media": 6.006,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.006
+      },
+      "Ly:6.3 (Dominante) | VENTANA 72H": {
+        "n": 29,
+        "corr_media": 6.007,
+        "lag_horas_media": 71.7,
+        "confiabilidad_media": 6.007
+      },
+      "Ly:1.8 (Dominante) | VENTANA 72H": {
+        "n": 29,
+        "corr_media": 5.979,
+        "lag_horas_media": 71.8,
+        "confiabilidad_media": 5.979
+      },
+      "Ly:1.6 (Dominante) | VENTANA 72H": {
+        "n": 24,
+        "corr_media": 5.967,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 5.967
+      },
+      "Ly:1.7 (Dominante) | VENTANA 72H": {
+        "n": 22,
+        "corr_media": 5.981,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 5.981
+      },
+      "Kp:0.4 (Dominante) | VENTANA 72H": {
+        "n": 21,
+        "corr_media": 5.94,
+        "lag_horas_media": 71.8,
+        "confiabilidad_media": 5.94
+      },
+      "Kp:5.7 (Dominante) | VENTANA 72H": {
+        "n": 18,
+        "corr_media": 6.006,
+        "lag_horas_media": 72.3,
+        "confiabilidad_media": 6.006
+      },
+      "Ly:6.7 (Dominante) | VENTANA 72H": {
+        "n": 17,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 6.007
+      },
+      "Ly:6.5 (Dominante) | VENTANA 72H": {
+        "n": 16,
+        "corr_media": 6.006,
+        "lag_horas_media": 72.5,
+        "confiabilidad_media": 6.006
+      },
+      "Ly:6.9 (Dominante) | VENTANA 72H": {
+        "n": 14,
+        "corr_media": 6.009,
+        "lag_horas_media": 72.6,
+        "confiabilidad_media": 6.009
+      },
+      "Ly:1.4 (Dominante) | VENTANA 72H": {
+        "n": 14,
+        "corr_media": 5.969,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 5.969
+      },
+      "Bz:-0.4 (Dominante) | VENTANA 72H": {
+        "n": 13,
+        "corr_media": 5.99,
+        "lag_horas_media": 71.4,
+        "confiabilidad_media": 5.99
+      },
+      "Ly:6.6 (Dominante) | VENTANA 72H": {
+        "n": 12,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.3,
+        "confiabilidad_media": 6.007
+      },
+      "Ly:1.5 (Dominante) | VENTANA 72H": {
+        "n": 12,
+        "corr_media": 5.965,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 5.965
+      },
+      "Bz:0.4 (Dominante) | VENTANA 72H": {
+        "n": 12,
+        "corr_media": 5.987,
+        "lag_horas_media": 72.8,
+        "confiabilidad_media": 5.987
+      },
+      "Bz:-0.9 (Dominante) | VENTANA 72H": {
+        "n": 12,
+        "corr_media": 5.977,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 5.977
+      },
+      "Bz:-0.2 (Dominante) | VENTANA 72H": {
+        "n": 12,
+        "corr_media": 5.993,
+        "lag_horas_media": 71.5,
+        "confiabilidad_media": 5.993
+      },
+      "Ly:1.2 (Dominante) | VENTANA 72H": {
+        "n": 11,
+        "corr_media": 5.97,
+        "lag_horas_media": 71.7,
+        "confiabilidad_media": 5.97
+      },
+      "Bz:-1.4 (Dominante) | VENTANA 72H": {
+        "n": 11,
+        "corr_media": 5.975,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 5.975
+      },
+      "Ly:1.3 (Dominante) | VENTANA 72H": {
+        "n": 10,
+        "corr_media": 5.945,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 5.945
+      },
+      "Kp:5.8 (Dominante) | VENTANA 72H": {
+        "n": 9,
+        "corr_media": 6.008,
+        "lag_horas_media": 72.3,
+        "confiabilidad_media": 6.008
+      },
+      "Bz:0.6 (Dominante) | VENTANA 72H": {
+        "n": 9,
+        "corr_media": 5.977,
+        "lag_horas_media": 72.6,
+        "confiabilidad_media": 5.977
+      },
+      "Bz:0.2 (Dominante) | VENTANA 72H": {
+        "n": 9,
+        "corr_media": 5.977,
+        "lag_horas_media": 71.6,
+        "confiabilidad_media": 5.977
+      },
+      "Bz:2.2 (Dominante) | VENTANA 72H": {
+        "n": 8,
+        "corr_media": 5.993,
+        "lag_horas_media": 71.7,
+        "confiabilidad_media": 5.993
+      },
+      "Bz:1.1 (Dominante) | VENTANA 72H": {
+        "n": 8,
+        "corr_media": 5.997,
+        "lag_horas_media": 72.2,
+        "confiabilidad_media": 5.997
+      },
+      "Bz:0.8 (Dominante) | VENTANA 72H": {
+        "n": 8,
+        "corr_media": 6.0,
+        "lag_horas_media": 72.4,
+        "confiabilidad_media": 6.0
+      },
+      "Bz:-1.6 (Dominante) | VENTANA 72H": {
+        "n": 8,
+        "corr_media": 6.0,
+        "lag_horas_media": 73.4,
+        "confiabilidad_media": 6.0
+      },
+      "Bz:-1.5 (Dominante) | VENTANA 72H": {
+        "n": 8,
+        "corr_media": 6.0,
+        "lag_horas_media": 72.4,
+        "confiabilidad_media": 6.0
+      },
+      "Bz:-0.3 (Dominante) | VENTANA 72H": {
+        "n": 8,
+        "corr_media": 6.002,
+        "lag_horas_media": 72.3,
+        "confiabilidad_media": 6.002
+      },
+      "Bz:0.7 (Dominante) | VENTANA 72H": {
+        "n": 7,
+        "corr_media": 5.995,
+        "lag_horas_media": 71.9,
+        "confiabilidad_media": 5.995
+      },
+      "Bz:0.3 (Dominante) | VENTANA 72H": {
+        "n": 7,
+        "corr_media": 5.984,
+        "lag_horas_media": 72.8,
+        "confiabilidad_media": 5.984
+      },
+      "Bz:0.1 (Dominante) | VENTANA 72H": {
+        "n": 7,
+        "corr_media": 6.002,
+        "lag_horas_media": 71.6,
+        "confiabilidad_media": 6.002
+      },
+      "Bz:-1.7 (Dominante) | VENTANA 72H": {
+        "n": 7,
+        "corr_media": 5.986,
+        "lag_horas_media": 72.4,
+        "confiabilidad_media": 5.986
+      },
+      "Bz:-0.8 (Dominante) | VENTANA 72H": {
+        "n": 7,
+        "corr_media": 5.976,
+        "lag_horas_media": 71.3,
+        "confiabilidad_media": 5.976
+      },
+      "Bz:-0.7 (Dominante) | VENTANA 72H": {
+        "n": 7,
+        "corr_media": 5.951,
+        "lag_horas_media": 72.3,
+        "confiabilidad_media": 5.951
+      },
+      "Bz:-0.6 (Dominante) | VENTANA 72H": {
+        "n": 7,
+        "corr_media": 5.989,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 5.989
+      },
+      "Bz:-0.1 (Dominante) | VENTANA 72H": {
+        "n": 7,
+        "corr_media": 5.984,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 5.984
+      },
+      "Ly:6.8 (Dominante) | VENTANA 72H": {
+        "n": 6,
+        "corr_media": 6.007,
+        "lag_horas_media": 71.4,
+        "confiabilidad_media": 6.007
+      },
+      "Kp:0.3 (Dominante) | VENTANA 72H": {
+        "n": 6,
+        "corr_media": 5.961,
+        "lag_horas_media": 72.9,
+        "confiabilidad_media": 5.961
+      },
+      "Bz:0.9 (Dominante) | VENTANA 72H": {
+        "n": 6,
+        "corr_media": 6.004,
+        "lag_horas_media": 72.6,
+        "confiabilidad_media": 6.004
+      },
+      "Bz:-2.0 (Dominante) | VENTANA 72H": {
+        "n": 6,
+        "corr_media": 5.996,
+        "lag_horas_media": 71.8,
+        "confiabilidad_media": 5.996
+      },
+      "Bz:-1.3 (Dominante) | VENTANA 72H": {
+        "n": 6,
+        "corr_media": 6.004,
+        "lag_horas_media": 72.4,
+        "confiabilidad_media": 6.004
+      },
+      "Bz:-1.1 (Dominante) | VENTANA 72H": {
+        "n": 6,
+        "corr_media": 5.987,
+        "lag_horas_media": 73.3,
+        "confiabilidad_media": 5.987
+      },
+      "Bz:-0.5 (Dominante) | VENTANA 72H": {
+        "n": 6,
+        "corr_media": 5.984,
+        "lag_horas_media": 71.7,
+        "confiabilidad_media": 5.984
+      },
+      "Ly:7.3 (Dominante) | VENTANA 72H": {
+        "n": 5,
+        "corr_media": 6.005,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.005
+      },
+      "Ly:1.1 (Dominante) | VENTANA 72H": {
+        "n": 5,
+        "corr_media": 5.951,
+        "lag_horas_media": 72.3,
+        "confiabilidad_media": 5.951
+      },
+      "Kp:0.1 (Dominante) | VENTANA 72H": {
+        "n": 5,
+        "corr_media": 5.943,
+        "lag_horas_media": 74.4,
+        "confiabilidad_media": 5.943
+      },
+      "Bz:1.5 (Dominante) | VENTANA 72H": {
+        "n": 5,
+        "corr_media": 5.974,
+        "lag_horas_media": 71.7,
+        "confiabilidad_media": 5.974
+      },
+      "Ly:7.1 (Dominante) | VENTANA 72H": {
+        "n": 4,
+        "corr_media": 6.005,
+        "lag_horas_media": 72.5,
+        "confiabilidad_media": 6.005
+      },
+      "Kp:0.0 (Dominante) | VENTANA 72H": {
+        "n": 4,
+        "corr_media": 5.947,
+        "lag_horas_media": 73.0,
+        "confiabilidad_media": 5.947
+      },
+      "Bz:3.2 (Dominante) | VENTANA 72H": {
+        "n": 4,
+        "corr_media": 6.0,
+        "lag_horas_media": 72.7,
+        "confiabilidad_media": 6.0
+      },
+      "Bz:2.9 (Dominante) | VENTANA 72H": {
+        "n": 4,
+        "corr_media": 5.968,
+        "lag_horas_media": 73.2,
+        "confiabilidad_media": 5.968
+      },
+      "Bz:2.1 (Dominante) | VENTANA 72H": {
+        "n": 4,
+        "corr_media": 6.007,
+        "lag_horas_media": 71.7,
+        "confiabilidad_media": 6.007
+      },
+      "Bz:2.0 (Dominante) | VENTANA 72H": {
+        "n": 4,
+        "corr_media": 6.003,
+        "lag_horas_media": 71.5,
+        "confiabilidad_media": 6.003
+      },
+      "Bz:1.9 (Dominante) | VENTANA 72H": {
+        "n": 4,
+        "corr_media": 5.975,
+        "lag_horas_media": 70.5,
+        "confiabilidad_media": 5.975
+      },
+      "Bz:1.4 (Dominante) | VENTANA 72H": {
+        "n": 4,
+        "corr_media": 6.002,
+        "lag_horas_media": 72.4,
+        "confiabilidad_media": 6.002
+      },
+      "Bz:1.3 (Dominante) | VENTANA 72H": {
+        "n": 4,
+        "corr_media": 5.974,
+        "lag_horas_media": 70.7,
+        "confiabilidad_media": 5.974
+      },
+      "Bz:1.0 (Dominante) | VENTANA 72H": {
+        "n": 4,
+        "corr_media": 6.007,
+        "lag_horas_media": 71.5,
+        "confiabilidad_media": 6.007
+      },
+      "Bz:-1.9 (Dominante) | VENTANA 72H": {
+        "n": 4,
+        "corr_media": 5.944,
+        "lag_horas_media": 71.9,
+        "confiabilidad_media": 5.944
+      },
+      "Bz:-1.2 (Dominante) | VENTANA 72H": {
+        "n": 4,
+        "corr_media": 6.002,
+        "lag_horas_media": 71.7,
+        "confiabilidad_media": 6.002
+      },
+      "Bz:-1.0 (Dominante) | VENTANA 72H": {
+        "n": 4,
+        "corr_media": 5.989,
+        "lag_horas_media": 72.5,
+        "confiabilidad_media": 5.989
+      },
+      "Bz:-0.0 (Dominante) | VENTANA 72H": {
+        "n": 4,
+        "corr_media": 5.958,
+        "lag_horas_media": 72.5,
+        "confiabilidad_media": 5.958
+      },
+      "Ly:7.6 (Dominante) | VENTANA 72H": {
+        "n": 3,
+        "corr_media": 6.007,
+        "lag_horas_media": 70.4,
+        "confiabilidad_media": 6.007
+      },
+      "Ly:7.0 (Dominante) | VENTANA 72H": {
+        "n": 3,
+        "corr_media": 6.01,
+        "lag_horas_media": 71.5,
+        "confiabilidad_media": 6.01
+      },
+      "Ly:1.0 (Dominante) | VENTANA 72H": {
+        "n": 3,
+        "corr_media": 5.994,
+        "lag_horas_media": 72.4,
+        "confiabilidad_media": 5.994
+      },
+      "Ly:0.8 (Dominante) | VENTANA 72H": {
+        "n": 3,
+        "corr_media": 5.985,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 5.985
+      },
+      "Kp:5.9 (Dominante) | VENTANA 72H": {
+        "n": 3,
+        "corr_media": 6.005,
+        "lag_horas_media": 72.8,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:3.0 (Dominante) | VENTANA 72H": {
+        "n": 3,
+        "corr_media": 5.992,
+        "lag_horas_media": 72.8,
+        "confiabilidad_media": 5.992
+      },
+      "Bz:2.8 (Dominante) | VENTANA 72H": {
+        "n": 3,
+        "corr_media": 5.999,
+        "lag_horas_media": 71.2,
+        "confiabilidad_media": 5.999
+      },
+      "Bz:2.3 (Dominante) | VENTANA 72H": {
+        "n": 3,
+        "corr_media": 6.006,
+        "lag_horas_media": 72.4,
+        "confiabilidad_media": 6.006
+      },
+      "Bz:1.2 (Dominante) | VENTANA 72H": {
+        "n": 3,
+        "corr_media": 5.977,
+        "lag_horas_media": 72.2,
+        "confiabilidad_media": 5.977
+      },
+      "Bz:0.5 (Dominante) | VENTANA 72H": {
+        "n": 3,
+        "corr_media": 6.006,
+        "lag_horas_media": 73.5,
+        "confiabilidad_media": 6.006
+      },
+      "Bz:-2.8 (Dominante) | VENTANA 72H": {
+        "n": 3,
+        "corr_media": 6.008,
+        "lag_horas_media": 72.7,
+        "confiabilidad_media": 6.008
+      },
+      "Bz:-2.5 (Dominante) | VENTANA 72H": {
+        "n": 3,
+        "corr_media": 5.996,
+        "lag_horas_media": 72.7,
+        "confiabilidad_media": 5.996
+      },
+      "Bz:-1.8 (Dominante) | VENTANA 72H": {
+        "n": 3,
+        "corr_media": 6.001,
+        "lag_horas_media": 71.8,
+        "confiabilidad_media": 6.001
+      },
+      "Ly:7.4 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 6.005,
+        "lag_horas_media": 71.8,
+        "confiabilidad_media": 6.005
+      },
+      "Ly:0.9 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 5.994,
+        "lag_horas_media": 70.7,
+        "confiabilidad_media": 5.994
+      },
+      "Ly:0.7 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 6.001,
+        "lag_horas_media": 71.3,
+        "confiabilidad_media": 6.001
+      },
+      "Ly:0.4 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 5.949,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 5.949
+      },
+      "Kp:0.2 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 5.931,
+        "lag_horas_media": 68.6,
+        "confiabilidad_media": 5.931
+      },
+      "Bz:4.9 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 6.008,
+        "lag_horas_media": 71.5,
+        "confiabilidad_media": 6.008
+      },
+      "Bz:4.7 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 6.008,
+        "lag_horas_media": 70.6,
+        "confiabilidad_media": 6.008
+      },
+      "Bz:4.6 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 6.005,
+        "lag_horas_media": 70.6,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:3.8 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 6.01,
+        "lag_horas_media": 71.6,
+        "confiabilidad_media": 6.01
+      },
+      "Bz:3.5 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 6.001,
+        "lag_horas_media": 73.4,
+        "confiabilidad_media": 6.001
+      },
+      "Bz:3.1 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 6.005,
+        "lag_horas_media": 71.9,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:2.6 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 6.006,
+        "lag_horas_media": 71.6,
+        "confiabilidad_media": 6.006
+      },
+      "Bz:2.5 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 6.01,
+        "lag_horas_media": 70.7,
+        "confiabilidad_media": 6.01
+      },
+      "Bz:2.4 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 6.007,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 6.007
+      },
+      "Bz:1.7 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 6.006,
+        "lag_horas_media": 70.1,
+        "confiabilidad_media": 6.006
+      },
+      "Bz:1.6 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 6.006,
+        "lag_horas_media": 71.9,
+        "confiabilidad_media": 6.006
+      },
+      "Bz:-6.0 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 6.005,
+        "lag_horas_media": 70.8,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:-4.8 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 6.006,
+        "lag_horas_media": 71.5,
+        "confiabilidad_media": 6.006
+      },
+      "Bz:-4.6 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 5.998,
+        "lag_horas_media": 73.0,
+        "confiabilidad_media": 5.998
+      },
+      "Bz:-4.2 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 6.009,
+        "lag_horas_media": 72.2,
+        "confiabilidad_media": 6.009
+      },
+      "Bz:-3.9 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 6.007,
+        "lag_horas_media": 71.9,
+        "confiabilidad_media": 6.007
+      },
+      "Bz:-3.8 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 5.981,
+        "lag_horas_media": 71.9,
+        "confiabilidad_media": 5.981
+      },
+      "Bz:-2.7 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 6.008,
+        "lag_horas_media": 73.5,
+        "confiabilidad_media": 6.008
+      },
+      "Bz:-2.6 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 6.008,
+        "lag_horas_media": 73.5,
+        "confiabilidad_media": 6.008
+      },
+      "Bz:-2.3 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 6.003,
+        "lag_horas_media": 71.8,
+        "confiabilidad_media": 6.003
+      },
+      "Bz:-2.2 (Dominante) | VENTANA 72H": {
+        "n": 2,
+        "corr_media": 5.934,
+        "lag_horas_media": 72.7,
+        "confiabilidad_media": 5.934
+      },
+      "Ly:8.1 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 73.1,
+        "confiabilidad_media": 6.005
+      },
+      "Ly:8.0 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.012,
+        "lag_horas_media": 73.3,
+        "confiabilidad_media": 6.012
+      },
+      "Ly:7.9 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 71.0,
+        "confiabilidad_media": 6.005
+      },
+      "Ly:7.5 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 73.0,
+        "confiabilidad_media": 6.005
+      },
+      "Ly:7.2 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 73.2,
+        "confiabilidad_media": 6.005
+      },
+      "Ly:0.6 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 5.988,
+        "lag_horas_media": 72.5,
+        "confiabilidad_media": 5.988
+      },
+      "Kp:6.1 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 74.1,
+        "confiabilidad_media": 6.005
+      },
+      "Kp:6.0 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 70.7,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:8.5 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.008,
+        "lag_horas_media": 72.6,
+        "confiabilidad_media": 6.008
+      },
+      "Bz:7.9 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 70.8,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:7.5 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 68.3,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:6.3 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 77.3,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:6.1 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 71.4,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:5.8 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.01,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.01
+      },
+      "Bz:5.2 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 73.8,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:4.8 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.008,
+        "lag_horas_media": 71.9,
+        "confiabilidad_media": 6.008
+      },
+      "Bz:4.4 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 75.7,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:4.2 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.012,
+        "lag_horas_media": 70.7,
+        "confiabilidad_media": 6.012
+      },
+      "Bz:4.1 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 71.2,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:3.7 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 73.6,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:3.3 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.008,
+        "lag_horas_media": 73.4,
+        "confiabilidad_media": 6.008
+      },
+      "Bz:1.8 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 5.994,
+        "lag_horas_media": 73.2,
+        "confiabilidad_media": 5.994
+      },
+      "Bz:0.0 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 5.994,
+        "lag_horas_media": 70.7,
+        "confiabilidad_media": 5.994
+      },
+      "Bz:-9.0 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 71.7,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:-7.3 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 72.7,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:-6.9 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 73.7,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:-6.4 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 71.9,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:-6.1 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 71.5,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:-5.8 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 70.8,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:-4.9 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 73.6,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:-4.3 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 72.0,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:-4.0 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 72.1,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:-3.7 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 71.5,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:-3.6 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 71.6,
+        "confiabilidad_media": 6.005
+      },
+      "Bz:-3.5 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 5.994,
+        "lag_horas_media": 72.3,
+        "confiabilidad_media": 5.994
+      },
+      "Bz:-3.3 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 5.887,
+        "lag_horas_media": 74.7,
+        "confiabilidad_media": 5.887
+      },
+      "Bz:-3.2 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 5.852,
+        "lag_horas_media": 74.6,
+        "confiabilidad_media": 5.852
+      },
+      "Bz:-3.0 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.008,
+        "lag_horas_media": 72.7,
+        "confiabilidad_media": 6.008
+      },
+      "Bz:-2.4 (Dominante) | VENTANA 72H": {
+        "n": 1,
+        "corr_media": 6.005,
+        "lag_horas_media": 73.1,
+        "confiabilidad_media": 6.005
+      }
+    }
+  },
+  "backcast_inferences": {
+    "n": 11839,
+    "modelo_versions": [
+      "rf_v3_reloj",
+      "rf_v3_backcast"
+    ],
+    "riesgo_predicho": {
+      "n": 11839,
+      "media": 5.597,
+      "min": 0.15,
+      "max": 6.39
+    }
+  },
+  "fact_loteria": {
+    "n": 22660,
+    "_nota": "Loteria (Sentinel Titan) — no pertenece a este repo (predictores naturales). Dropeada sin referencia."
+  }
+}

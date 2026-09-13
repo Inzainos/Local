@@ -1,0 +1,16 @@
+[Unit]
+Description=Sentinel Omega — Mantenimiento diario (disciplina + barrido)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=__REPO_DIR__
+EnvironmentFile=-__REPO_DIR__/deploy/.env
+ExecStart=__REPO_DIR__/.venv/bin/python sentinel_omega/launcher.py --disciplina --barrido --dry-run
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+[Install]
+WantedBy=multi-user.target

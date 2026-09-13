@@ -1,0 +1,8 @@
+# Sentinel Omega — ejemplos de crontab
+# Ajustar rutas y usuario
+
+# Barrido diario 03:00 (volcado 24h + mantenimiento)
+0 3 * * * cd /opt/workspaces && .venv/bin/python -m sentinel_omega.launcher --barrido >> /var/log/sentinel-barrido.log 2>&1
+
+# Disciplina / Juez cada 2h
+0 */2 * * * cd /opt/workspaces && .venv/bin/python -m sentinel_omega.launcher --disciplina >> /var/log/sentinel-disciplina.log 2>&1

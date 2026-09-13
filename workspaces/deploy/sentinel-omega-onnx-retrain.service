@@ -1,0 +1,17 @@
+[Unit]
+Description=Sentinel Omega — Retrain ONNX semanal (desde TBL_FIRMAS)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=__REPO_DIR__
+EnvironmentFile=-__REPO_DIR__/deploy/.env
+ExecStart=__REPO_DIR__/.venv/bin/python -m sentinel_omega.models.train_onnx_from_db --db-path sentinel_omega/data/SENTINEL_OMEGA_PRO.db --min-samples 50
+ExecStartPost=/bin/sh -c 'systemctl is-active sentinel-omega >/dev/null 2>&1 && systemctl restart sentinel-omega || true'
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+[Install]
+WantedBy=multi-user.target

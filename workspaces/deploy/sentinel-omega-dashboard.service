@@ -1,0 +1,15 @@
+[Unit]
+Description=Sentinel Omega Dashboard (Streamlit) - acceso remoto Safari/iPad
+After=network-online.target sentinel-omega.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=__REPO_DIR__
+EnvironmentFile=__REPO_DIR__/deploy/.env
+ExecStart=__REPO_DIR__/.venv/bin/streamlit run sentinel_omega/infrastructure/dashboard/app.py --server.address 0.0.0.0 --server.port 8501 --server.headless true
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

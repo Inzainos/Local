@@ -1,0 +1,36 @@
+{
+  "retrained_at": "2026-09-13T09:05:00.837471Z",
+  "db_path": "sentinel_omega/data/SENTINEL_OMEGA_PRO.db",
+  "bots": {
+    "alfa1": {
+      "path": "/home/deamon/workspaces/sentinel_omega/models/alfa1_spaceweather_rf.onnx",
+      "n": 1388,
+      "source": "db-only (1388)"
+    },
+    "alfa2": {
+      "path": "/home/deamon/workspaces/sentinel_omega/models/alfa2_satellite_cnn.onnx",
+      "n": 1183,
+      "source": "db-only (1183)"
+    },
+    "beta1": {
+      "path": "/home/deamon/workspaces/sentinel_omega/models/beta1_schumann_fft.onnx",
+      "n": 2082,
+      "source": "db-only (2082)"
+    },
+    "beta2": {
+      "path": "/home/deamon/workspaces/sentinel_omega/models/beta2_atmospheric_cnn.onnx",
+      "n": 1967,
+      "source": "db-only (1967)"
+    },
+    "delta": {
+      "path": "/home/deamon/workspaces/sentinel_omega/models/delta_financial_lstm.onnx",
+      "n": 1858,
+      "source": "db-only (1858)"
+    },
+    "omega": {
+      "path": "/home/deamon/workspaces/sentinel_omega/models/omega_espacial_rf.onnx",
+      "n": 2726,
+      "source": "db-only (2726)"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+# ONNX Models Directory
+# Place all .onnx model files here:
+# - alfa1_spaceweather_rf.onnx (RandomForest, 10 inputs → 2 outputs)
+# - alfa2_satellite_cnn.onnx (CNN, 512 inputs → 3 outputs)
+# - beta1_schumann_fft.onnx (FFT analyzer, 256 inputs → 4 outputs)
+# - beta2_atmospheric_cnn.onnx (CNN, 64 inputs → 3 outputs)
+# - delta_financial_lstm.onnx (LSTM, 32 inputs → 2 outputs)

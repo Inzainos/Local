@@ -1,0 +1,29 @@
+{
+  "guerrero_gap": {
+    "obs_mean": 58.504,
+    "obs_std": 3.867,
+    "thermal_mean": 0.0,
+    "thermal_std": 0.0,
+    "clarity_mean": 0.337,
+    "clarity_std": 0.062,
+    "n_samples": 755
+  },
+  "oaxaca_costa": {
+    "obs_mean": 24.439,
+    "obs_std": 2.462,
+    "thermal_mean": 0.0,
+    "thermal_std": 0.0,
+    "clarity_mean": 0.276,
+    "clarity_std": 0.036,
+    "n_samples": 755
+  },
+  "chiapas": {
+    "obs_mean": 35.633,
+    "obs_std": 3.584,
+    "thermal_mean": 0.0,
+    "thermal_std": 0.0,
+    "clarity_mean": 0.239,
+    "clarity_std": 0.057,
+    "n_samples": 754
+  }
+}

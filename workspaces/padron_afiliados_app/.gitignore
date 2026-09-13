@@ -1,0 +1,14 @@
+# Base de datos local
+*.db
+*.sqlite
+*.sqlite3
+
+# Entornos virtuales
+venv/
+__pycache__/
+*.pyc
+
+# Archivos de ejecución y logs
+*.log
+.DS_Store
+.streamlit/

@@ -1,0 +1,43 @@
+{
+  "retrained_at": "2026-09-11T00:20:23.634306Z",
+  "db_path": "data/SENTINEL_OMEGA_PRO.db",
+  "bots": {
+    "alfa1": {
+      "path": "/home/deamon/workspaces/sentinel_omega/models/alfa1_spaceweather_rf.onnx",
+      "n": 1303,
+      "source": "db-only (1303)"
+    },
+    "alfa2": {
+      "path": "/home/deamon/workspaces/sentinel_omega/models/alfa2_satellite_cnn.onnx",
+      "n": 1098,
+      "source": "db-only (1098)"
+    },
+    "beta1": {
+      "path": "/home/deamon/workspaces/sentinel_omega/models/beta1_schumann_fft.onnx",
+      "n": 1997,
+      "source": "db-only (1997)"
+    },
+    "beta2": {
+      "path": "/home/deamon/workspaces/sentinel_omega/models/beta2_atmospheric_cnn.onnx",
+      "n": 1882,
+      "source": "db-only (1882)"
+    },
+    "delta": {
+      "path": "/home/deamon/workspaces/sentinel_omega/models/delta_financial_lstm.onnx",
+      "n": 1773,
+      "source": "db-only (1773)"
+    },
+    "omega": {
+      "path": "/home/deamon/workspaces/sentinel_omega/models/omega_espacial_rf.onnx",
+      "n": 2556,
+      "source": "db-only (2556)"
+    },
+    "loki": {
+      "path": "/home/deamon/workspaces/sentinel_omega/sentinel_omega/models/loki_unificado_rf.onnx",
+      "n": null,
+      "source": "copied-from-dev (Prod train_onnx_from_db.py pre-loki)",
+      "synthetic": false
+    }
+  },
+  "retrain_note": "2026-09-10 Prod wipe+train_onnx_from_db (older script lacked loki); loki_unificado_rf.onnx copied from Dev after joint Dev retrain"
+}

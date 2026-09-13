@@ -1,0 +1,14 @@
+# Prod ONNX before wipe 2026-09-10
+-rw-r--r-- 1 deamon deamon 768K Sep  8 12:10 /home/deamon/workspaces/sentinel_omega/models/alfa1_spaceweather_rf.onnx
+-rw-r--r-- 1 deamon deamon  32K Sep  8 12:10 /home/deamon/workspaces/sentinel_omega/models/alfa2_satellite_cnn.onnx
+-rw-r--r-- 1 deamon deamon 456K Sep  8 12:10 /home/deamon/workspaces/sentinel_omega/models/beta1_schumann_fft.onnx
+-rw-r--r-- 1 deamon deamon  31K Sep  8 12:10 /home/deamon/workspaces/sentinel_omega/models/beta2_atmospheric_cnn.onnx
+-rw-r--r-- 1 deamon deamon  79K Sep  8 12:10 /home/deamon/workspaces/sentinel_omega/models/delta_financial_lstm.onnx
+-rw-r--r-- 1 deamon deamon 1.2K Sep  8 12:10 /home/deamon/workspaces/sentinel_omega/models/models_meta.json
+-rw-r--r-- 1 deamon deamon 254K Sep  8 12:10 /home/deamon/workspaces/sentinel_omega/models/omega_espacial_rf.onnx
+-rw-r--r-- 1 deamon deamon 768K Sep  4 13:29 /home/deamon/workspaces/sentinel_omega/sentinel_omega/models/alfa1_spaceweather_rf.onnx
+-rw-r--r-- 1 deamon deamon  32K Sep  4 13:29 /home/deamon/workspaces/sentinel_omega/sentinel_omega/models/alfa2_satellite_cnn.onnx
+-rw-r--r-- 1 deamon deamon 456K Sep  4 13:29 /home/deamon/workspaces/sentinel_omega/sentinel_omega/models/beta1_schumann_fft.onnx
+-rw-r--r-- 1 deamon deamon  31K Sep  4 13:29 /home/deamon/workspaces/sentinel_omega/sentinel_omega/models/beta2_atmospheric_cnn.onnx
+-rw-r--r-- 1 deamon deamon  79K Sep  4 13:29 /home/deamon/workspaces/sentinel_omega/sentinel_omega/models/delta_financial_lstm.onnx
+-rw-r--r-- 1 deamon deamon 254K Sep  4 13:29 /home/deamon/workspaces/sentinel_omega/sentinel_omega/models/omega_espacial_rf.onnx

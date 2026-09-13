@@ -1,0 +1,9 @@
+[Unit]
+Description=Sentinel Omega - Rutinas locales (reportes, Juez, correo)
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=__REPO_DIR__
+EnvironmentFile=__REPO_DIR__/deploy/.env
+ExecStart=/bin/bash __REPO_DIR__/deploy/rutinas_locales.sh

@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sentinel-omega"
+version = "2.5.4"
+description = "Precursor detection platform for natural events — 15-type scanner, 5-wall cross-correlation, 125-node topology, Schumann harmonic filter (TITAN V32/V46/V53 lineage)"
+authors = [
+    {name = "Elán Zainos Corona", email = "elan.zainos.corona@gmail.com"},
+]
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Proprietary — Fractal Core Research"}
+
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "pandas>=2.0",
+    "requests>=2.28",
+    "onnxruntime>=1.14",
+    "pyyaml>=6.0",
+    "tenacity>=8.2",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+geodynamic = [
+    "ephem>=4.1",
+    "opencv-python>=4.7",
+    "folium>=0.14",
+    "eodag>=4.0",
+]
+crypto = [
+    "ccxt>=4.0",
+    "websockets>=11.0",
+]
+bolsa = [
+    "yfinance>=0.2",
+]
+dashboard = [
+    "streamlit>=1.28",
+    "plotly>=5.15",
+]
+all = [
+    "sentinel-omega[geodynamic,crypto,bolsa,dashboard]",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sentinel_omega*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-q --strict-markers"
+markers = ["slow: marks tests as slow"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = ["E", "F", "I", "UP", "B", "C4", "SIM"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+ignore_missing_imports = true

@@ -1,0 +1,56 @@
+app:
+  name: sentinel-omega
+  version: "2.5.0-shadow-node"
+  environment: development
+  debug: true
+database:
+  geodynamic_db: "data/SENTINEL_OMEGA_PRO.db"
+  lottery_db: "data/TITAN_MEMORY.db"
+  ensure_dir: true
+logging:
+  level: INFO
+  format: json
+  file: "logs/sentinel_omega.log"
+  max_bytes: 10485760
+  backup_count: 5
+  structured: true
+api:
+  timeout: 15
+  max_retries: 3
+  backoff_factor: 1.5
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 5
+    recovery_timeout: 60
+    half_open_max_calls: 3
+telegram:
+  enabled: false
+  heartbeat_interval_s: 14400
+  cooldown_s: 1800
+  rate_limit_per_second: 1
+pipeline:
+  locf_enabled: true
+  max_lookback_days: 90
+  min_data_points: 10
+  enable_satellite: false
+  enable_jupiter: true
+models:
+  enabled: true
+  models_dir: "models"
+  fallback_to_mock: true
+  use_gpu: true
+precursor:
+  phantom_threshold: 10.0
+  risk_levels:
+    low: 5.0
+    moderate: 10.0
+    high: 20.0
+    critical: 30.0
+consensus:
+  min_families_for_alert: 2
+  confidence_threshold: 0.6
+  watch_confidence_threshold: 0.35
+scheduler:
+  cycle_interval_minutes: 30
+  heartbeat_interval_minutes: 60
+  cleanup_interval_hours: 24

@@ -1,0 +1,189 @@
+# Roy Vigilante — Sentinel Omega corriendo 24/7 en GitHub Actions (sin servidor)
+#
+# Ritmos (hora MX = UTC-6, CDMX sin horario de verano):
+#   cada 2 h    → ciclo del Padre (status + registro + cimática)
+#   cada 4 h    → el Juez verifica real vs predicción (USGS, verdad por fila)
+#   cada 6 h    → reporte ejecutivo
+#   12am/12pm MX (06/18 UTC) → comparativo contra el día anterior
+#   domingo 12:15pm MX (18:15 UTC dom) → reporte semanal
+#   fin de mes 12:30pm MX (18:30 UTC, con guardia de "mañana es día 1") → mensual
+#   cada corrida → despacho del outbox de correo (alertas + reportes)
+#
+# Secrets (Settings → Secrets and variables → Actions):
+#   SMTP_USER, SMTP_PASS       → envío real de correo (app password de Gmail)
+#   CORREO_DESTINO             → opcional (default elan.zainos.corona@gmail.com)
+#   OPENWEATHERMAP_KEY         → desgasificación/atmósfera
+#   NASA_API_KEY               → asteroides NEO (opcional)
+#
+# NOTA: el cron solo corre en la rama default (main) — mergear el PR lo activa.
+
+name: Roy Vigilante
+
+on:
+  schedule:
+    # Ciclo base cada 2 horas (minuto :07 para esquivar la congestión del
+    # scheduler). Las tareas de 4h/6h/12h se deciden DENTRO del job por la
+    # hora UTC agendada — con tolerancia al retraso típico de Actions.
+    - cron: "7 */2 * * *"
+    # Reporte semanal: domingo 12:15pm hora MX
+    - cron: "15 18 * * 0"
+    # Reporte mensual: 12:30pm hora MX los días 28-31 (guardia interna:
+    # solo corre si mañana es día 1)
+    - cron: "30 18 28-31 * *"
+  workflow_dispatch:
+
+concurrency:
+  group: roy-vigilante
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  ciclo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      OPENWEATHERMAP_KEY: ${{ secrets.OPENWEATHERMAP_KEY }}
+      NASA_API_KEY: ${{ secrets.NASA_API_KEY }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASS: ${{ secrets.SMTP_PASS }}
+      CORREO_DESTINO: ${{ secrets.CORREO_DESTINO }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Dependencias
+        run: pip install -r sentinel_omega/requirements.txt
+
+      - name: Restaurar memoria (30 años + firmas)
+        uses: actions/cache/restore@v4
+        with:
+          path: sentinel_omega/data/SENTINEL_OMEGA_PRO.db
+          key: roy-db-${{ github.run_id }}
+          restore-keys: roy-db-
+
+      - name: Bootstrap (solo la primera vez, ~1h)
+        run: |
+          if [ ! -f sentinel_omega/data/SENTINEL_OMEGA_PRO.db ]; then
+            echo "Sin memoria previa — backcast 30 años + entrenamiento de firmas"
+            python sentinel_omega/launcher.py --backcast --entrenar --once
+          else
+            echo "Memoria restaurada del cache"
+          fi
+
+      - name: Ciclo del Padre (status cada 2h + cimática)
+        if: github.event.schedule == '7 */2 * * *' || github.event_name == 'workflow_dispatch'
+        run: |
+          rm -f sentinel_omega/data/sentinel_omega.pid
+          python sentinel_omega/launcher.py --once
+
+      - name: Bootstrap Omega (una vez — puebla las firmas del bot nuevo)
+        if: github.event.schedule == '7 */2 * * *' || github.event_name == 'workflow_dispatch'
+        run: python deploy/bootstrap_omega.py
+
+      - name: Juez — verificación real vs predicción (cada 4h)
+        if: github.event.schedule == '7 */2 * * *' || github.event_name == 'workflow_dispatch'
+        run: |
+          # Corre en las corridas cuya hora agendada es múltiplo de 4
+          # (tolerancia de 1h al retraso del scheduler de Actions).
+          H=$(date -u +%-H)
+          if [ $((H % 4)) -le 1 ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python deploy/verificacion_juez.py
+          else
+            echo "skip — el Juez pasa cada 4 horas"
+          fi
+
+      - name: Disciplina de trasfondo + barrido (1×/día, madrugada MX)
+        if: github.event.schedule == '7 */2 * * *'
+        run: |
+          # 08 UTC = 2am MX (hora agendada de la corrida de las 08:07)
+          # NOTA: Ejecutar ANTES de reporte ejecutivo para que Omega tenga datos frescos
+          H=$(date -u +%-H)
+          if [ "$H" = "8" ] || [ "$H" = "9" ]; then
+            python sentinel_omega/launcher.py --disciplina
+            python sentinel_omega/launcher.py --barrido
+          else
+            echo "skip — disciplina y barrido corren 1×/día (08 UTC / 2am MX)"
+          fi
+
+      - name: Reporte ejecutivo (cada 6h)
+        if: github.event.schedule == '7 */2 * * *' || github.event_name == 'workflow_dispatch'
+        run: |
+          # NOTA: Ejecutar DESPUÉS de disciplina + barrido para tener correlaciones_omega frescos
+          H=$(date -u +%-H)
+          if [ $((H % 6)) -le 1 ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python deploy/reporte_ejecutivo.py
+          else
+            echo "skip — reporte ejecutivo cada 6 horas"
+          fi
+
+      - name: Comparativo diario (12am y 12pm hora MX)
+        if: github.event.schedule == '7 */2 * * *'
+        run: |
+          # 06 UTC = 12am MX · 18 UTC = 12pm MX
+          H=$(date -u +%-H)
+          if [ "$H" = "6" ] || [ "$H" = "7" ] || [ "$H" = "18" ] || [ "$H" = "19" ]; then
+            python deploy/reporte_periodico.py --comparativo
+          else
+            echo "skip — comparativo corre 12am/12pm hora MX"
+          fi
+
+      - name: Reporte semanal (domingo 12:15pm MX)
+        if: github.event.schedule == '15 18 * * 0'
+        run: python deploy/reporte_periodico.py --semanal
+
+      - name: Reporte mensual (fin de mes 12:30pm MX)
+        if: github.event.schedule == '30 18 28-31 * *'
+        run: |
+          if [ "$(date -u -d tomorrow +%d)" = "01" ]; then
+            python deploy/reporte_periodico.py --mensual
+          else
+            echo "skip — aún no es el último día del mes"
+          fi
+
+      - name: Tuning diario de la base (fin de día MX, ANALYZE)
+        if: github.event.schedule == '7 */2 * * *'
+        run: |
+          # 05 UTC ≈ 11pm MX (cierre del día): ANALYZE + optimize, ligero.
+          H=$(date -u +%-H)
+          if [ "$H" = "5" ]; then
+            python deploy/tuning_db.py --diario
+          else
+            echo "skip — tuning diario al cierre del día MX (05 UTC)"
+          fi
+
+      - name: Tuning mensual (fin de mes, VACUUM rebuild)
+        if: github.event.schedule == '30 18 28-31 * *'
+        run: |
+          if [ "$(date -u -d tomorrow +%d)" = "01" ]; then
+            python deploy/tuning_db.py --mensual
+          fi
+
+      - name: Despacho de correo (alertas + reportes del outbox)
+        if: always()
+        run: python deploy/enviar_correos.py
+
+      - name: Guardar memoria
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: sentinel_omega/data/SENTINEL_OMEGA_PRO.db
+          key: roy-db-${{ github.run_id }}
+
+      - name: Publicar reporte al repo
+        if: always()
+        run: |
+          python deploy/generar_reporte.py
+          git config user.name "roy-vigilante"
+          git config user.email "actions@users.noreply.github.com"
+          git add estado/
+          if ! git diff --cached --quiet; then
+            git commit -m "🌍 Reporte Roy $(date -u +'%Y-%m-%d %H:%M') UTC"
+            git pull --rebase origin ${{ github.ref_name }} || true
+            git push
+          fi
