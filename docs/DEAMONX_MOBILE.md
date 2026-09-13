@@ -94,3 +94,7 @@ Si `bind: Address already in use` en 11434 → ya hay un `ssh -N` previo; no hac
 - [x] `REMOTE_MODEL=concilio-lightest:latest`
 - [x] `autossh` / `tunnel_ollama.sh` documentados (opcional si el `ssh -N` sigue vivo)
 - [x] `jq` + `~/bridge/check_bridge.sh` en Kali (Agente-C)
+
+## Auditoría GitHub (2026-09-13)
+
+Ramas `local/home-bridge` / `local/deamonx-bridge-v1.0.0`: limpio / cero secretos. Detalle: [AUDIT_GITHUB_20260913.md](AUDIT_GITHUB_20260913.md). Tags: push `403` — Capitán desde máquina con permiso `refs/tags/*`.

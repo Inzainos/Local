@@ -1,3 +1,11 @@
+## 2026-09-13 — Auditoría GitHub (Claude/Copilot) — Agente-A
+
+### Notes
+- Auditoría de ramas `local/home-bridge` y `local/deamonx-bridge-v1.0.0`: **limpio / cero secretos**.
+- Contenido: `bridge/` (scripts/confs/docs) + `docs/DEAMONX_*.md` (+ README/AGENTS/CHANGELOG/LICENSE en home-bridge). Sin `.env`, tokens ni claves privadas.
+- Tags en origin: push de `refs/tags/*` devolvió **403** desde el entorno de agentes — requiere push del Capitán desde máquina con permiso de tags.
+- Remediación destructiva: N/A (sin hallazgos H1–H6 en estas ramas).
+
 ## 2026-09-13 — Puente seguro DeamonX ↔ Ollama (Agente-C + G + A)
 
 ### Added
