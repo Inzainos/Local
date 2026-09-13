@@ -11,11 +11,11 @@ Monorepo índice de sistemas locales en WSL Kali (**deamon** / X-Deamon).
 | `local/home-bridge` | Home bridge / DeamonX móvil | `/home/deamon` (README, AGENTS, CHANGELOG, `bridge/`, docs DeamonX) | 13 |
 | `local/concilio` | Consensus / Concilio expert agent | `/home/deamon/consensus-expert-agent` | 59 |
 | `local/padron` | Padrón de afiliados (Streamlit) | `/home/deamon/padron_afiliados_app` | 10 |
-| `local/sentinel-omega` | Sentinel Ω (workspaces) | `/home/deamon/workspaces` | 1643 |
+| `local/sentinel-omega` | Sentinel Ω (workspaces) | `/home/deamon/workspaces` | 1639 |
 | `local/watchdog` | Watchdog — monitor de seguridad por cron | `/watchdog` (Kali) | 42 |
 
 Conteos medidos el 2026-09-13 sobre `home-bridge@b80548b`, `concilio@c11df3f`,
-`padron@49caaac`, `sentinel-omega@a0bb343` y `watchdog@358f2ee`. Cambian con cada
+`padron@49caaac`, `sentinel-omega@8ed0681` y `watchdog@358f2ee`. Cambian con cada
 push: `git ls-tree -r --name-only origin/<rama> | wc -l` da el valor vigente.
 
 ### Ramas de snapshot
@@ -91,20 +91,21 @@ usa, `beta2_atmospheric_cnn.onnx` el mayor con ~780 KB) y 6 conservados en
 
 ## Deuda conocida
 
-Estado al 2026-09-13. La columna **Estado** dice en qué punto está cada uno: los
-hay resueltos, parciales, bloqueados, pendientes de tu decisión y uno meramente
-informativo. Se conservan los resueltos para que quede el rastro de qué se hizo
-y dónde. De los 9, **4 siguen abiertos** (#1, #5, #6, #9), uno está bloqueado
-(#7) y uno es informativo (#8).
+Estado al 2026-09-13. La columna **Estado** dice en qué punto está cada uno. Se
+conservan los cerrados para que quede el rastro de qué se hizo, dónde y con qué
+criterio. De los 9, **queda 1 abierto** (#9), uno bloqueado por permisos (#7) y
+uno informativo (#8). Los demás están cerrados: cuatro por trabajo hecho (#2,
+#3, #4, #1) y dos por decisión documentada del autor (#5, #6) — una decisión
+explícita cierra una deuda igual que un commit, siempre que quede escrita.
 
 | # | Rama | Asunto | Estado |
 |---|------|--------|--------|
-| 1 | `local/sentinel-omega` | Los 4 workflows no se ejecutan. Están en `workspaces/.github/workflows/` y GitHub solo lee `.github/workflows/` en la raíz. Moverlos no bastaría: `bandit`/`codeql` disparan sobre `main`, que solo tiene este índice; `roy-vigilante` depende de un `schedule:`, que solo dispara desde la rama por defecto; y `copy-delta-to-snt` exige una rama `origin/jupyter-setup` inexistente aquí y copia a otro repo. Fueron escritos para el repo `workspaces` original | **Documentado en `AGENTS.md`** (ya no promete serverless). Los archivos se conservan: retirar escáneres de seguridad es decisión humana |
+| 1 | `local/sentinel-omega` | Los 4 workflows (`bandit`, `codeql`, `copy-delta-to-snt`, `roy-vigilante`) nunca se ejecutaron: vivían en `workspaces/.github/workflows/` y GitHub solo lee `.github/workflows/` en la raíz del repo; los `schedule:` además solo disparan desde la rama por defecto | **Cerrado en `8ed0681`** (decisión del autor): eliminados de la rama. La operación queda 100% en systemd local (`deploy/*.service` y `.timer`). Siguen recuperables con `git show 8ed0681^:workspaces/.github/workflows/<archivo>` |
 | 2 | `local/sentinel-omega` | Árbol de modelos duplicado | **Resuelto en `b639aa8`** (Agente-C): los 6 ONNX anidados + su `models_meta.json` se movieron a `_archive/20260913/models_nested/` (renames `R100`, byte a byte idénticos) y `loki_unificado_rf.onnx` se borró por ser el mismo blob `e27bb4b` que el canónico. Quedan 7 ONNX en `sentinel_omega/models/`. Diagnóstico previo: el canónico es `sentinel_omega/models/` (meta del 2026-09-13T09:05Z, alfa1 n=1388 / beta1 n=2082 / omega n=2726). El anidado `sentinel_omega/sentinel_omega/models/` es copia congelada del 2026-09-11T00:20Z (n=1303 / 1997 / 2556). El `path` absoluto de **ambos** meta apunta al de primer nivel, igual que el `base_dir` por defecto de `config/onnx_config.py`. Falta decidir si se borra la copia |
 | 3 | `local/sentinel-omega` | Respaldos manuales versionados | **Resuelto.** `b639aa8` sacó 40 archivos y archivó el tarball `_SCHEMA_PARTS_BACKUP_PRE_FIX.tar.gz`; `e70e462` archivó los 2 que el glob `*.bak*` no alcanzó por su nombre (`launcher.py.broken-2026-09-10`, `launcher_fixed.py`) en `_archive/20260913/launchers/` |
 | 4 | `local/padron`, `local/sentinel-omega` | Symlinks de skills apuntando dentro de `venv/`/`.venv/` (gitignorado): rotos en cualquier clon | **Resuelto.** El de `sentinel-omega` en `b639aa8`; los dos de `local/padron` en `49caaac`, fuera del índice y añadidos al `.gitignore` con el motivo escrito. El symlink `sentinel_omega/sentinel_omega/data → ../data` se conserva a propósito: resuelve bien |
-| 5 | `local/sentinel-omega` | `estado/` crece por ejecución (1117 de 1677 archivos, 67% de la rama). Evaluar retención o Git LFS | Documentado |
-| 6 | `local/sentinel-omega` | `LICENSE` de raíz (y `workspaces/LICENSE`) dicen MIT mientras `workspaces/sentinel_omega/pyproject.toml` dice `Proprietary — Fractal Core Research` | **Pendiente: decisión del autor.** Cambiar un `LICENSE` es acto legal, no mantenimiento |
+| 5 | `local/sentinel-omega` | `estado/` crece por ejecución (1117 de 1639 archivos, 68% de la rama) | **Cerrado por decisión del autor (`8ed0681`):** sin retención ni purga, igualando a `Inzainos/workspaces` (main), que tampoco poda. Se asume el crecimiento a cambio de conservar el histórico completo |
+| 6 | `local/sentinel-omega` | `LICENSE` de raíz (y `workspaces/LICENSE`) dicen MIT mientras `workspaces/sentinel_omega/pyproject.toml` dice `Proprietary — Fractal Core Research` | **Cerrado por decisión del autor (`8ed0681`):** sin cambio. `Inzainos/workspaces` (main) declara la misma combinación, así que es el patrón establecido entre monorepo y subproyecto, no una contradicción accidental |
 | 7 | — | El remoto no tiene tags. Las dos ramas de snapshot deberían serlo | **Bloqueado:** el push de `refs/tags/*` se deniega con HTTP 403 desde esta sesión (los pushes a `refs/heads/*` sí pasan). Hay que crearlos desde la katana |
 | 8 | `local/sentinel-omega` | `_archive/20260913/` es material conservado a propósito (ONNX anidados, tarball de schema, variantes del launcher), no basura. Su `README.md` explica qué hay dentro y cómo revertir | Informativo |
 | 9 | `local/sentinel-omega` | Dos cosas importables se llaman `sentinel_omega`: el directorio de proyecto (tiene `__init__.py`) y el paquete anidado que declara el `egg-info`. Es la causa de que los modelos se duplicaran | **Pendiente: requiere correr la suite.** Ver nota abajo |
