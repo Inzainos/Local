@@ -31,7 +31,8 @@ git clone -b local/sentinel-omega https://github.com/Inzainos/Local.git Local-se
 git clone -b local/watchdog       https://github.com/Inzainos/Local.git Local-watchdog
 ```
 
-Cada rama incluye su propio `README.md` y `AGENTS.md` (sin secretos).
+Cada rama incluye en su raíz `README.md`, `AGENTS.md`, `CHANGELOG.md` y `LICENSE`
+(sin secretos), más la cabecera que enlaza de vuelta a este índice.
 
 ## Qué contiene cada sistema
 
@@ -67,13 +68,29 @@ Cada rama incluye su propio `README.md` y `AGENTS.md` (sin secretos).
 
 ## Deuda conocida
 
-Pendientes detectados el 2026-09-13, aún sin resolver en sus ramas:
+Estado al 2026-09-13. Las ramas reflejan el árbol de la máquina Kali y su contenido
+no se modifica desde aquí; lo que sigue está documentado en cada rama, no resuelto.
 
-| # | Rama | Asunto |
-|---|------|--------|
-| 1 | `local/sentinel-omega` | Workflows en `workspaces/.github/workflows/` — GitHub solo lee `.github/workflows/` en la raíz, así que hoy no corre ningún CI (`bandit`, `codeql`, `copy-delta-to-snt`, `roy-vigilante`). Los `schedule:` además solo disparan desde la rama por defecto |
-| 2 | `local/sentinel-omega` | Árbol de modelos duplicado: `sentinel_omega/models/` y `sentinel_omega/sentinel_omega/models/` con los mismos nombres y contenidos distintos (salvo `loki_unificado_rf.onnx`, blob idéntico). Falta definir cuál es el canónico |
-| 3 | `local/sentinel-omega` | Respaldos manuales versionados: `launcher_hex_backup_1788196565/`, `launcher.py.broken-2026-09-10`, `launcher_fixed.py`, `*.bak_ingest_20260910_183137`, `*.bak_delta_20260910` |
-| 4 | `local/padron`, `local/sentinel-omega` | Symlinks `.claude/skills/` y `.agents/skills/developing-with-streamlit` apuntan dentro de `venv/`/`.venv/` (gitignorado): quedan rotos en cualquier clon hasta crear el entorno con Streamlit |
-| 5 | `local/sentinel-omega` | `estado/` crece por ejecución (1117 de 1677 archivos, 67% de la rama). Evaluar retención o Git LFS |
-| 6 | — | Las dos ramas de snapshot deberían ser tags anotados; hoy el remoto no tiene ningún tag |
+| # | Rama | Asunto | Estado |
+|---|------|--------|--------|
+| 1 | `local/sentinel-omega` | Workflows en `workspaces/.github/workflows/` — GitHub solo lee `.github/workflows/` en la raíz, así que hoy no corre ningún CI (`bandit`, `codeql`, `copy-delta-to-snt`, `roy-vigilante`). Los `schedule:` además solo disparan desde la rama por defecto | Documentado |
+| 2 | `local/sentinel-omega` | Árbol de modelos duplicado | **Resuelto el diagnóstico:** el canónico es `sentinel_omega/models/` (meta del 2026-09-13T09:05Z, alfa1 n=1388 / beta1 n=2082 / omega n=2726). El anidado `sentinel_omega/sentinel_omega/models/` es copia congelada del 2026-09-11T00:20Z (n=1303 / 1997 / 2556). El `path` absoluto de **ambos** meta apunta al de primer nivel, igual que el `base_dir` por defecto de `config/onnx_config.py`. Falta decidir si se borra la copia |
+| 3 | `local/sentinel-omega` | Respaldos manuales versionados: `launcher_hex_backup_1788196565/`, `launcher.py.broken-2026-09-10`, `launcher_fixed.py`, `*.bak_ingest_20260910_183137`, `*.bak_delta_20260910` | Documentado |
+| 4 | `local/padron`, `local/sentinel-omega` | Symlinks `.claude/skills/` y `.agents/skills/developing-with-streamlit` apuntan dentro de `venv/`/`.venv/` (gitignorado): quedan rotos en cualquier clon hasta crear el entorno con Streamlit | Documentado |
+| 5 | `local/sentinel-omega` | `estado/` crece por ejecución (1117 de 1677 archivos, 67% de la rama). Evaluar retención o Git LFS | Documentado |
+| 6 | `local/sentinel-omega` | `LICENSE` de raíz dice MIT y `workspaces/sentinel_omega/pyproject.toml` dice `Proprietary — Fractal Core Research` | Documentado |
+| 7 | — | El remoto no tiene tags. Las dos ramas de snapshot deberían serlo | **Bloqueado:** el push de `refs/tags/*` se deniega con HTTP 403 desde esta sesión (los pushes a `refs/heads/*` sí pasan). Hay que crearlos desde la katana |
+
+### Tags pendientes
+
+Los mensajes ya están redactados; falta ejecutarlos desde una máquina con permiso
+de escritura sobre `refs/tags/*`:
+
+```bash
+git tag -a concilio-2.2.6 f4abb65 -m "Concilio 2.2.6 (2026-09-13)"
+git tag -a deamonx-bridge-v1.0.0 6ef194b -m "DeamonX bridge v1.0.0 (2026-09-13)"
+git push origin concilio-2.2.6 deamonx-bridge-v1.0.0
+```
+
+Las ramas `local/concilio-2.2.6-20260913` y `local/deamonx-bridge-v1.0.0` se
+conservan tal cual: los tags no las reemplazan hasta que se decida borrarlas.
