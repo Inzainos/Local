@@ -1,3 +1,8 @@
+## 2026-09-13 ? H2/H3/H4 classify (Agente-C)
+- Nested ONNX ?canon ? `_archive/20260913/models_nested/`; loki nested id?ntico borrado
+- Baks/hex obsolete borrados; schema tar ? `_archive/20260913/schema/`
+- Symlink venv/streamlit eliminado
+
 ## 2026-09-13 ? Auditor?a GitHub (Agente-C)
 
 - Doc: `docs/AUDIT_GITHUB_20260913.md` (H1?H6 + decisiones pendientes).

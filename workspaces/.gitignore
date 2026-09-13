@@ -18,3 +18,9 @@ __pycache__/
 .env.*
 !.env.example
 *.pem
+
+# audit cleanup 2026-09-13
+*.bak*
+*_backup_*
+launcher_hex_backup_*/
+.agents/

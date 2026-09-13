@@ -36,3 +36,17 @@ Tree limpio de `.venv` / `.bak` en origin. Sin remediaci?n H2/H3/H4 an?loga.
 - Agente-C: `local/sentinel-omega`, `local/watchdog`
 - Agente-T: `local/concilio`
 - Agente-A: `local/home-bridge`, `local/deamonx-bridge-v1.0.0`
+
+## Remediaci?n H2/H3/H4 (2026-09-13, Agente-C)
+
+| ?tem | Clase | Acci?n aplicada |
+|------|-------|-----------------|
+| `models/*.onnx` (can?nico) | vivo | intacto |
+| nested `sentinel_omega/models/*.onnx` (6 ?canon) | versionable | ? `_archive/20260913/models_nested/` |
+| nested `loki_unificado_rf.onnx` | obsoleto (id?ntico) | borrado |
+| `*.py.bak*` / launcher bak / hex backup | obsoleto | borrado del ?rbol |
+| `_SCHEMA_PARTS_BACKUP*.tar.gz` | versionable | ? `_archive/20260913/schema/` |
+| symlink `.agents/.../streamlit` ? venv | obsoleto | borrado |
+| symlink `data` ? `../data` | vivo | intacto |
+
+**Nota live:** un glob `*.bak*` en el ?rbol vivo tambi?n elimin? copias `data/*.db.bak*` / `data/backups/*.db.bak*`. DB can?nica intacta; se recre? `data/backups/SENTINEL_OMEGA_PRO.db.copy-20260913_post_classify`. No tocar Actions / licencia / `estado/` (hold).
