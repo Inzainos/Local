@@ -31,8 +31,14 @@ git clone -b local/sentinel-omega https://github.com/Inzainos/Local.git Local-se
 git clone -b local/watchdog       https://github.com/Inzainos/Local.git Local-watchdog
 ```
 
-Cada rama incluye en su raíz `README.md`, `AGENTS.md`, `CHANGELOG.md` y `LICENSE`
-(sin secretos), más la cabecera que enlaza de vuelta a este índice.
+Cada una de las **cinco ramas de sistema** de arriba incluye en su raíz `README.md`,
+`AGENTS.md`, `CHANGELOG.md` y `LICENSE` (sin secretos), más la cabecera que enlaza de
+vuelta a este índice.
+
+Las dos ramas de snapshot no: son cortes congelados y quedaron fuera de esa
+normalización. `local/deamonx-bridge-v1.0.0` solo trae `bridge/` + `docs/`, sin ningún
+archivo de raíz; `local/concilio-2.2.6-20260913` conserva `README.md`, `AGENTS.md` y
+`CHANGELOG.md` pero es anterior al `LICENSE`, así que tampoco lo tiene.
 
 ## Qué contiene cada sistema
 
