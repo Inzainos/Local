@@ -1,0 +1,15 @@
+[Unit]
+Description=Timer respaldo diario de la DB de Sentinel Omega
+
+[Timer]
+# 03:45 hora local. Se coloca después del barrido diario (03:00) y del backup
+# off-box de watchdog (03:30) para no pelear por IO sobre /mnt/c.
+OnCalendar=*-*-* 03:45:00
+# Si la máquina estaba apagada a esa hora, se corre al encender. Un respaldo
+# tarde vale más que un respaldo que nunca ocurrió.
+Persistent=true
+# Evita que varias máquinas o varios timers golpeen el disco al mismo segundo.
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

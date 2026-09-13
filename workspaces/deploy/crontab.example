@@ -6,3 +6,8 @@
 
 # Disciplina / Juez cada 2h
 0 */2 * * * cd /opt/workspaces && .venv/bin/python -m sentinel_omega.launcher --disciplina >> /var/log/sentinel-disciplina.log 2>&1
+
+# Respaldo off-box de la DB 03:45 (después del barrido). Usa sqlite3 .backup,
+# NO cp: copiar una SQLite en caliente con cp puede producir un archivo roto.
+# Destino fuera del árbol del proyecto, retención de 30 días.
+45 3 * * * bash /opt/workspaces/deploy/offbox_backup_db.sh --verify >> /var/log/sentinel-backup-db.log 2>&1

@@ -3,6 +3,39 @@
 - Baks/hex obsolete borrados; schema tar → `_archive/20260913/schema/`
 - Symlink venv/streamlit eliminado
 
+## 2026-09-13 — El respaldo de la DB entra al sistema de timers
+
+Hasta hoy `workspaces` no tenía **ningún** job de respaldo: los timers cubrían
+mantenimiento, rutinas locales y retrain ONNX, pero nada copiaba la DB. El
+script nuevo deja de ser una herramienta suelta y se engancha al mismo
+mecanismo que el resto.
+
+### Added
+- `deploy/sentinel-omega-backup-db.service` — misma convención que las demás
+  unidades: `Type=oneshot`, `WorkingDirectory=__REPO_DIR__`, `EnvironmentFile`
+  opcional desde `deploy/.env`. Tres decisiones propias de esta tarea:
+  `Nice=15` + `IOSchedulingClass=idle` para que el respaldo nunca compita con
+  el pipeline; `TimeoutStartSec=3600` porque copiar cientos de MB a `/mnt/c`
+  puede pasarse del timeout por defecto y systemd mataría el proceso a media
+  faena; y `After=sentinel-omega-mantenimiento.service`, para que el respaldo
+  salga con la DB ya compactada por el barrido.
+- `deploy/sentinel-omega-backup-db.timer` — `OnCalendar=*-*-* 03:45:00`, entre
+  el barrido (03:00) y el off-box de watchdog (03:30) para no pelear por IO.
+  `Persistent=true` (si la máquina estaba apagada, se corre al encender: un
+  respaldo tarde vale más que uno que nunca ocurrió) y `RandomizedDelaySec=5min`.
+- `deploy/crontab.example` — línea equivalente para quien no use timers.
+
+### Changed
+- `deploy/install.sh` — instala y habilita la pareja nueva junto a las demás,
+  y la anuncia en el bloque de arranque 24/7.
+
+### Verified
+- `systemd-analyze verify` sobre la unidad ya sustituida: sin observaciones.
+- Sustitución de `__REPO_DIR__` igual que la hace `install.sh`: cero marcadores
+  restantes.
+- El `ExecStart` exacto de la unidad, con su `Environment`, produce un respaldo
+  con `integrity_check=ok`.
+
 ## 2026-09-13 — Respaldo off-box de la DB + hook anti-mojibake
 
 ### Added
