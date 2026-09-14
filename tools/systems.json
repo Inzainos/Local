@@ -1,0 +1,31 @@
+{
+  "_comment": "Metadatos curados por rama. gen_index.py fusiona esto con las ramas reales del remoto. Si una rama local/* no aparece aqui, se lista igual con descripcion pendiente. Anade cada sistema nuevo aqui para que el indice quede completo.",
+  "local/home-bridge": {
+    "sistema": "Home bridge / DeamonX movil",
+    "origen": "/home/deamon (README, AGENTS, CHANGELOG, bridge/, docs DeamonX)"
+  },
+  "local/concilio": {
+    "sistema": "Consensus / Concilio expert agent",
+    "origen": "/home/deamon/consensus-expert-agent"
+  },
+  "local/concilio-2.2.6-20260913": {
+    "sistema": "Consensus / Concilio expert agent (snapshot v2.2.6, 2026-09-13)",
+    "origen": "/home/deamon/consensus-expert-agent"
+  },
+  "local/padron": {
+    "sistema": "Padron de afiliados (Streamlit)",
+    "origen": "/home/deamon/padron_afiliados_app"
+  },
+  "local/sentinel-omega": {
+    "sistema": "Sentinel Ω — primera version (workspaces)",
+    "origen": "/home/deamon/workspaces (sin ONNX/DB/.env/venv)"
+  },
+  "local/deamonx-bridge-v1.0.0": {
+    "sistema": "DeamonX bridge (release v1.0.0)",
+    "origen": "/home/deamon/bridge"
+  },
+  "local/watchdog": {
+    "sistema": "Watchdog / monitor local",
+    "origen": "/home/deamon (watchdog)"
+  }
+}

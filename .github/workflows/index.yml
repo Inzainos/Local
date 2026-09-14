@@ -1,0 +1,81 @@
+name: index
+
+# Regenera el indice de sistemas del README desde las ramas reales del remoto.
+#
+#   - create / push a main / diario / manual  -> regenera y commitea a main
+#   - pull_request                            -> solo verifica (--check), no escribe
+#
+# El evento `create` corre con el workflow de la rama por defecto (main), asi que
+# crear una rama huerfana local/* dispara la regeneracion aunque esa rama no tenga
+# este archivo.
+
+on:
+  create:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 6 * * *"   # 06:17 UTC diario
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: index-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  regenerate:
+    # En PRs no commiteamos: solo verificamos (job check).
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Regenerar indice
+        run: python3 tools/gen_index.py
+
+      - name: Subir log como artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gen_index-log
+          path: logs/gen_index.log
+          if-no-files-found: ignore
+
+      - name: Commit si hay cambios
+        run: |
+          if [ -n "$(git status --porcelain README.md)" ]; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add README.md
+            git commit -m "docs: regenerar indice de sistemas (auto)"
+            git push origin main
+          else
+            echo "Sin cambios en el indice."
+          fi
+
+  check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verificar que el indice esta al dia
+        run: python3 tools/gen_index.py --check
