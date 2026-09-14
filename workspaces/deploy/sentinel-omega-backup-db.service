@@ -1,0 +1,24 @@
+[Unit]
+Description=Sentinel Omega — Respaldo off-box de la DB (sqlite3 .backup, no cp)
+Documentation=file:__REPO_DIR__/deploy/offbox_backup_db.sh
+After=network-online.target
+Wants=network-online.target
+# Corre después del barrido diario: la DB queda compactada y el respaldo sale
+# más pequeño. No es una dependencia dura — .backup tolera escrituras en curso.
+After=sentinel-omega-mantenimiento.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=__REPO_DIR__
+EnvironmentFile=-__REPO_DIR__/deploy/.env
+Environment=SENTINEL_ROOT=__REPO_DIR__
+ExecStart=/usr/bin/env bash __REPO_DIR__/deploy/offbox_backup_db.sh --verify
+# El respaldo no debe competir con el pipeline: baja prioridad de CPU y de IO.
+Nice=15
+IOSchedulingClass=idle
+# Una copia de cientos de MB sobre /mnt/c puede tardar; sin tope propio systemd
+# usa 90s por defecto en algunos sistemas y mataría el proceso a media faena.
+TimeoutStartSec=3600
+
+[Install]
+WantedBy=multi-user.target

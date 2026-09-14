@@ -43,12 +43,17 @@ install_unit deploy/sentinel-omega-disciplina.service
 install_unit deploy/sentinel-omega-barrido.service
 install_unit deploy/sentinel-omega-scheduler.service
 install_unit deploy/sentinel-omega-watchdog.service
+install_unit deploy/sentinel-omega-backup-db.service
+install_unit deploy/sentinel-omega-backup-db.timer
 
 sudo systemctl daemon-reload
 echo ">> systemd daemon-reload OK."
 
 sudo systemctl enable sentinel-omega-mantenimiento.timer
 echo ">> Timer mantenimiento diario habilitado (08:00 UTC)."
+
+sudo systemctl enable sentinel-omega-backup-db.timer
+echo ">> Timer respaldo de la DB habilitado (03:45 local, off-box)."
 
 echo ""
 echo "═══════════════════════════════════════════════════════════"
@@ -63,6 +68,7 @@ echo "    sudo systemctl enable --now sentinel-omega-scheduler   # reportes 2h/6
 echo "    sudo systemctl enable --now sentinel-omega-watchdog     # watchdog red/agente"
 echo "    sudo systemctl start sentinel-omega-mantenimiento.timer"
 echo "    sudo systemctl enable --now sentinel-omega-onnx-retrain.timer  # retrain ONNX domingos 03:00"
+echo "    sudo systemctl enable --now sentinel-omega-backup-db.timer    # respaldo DB off-box 03:45"
 echo ""
 echo "  MANTENIMIENTO MANUAL:"
 echo "    sudo systemctl start sentinel-omega-mantenimiento.service"

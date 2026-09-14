@@ -29,7 +29,7 @@ SNT (Shadow Node Theory) se usa **solo como framework matemático**
 sentinel_omega/     El sistema (6 agentes + Padre + Juez, pipeline, DB, dashboard)
 deploy/             Operación: generar_reporte.py, systemd/Windows, atajo iOS, .env.example
 estado/             Reportes publicados: REPORTE.md (último) + historial/AAAA/MM/ (versionado)
-.github/workflows/  roy-vigilante.yml — corre un ciclo cada 2h en GitHub Actions (serverless)
+.github/workflows/  INERTE en este repo — ver nota abajo. Los 4 workflows no se ejecutan
 ```
 
 ## Comandos
@@ -127,8 +127,20 @@ streamlit run sentinel_omega/infrastructure/dashboard/app.py
 - No pushear a otra rama sin permiso explícito.
 - Los PRs se abren como **draft**. Si un PR ya fue mergeado, no apiles trabajo
   nuevo encima: reinicia la rama desde `origin/main` y abre un PR nuevo.
-- El cron de `roy-vigilante.yml` solo dispara en `main` → hay que mergear para
-  activarlo.
+- **Los workflows de `.github/` no corren en este repositorio.** Están en
+  `workspaces/.github/workflows/`, y GitHub solo lee `.github/workflows/` en la
+  **raíz del repo** — un subdirectorio no se escanea. Verificado: el PR del
+  índice reporta `total_count: 0` en checks.
+  Aunque se movieran a la raíz seguirían sin servir tal como están escritos:
+  `bandit` y `codeql` disparan en push/PR a `main`, que aquí solo contiene el
+  índice del monorepo (cero Python que escanear); `roy-vigilante` depende de un
+  `schedule:`, que solo dispara desde la rama por defecto, y esta es una rama
+  huérfana; y `copy-delta-to-snt` exige una rama `origin/jupyter-setup` que no
+  existe en `Inzainos/Local` y copia hacia otro repositorio.
+  Fueron escritos para el repo `workspaces` original, donde el código vivía en
+  `main`. **El ciclo de 2h lo sostiene systemd en la Kali, no Actions.** Se
+  conservan sin tocar a la espera de decisión: repo propio para Sentinel (los
+  4 funcionarían tal cual) o retirarlos.
 
 ## Fuentes de datos (todas públicas salvo donde se indica)
 

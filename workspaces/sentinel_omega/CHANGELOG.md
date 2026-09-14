@@ -1,12 +1,154 @@
-## 2026-09-13 ? H2/H3/H4 classify (Agente-C)
-- Nested ONNX ?canon ? `_archive/20260913/models_nested/`; loki nested id?ntico borrado
-- Baks/hex obsolete borrados; schema tar ? `_archive/20260913/schema/`
+## 2026-09-13 — H2/H3/H4 classify (Agente-C)
+- Nested ONNX ≠canon → `_archive/20260913/models_nested/`; loki nested idéntico borrado
+- Baks/hex obsolete borrados; schema tar → `_archive/20260913/schema/`
 - Symlink venv/streamlit eliminado
 
-## 2026-09-13 ? Auditor?a GitHub (Agente-C)
+## 2026-09-13 — Correcciones de la revisión de Copilot (PR #2)
 
-- Doc: `docs/AUDIT_GITHUB_20260913.md` (H1?H6 + decisiones pendientes).
-- Push `Inzainos/Local` rama `local/sentinel-omega`: cero secretos; remediaci?n H1?H4/H6 en hold hasta GO Capit?n.
+Ocho hallazgos sobre el script de respaldo y el hook. Todos verificados
+reproduciendo el fallo antes de corregirlo.
+
+### Fixed — `deploy/offbox_backup_db.sh`
+- **`--dry-run` sí escribía.** `mkdir -p "$LOG_DIR"` corría antes de la rama de
+  simulación y `log()` usaba `tee -a`, así que el modo que anunciaba "no se
+  escribe nada" creaba el directorio y añadía 5 líneas al log. Reproducido y
+  corregido: en dry-run no se crea nada y el log va solo a stdout.
+- **Reserva de espacio insuficiente.** Se exigía 1× el tamaño de la DB, pero
+  durante el `gzip` coexisten la copia `.db` y el `.db.gz`. Con justo ese
+  margen, `.backup` terminaba y `gzip` moría por ENOSPC. Ahora exige 2×.
+- **Un `.db.gz` parcial contaba como respaldo válido.** El `trap` solo borraba
+  la copia intermedia `.db`; si `gzip` fallaba a medias, el `.gz` truncado
+  casaba con el patrón de poda y se contaba como disponible — el fallo exacto
+  que este script existe para evitar. Ahora los intermedios llevan sufijo
+  `.tmp` (que no casa con el patrón) y solo se renombran al destino final tras
+  éxito, así que ni un `kill -9` deja un respaldo aparente pero corrupto.
+- **Carrera entre corridas concurrentes.** El sello con segundos no evita que
+  dos invocaciones pasen la comprobación de existencia antes de que la otra
+  escriba. Añadido `flock` exclusivo sobre toda la operación.
+- **La poda por edad no acotaba el disco.** Varias corridas manuales en la
+  misma ventana de 30 días dejaban N snapshots de cientos de MB. Añadido techo
+  por número de copias (`SENTINEL_BACKUP_MAX_COPIES`, 30 por defecto), y la
+  poda ahora corre **antes** de copiar, liberando espacio en vez de limpiar
+  cuando el disco ya se llenó.
+- `deploy/crontab.example` redirigía stdout al mismo archivo donde `log()` ya
+  escribe con `tee`, duplicando cada línea. Quitada la redirección.
+
+### Fixed — `deploy/hooks/pre-commit-utf8`
+- **No detectaba el caso real que lo motivó.** Si un archivo ya tenía algún
+  carácter no-ASCII, el hook lo saltaba entero. Pero el CHANGELOG de Agente-C
+  era exactamente eso: líneas correctas en UTF-8 que recibieron encima líneas
+  mutiladas. Verificado que se le escapaba. Ahora la prosa (`.md`, `.txt`) se
+  revisa siempre; en código se conserva el criterio conservador, porque ahí
+  `re.compile(r"a?b")` es legítimo y daría falso positivo.
+- **La raya tras un dígito se escapaba.** El patrón exigía letra antes del
+  espacio, y el caso real era `2026-09-13 ? Auditoría`. Dígitos incluidos.
+- **`--diff-filter=ACM` excluía renames.** Un archivo renombrado que además
+  recibiera la mutilación pasaba sin revisión. Ahora `ACMR`.
+- **Rutas de instalación rotas.** Decían `deploy/hooks/...` desde la raíz del
+  checkout, donde el hook vive en `workspaces/deploy/hooks/...`, así que el
+  symlink quedaba colgando. Corregidas las tres, con la explicación de por qué
+  el destino se resuelve desde `.git/hooks/`.
+- Documentación del hook alineada con lo que hace ahora.
+
+### Verified
+- Los 6 casos del hook: detecta prosa mixta, raya tras dígito y texto
+  íntegramente mutilado; deja pasar UTF-8 correcto, preguntas legítimas y URLs
+  con query string.
+- `--dry-run` no crea el directorio de logs ni escribe en él.
+- Respaldo → gunzip → `integrity_check=ok` → filas legibles.
+- Poda por exceso con techo de 3: de 6 copias quedan 3 + la nueva.
+- Dos corridas simultáneas: una guarda, la otra se bloquea por cerrojo; un solo
+  `.db.gz` resultante y cero restos `.tmp`.
+
+## 2026-09-13 — El respaldo de la DB entra al sistema de timers
+
+Hasta hoy `workspaces` no tenía **ningún** job de respaldo: los timers cubrían
+mantenimiento, rutinas locales y retrain ONNX, pero nada copiaba la DB. El
+script nuevo deja de ser una herramienta suelta y se engancha al mismo
+mecanismo que el resto.
+
+### Added
+- `deploy/sentinel-omega-backup-db.service` — misma convención que las demás
+  unidades: `Type=oneshot`, `WorkingDirectory=__REPO_DIR__`, `EnvironmentFile`
+  opcional desde `deploy/.env`. Tres decisiones propias de esta tarea:
+  `Nice=15` + `IOSchedulingClass=idle` para que el respaldo nunca compita con
+  el pipeline; `TimeoutStartSec=3600` porque copiar cientos de MB a `/mnt/c`
+  puede pasarse del timeout por defecto y systemd mataría el proceso a media
+  faena; y `After=sentinel-omega-mantenimiento.service`, para que el respaldo
+  salga con la DB ya compactada por el barrido.
+- `deploy/sentinel-omega-backup-db.timer` — `OnCalendar=*-*-* 03:45:00`, entre
+  el barrido (03:00) y el off-box de watchdog (03:30) para no pelear por IO.
+  `Persistent=true` (si la máquina estaba apagada, se corre al encender: un
+  respaldo tarde vale más que uno que nunca ocurrió) y `RandomizedDelaySec=5min`.
+- `deploy/crontab.example` — línea equivalente para quien no use timers.
+
+### Changed
+- `deploy/install.sh` — instala y habilita la pareja nueva junto a las demás,
+  y la anuncia en el bloque de arranque 24/7.
+
+### Verified
+- `systemd-analyze verify` sobre la unidad ya sustituida: sin observaciones.
+- Sustitución de `__REPO_DIR__` igual que la hace `install.sh`: cero marcadores
+  restantes.
+- El `ExecStart` exacto de la unidad, con su `Environment`, produce un respaldo
+  con `integrity_check=ok`.
+
+## 2026-09-13 — Respaldo off-box de la DB + hook anti-mojibake
+
+### Added
+- `deploy/offbox_backup_db.sh` — respaldo consistente de la DB fuera del árbol.
+  Usa `sqlite3 .backup` (API de respaldo en línea), **no `cp`**: copiar una
+  SQLite en caliente con `cp` puede llevarse páginas de dos estados y un WAL
+  desincronizado, produciendo un archivo que abre bien y falla meses después.
+  Destino en `/mnt/c`, fuera del alcance de cualquier glob de limpieza del
+  proyecto — la causa del incidente del 2026-09-13. Retención de 30 días, para
+  tener historia de restauración y no un solo snapshot. Flags `--verify`
+  (integrity_check y descarta la copia si falla) y `--dry-run`. Log en
+  `logs/offbox_db.log`. Calcado de `watchdog/scripts/offbox_backup.sh`.
+  Probado: respaldo → gunzip → `integrity_check=ok` → filas legibles; DB
+  inexistente → exit 1; poda de un respaldo de 40 días; doble corrida no
+  sobrescribe ni deja `.db` a medias.
+- `deploy/hooks/pre-commit-utf8` — rechaza commits con acentos mutilados.
+  Detecta archivos ASCII puro con `?` entre letras/dígitos, que es la firma de
+  un pipeline que no escribió UTF-8. Probado contra el texto real mutilado
+  (bloquea las 4 líneas), contra el mismo texto en UTF-8, contra preguntas
+  legítimas y contra URLs con query string y globs tipo `h0?.hex` (no marca
+  ninguno).
+
+### Fixed
+- `AGENTS.md` ya no promete que `roy-vigilante.yml` corre cada 2 h en GitHub
+  Actions. No corre: los workflows están en `workspaces/.github/workflows/` y
+  GitHub solo lee `.github/workflows/` en la raíz del repositorio. Aunque se
+  movieran seguirían sin servir tal como están escritos — `bandit`/`codeql`
+  disparan sobre `main`, que aquí solo tiene el índice del monorepo;
+  `roy-vigilante` depende de un `schedule:`, que solo dispara desde la rama por
+  defecto; y `copy-delta-to-snt` exige una rama `origin/jupyter-setup` que no
+  existe aquí. Fueron escritos para el repo `workspaces` original. El ciclo de
+  2 h lo sostiene systemd en la Kali. Los workflows se conservan sin tocar.
+
+## 2026-09-13 — Relevo de Agente-C (sin créditos): cierre de H3/H4
+
+- **H3 cerrado.** El glob `*.bak*` de `b639aa8` no alcanzó dos variantes del
+  launcher porque su nombre no casa con ese patrón. Archivadas en
+  `_archive/20260913/launchers/`: `launcher_fixed.py` (38 999 B) y
+  `launcher.py.broken-2026-09-10` (31 566 B). Ninguna es duplicado del vigente
+  `launcher.py` (39 441 B), así que se archivan en vez de borrarse, mismo
+  criterio que se aplicó a los ONNX anidados.
+- **Encoding corregido.** `docs/AUDIT_GITHUB_20260913.md` se había escrito en
+  ASCII y perdió 36 caracteres (acentos y rayas como `?`). Reescrito en UTF-8
+  sin cambiar contenido, y con las columnas de Estado de H2/H3/H4 actualizadas.
+  Las líneas de este CHANGELOG de la entrada anterior, igual.
+- **Documentado el incidente `/data`** en la auditoría: el mismo glob borró
+  copias `data/*.db.bak*` del árbol vivo (nunca versionadas, git no las tiene).
+  DB canónica `integrity_check=ok`. Riesgo residual: un solo snapshot de 873 MB
+  = sin historia de restauración.
+- `_archive/20260913/README.md` ampliado con qué hay dentro y cómo revertir.
+- Sin tocar: Actions, licencia y `estado/` siguen en hold.
+
+## 2026-09-13 — Auditoría GitHub (Agente-C)
+
+- Doc: `docs/AUDIT_GITHUB_20260913.md` (H1–H6 + decisiones pendientes).
+- Push `Inzainos/Local` rama `local/sentinel-omega`: cero secretos; remediación H1–H4/H6 en hold hasta GO Capitán.
 
 ## 2026-09-13 — Duelo launcher cerrado, watchdog/ops, Schumann/Alfa2 tests
 

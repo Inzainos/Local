@@ -1,6 +1,24 @@
 # Changelog — Sentinel Omega
 
 
+## [Unreleased] - 2026-09-13 - Cierre de pendientes GO Capitán (H1, H6, licencia)
+
+### Removed
+- `workspaces/.github/workflows/` completo (bandit.yml, codeql.yml,
+  copy-delta-to-snt.yml, roy-vigilante.yml). Nunca corrían en esta rama
+  huérfana — GitHub solo lee `.github/` en la raíz del repo, y `schedule:`
+  solo dispara desde la rama por defecto. Operación 100% local vía systemd
+  (`deploy/*.service` / `.timer`). H1 cerrado.
+
+### Decided
+- **Retención `estado/` (H6):** sin límite/purga, igual que `Inzainos/workspaces`
+  (main), que tampoco poda — 799 archivos acumulados desde 2026-07-02 sin corte.
+- **Licencia:** sin cambio. `Inzainos/workspaces` (main) declara la misma
+  combinación — `LICENSE` raíz MIT + `sentinel_omega/pyproject.toml` con
+  `Proprietary — Fractal Core Research` — así que no hay inconsistencia real
+  entre monorepo y subproyecto; ya coincide con el repo de referencia.
+- Detalle completo: `workspaces/sentinel_omega/docs/AUDIT_GITHUB_20260913.md`.
+
 ## [Unreleased] - 2026-09-13 - Metadata de rama: README de raíz
 
 ### Added

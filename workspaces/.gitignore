@@ -24,3 +24,11 @@ __pycache__/
 *_backup_*
 launcher_hex_backup_*/
 .agents/
+
+# Excepción: los scripts de operación SÍ se versionan aunque su nombre lleve
+# "backup". Sin esto, `deploy/offbox_backup_db.sh` casaba con `*_backup_*` y
+# `git add -A` lo descartaba en silencio — el mismo patrón demasiado ancho que
+# provocó el borrado de las copias de `data/` el 2026-09-13.
+!deploy/*.sh
+!deploy/hooks/*
+!scripts/*.sh
