@@ -1,12 +1,13 @@
 name: index
 
-# Regenera el indice de sistemas del README desde las ramas reales del remoto.
+# Verifica que el README (documento curado a mano) siga reflejando las ramas de
+# sistema reales del remoto. No reescribe el README: solo falla si aparece o
+# desaparece una rama `local/*` sin actualizar la documentacion.
 #
-#   - create / push a main / diario / manual  -> regenera y commitea a main
-#   - pull_request                            -> solo verifica (--check), no escribe
+#   - create / push a main / pull_request / diario / manual -> corre --check
 #
 # El evento `create` corre con el workflow de la rama por defecto (main), asi que
-# crear una rama huerfana local/* dispara la regeneracion aunque esa rama no tenga
+# crear una rama huerfana local/* dispara la verificacion aunque esa rama no tenga
 # este archivo.
 
 on:
@@ -19,54 +20,14 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: index-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  regenerate:
-    # En PRs no commiteamos: solo verificamos (job check).
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout main
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Regenerar indice
-        run: python3 tools/gen_index.py
-
-      - name: Subir log como artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gen_index-log
-          path: logs/gen_index.log
-          if-no-files-found: ignore
-
-      - name: Commit si hay cambios
-        run: |
-          if [ -n "$(git status --porcelain README.md)" ]; then
-            git config user.name  "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add README.md
-            git commit -m "docs: regenerar indice de sistemas (auto)"
-            git push origin main
-          else
-            echo "Sin cambios en el indice."
-          fi
-
   check:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -77,5 +38,13 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Verificar que el indice esta al dia
+      - name: Verificar que el indice del README esta al dia
         run: python3 tools/gen_index.py --check
+
+      - name: Subir log como artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gen_index-log
+          path: logs/gen_index.log
+          if-no-files-found: ignore
