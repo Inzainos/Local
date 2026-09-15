@@ -4,6 +4,16 @@ Monorepo índice de sistemas locales en WSL Kali (**deamon** / X-Deamon).
 
 `main` solo contiene este índice + LICENSE. El código de cada sistema vive en su propia rama huérfana (raíz limpia por sistema).
 
+## Relación con otros repositorios
+
+Este repo es **el índice de lo local de la Catana**: aquí solo vive lo que existe en la
+máquina Kali/WSL y se decide subir a GitHub. Los proyectos con repositorio propio **no**
+viven aquí; se referencian solo para dejar clara la diferencia:
+
+- **Sentinel Ω** — su **primera versión** (los `workspaces`) sí vive aquí, en la rama
+  `local/sentinel-omega`. Las iteraciones posteriores con repo propio quedan aparte.
+- **Shadow Note Theory** — proyecto con su **propio repositorio**, fuera de este índice.
+
 ## Ramas de sistema
 
 | Rama | Sistema | Origen local | Archivos |
@@ -51,6 +61,22 @@ Las dos ramas de snapshot no: son cortes congelados y quedaron fuera de esa
 normalización. `local/deamonx-bridge-v1.0.0` solo trae `bridge/` + `docs/`, sin ningún
 archivo de raíz; `local/concilio-2.2.6-20260913` conserva `README.md`, `AGENTS.md` y
 `CHANGELOG.md` pero es anterior al `LICENSE`, así que tampoco lo tiene.
+
+## Mantenimiento del índice
+
+Las tablas de este README se curan a mano, pero `tools/gen_index.py` las vigila: lee las
+ramas reales del remoto con `git ls-remote` y **falla si una rama de sistema (`local/*`)
+aparece o desaparece sin actualizar el README**. No reescribe nada; solo avisa de la
+deriva. Las ramas `review/*` y `wip/*` se consideran efímeras y no se exige documentarlas.
+
+```bash
+python3 tools/gen_index.py          # verifica; sale 1 si el índice quedó desfasado
+python3 tools/gen_index.py --check  # idéntico (alias explícito para CI)
+```
+
+El workflow [`.github/workflows/index.yml`](.github/workflows/index.yml) corre esta
+verificación al crear ramas, en cada push a `main`, en los pull requests, a diario y bajo
+demanda. Cada corrida deja registro en `logs/gen_index.log`.
 
 ## Qué contiene cada sistema
 

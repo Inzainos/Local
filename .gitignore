@@ -1,0 +1,6 @@
+# Logs generados por las herramientas del repo (se conservan localmente, no se versionan)
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
