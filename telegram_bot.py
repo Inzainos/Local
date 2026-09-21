@@ -345,6 +345,13 @@ def sentinel_proximos_eventos() -> str:
             "SELECT schumann_hz, schumann_activity, bz_nT, viento_km_s, kp, fantasma, nivel_riesgo "
             "FROM TBL_PRECURSORES_COSMICOS ORDER BY id DESC LIMIT 1"
         ).fetchone()
+        try:  # muro de lags: ventana temporal con countdown (tabla puede no existir aún)
+            ml = conn.execute(
+                "SELECT clases, fecha_inicio, fecha_fin, detectado_en "
+                "FROM tbl_muro_lags_estado WHERE id=1 AND activo=1"
+            ).fetchone()
+        except Exception:
+            ml = None
         conn.close()
         tipos = ciclo["precursor_types"]
         try:
@@ -388,6 +395,24 @@ def sentinel_proximos_eventos() -> str:
             lines.append("   activos: " + ", ".join(walls))
         if muro_types:
             lines.append("   tipos muro: " + html.escape(", ".join(map(str, muro_types))))
+        if ml:
+            try:
+                from datetime import datetime as _dt
+                dini = _dt.strptime(ml["fecha_inicio"], "%Y-%m-%d").date()
+                dfin = _dt.strptime(ml["fecha_fin"], "%Y-%m-%d").date()
+                hoy = _dt.utcnow().date()
+                rini = max(0, (dini - hoy).days)
+                rfin = max(0, (dfin - hoy).days)
+                clases_ml = ", ".join(_json.loads(ml["clases"] or "[]"))
+                lines.append("")
+                lines.append(
+                    f"⏳ <b>Ventana temporal (muro de lags)</b>: faltan ~{rini}-{rfin} días "
+                    f"(hasta {html.escape(str(ml['fecha_fin']))})"
+                )
+                if clases_ml:
+                    lines.append(f"   convergen: {html.escape(clases_ml)}")
+            except Exception:
+                pass
         lines.append("")
         lines.append(f"🛰️ Precursores en ciclo: <code>{int(ciclo['precursors_count'] or 0)}</code>")
         if tipos_list:

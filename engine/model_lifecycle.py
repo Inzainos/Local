@@ -1,7 +1,7 @@
 """Ollama sequential model lifecycle for Concilio.
 
-Rule: NEVER keep gemma4:26b (or sentinel-concilio-arbitro) loaded together
-with another chat model. Pattern: load → run role → write .concilio → stop/unload → next.
+Rule: NEVER keep the heavy arbiter (gemma3:4b / concilio-arbitro /
+sentinel-concilio-arbitro) loaded together with another chat model. Pattern: load → run role → write .concilio → stop/unload → next.
 """
 from __future__ import annotations
 

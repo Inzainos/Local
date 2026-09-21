@@ -21,7 +21,7 @@ roles:
     model: concilio-heavy
 ```
 
-Default config uses base tags `qwen2.5:1.5b` / `gemma4:26b` with thin system prompts in YAML (same effect without `ollama create`).
+Default config uses base tags `nemotron-mini` / `gemma3:4b` with thin system prompts in YAML (same effect without `ollama create`).
 
 Default Concilio uses thin Modelfile.lightest|medium|heavy or base tags.
 Do not use Modelfile.sentinel-concilio-* while inject_sentinel_architecture: false.

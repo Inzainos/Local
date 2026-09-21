@@ -21,9 +21,9 @@ def render_banner():
     banner_text = """
     ╔══════════════════════════════════════════════════════════════════╗
     ║       CONCILIO — cadena secuencial (standalone)                  ║
-    ║   • Worker-Research (qwen2.5:1.5b / concilio-worker)             ║
-    ║   • Worker-Coder    (qwen2.5:1.5b / concilio-worker)             ║
-    ║   • Árbitro         (gemma4:26b / concilio-arbitro)              ║
+    ║   • Worker-Research (nemotron-mini / concilio-worker)           ║
+    ║   • Worker-Coder    (nemotron-mini / concilio-worker)           ║
+    ║   • Árbitro         (gemma3:4b / concilio-arbitro)               ║
     ║   Umbral 85 · unload entre roles · sessions/*.concilio           ║
     ╚══════════════════════════════════════════════════════════════════╝
     """

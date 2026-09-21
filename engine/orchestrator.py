@@ -22,7 +22,7 @@ class ConsensusOrchestrator:
     """
     Motor central del Concilio: cadena secuencial un modelo a la vez.
     Patrón: load → rol → write .concilio → unload → siguiente.
-    Nunca gemma4:26b junto a otro modelo.
+    Nunca el árbitro pesado (gemma3:4b) junto a otro modelo.
     """
 
     def __init__(self, config_path: str = "config.yaml"):
@@ -61,13 +61,21 @@ class ConsensusOrchestrator:
         preferred_worker = conc.get("worker_model") or r_cfg["model"]
         preferred_arbiter = conc.get("arbiter_model") or o_cfg["model"]
         base_worker = r_cfg.get("fallback_model") or r_cfg["model"] or "qwen2.5:1.5b"
-        base_arbiter = "gemma4:26b" if self._model_installed("gemma4:26b") else (o_cfg.get("fallback_model") or o_cfg.get("model") or "qwen2.5:1.5b")
+        base_arbiter = o_cfg.get("fallback_model") or o_cfg.get("model") or "gemma3:4b"
         # Prefer custom Modelfile tags when present in Ollama.
         worker_model = self._resolve_model(preferred_worker, base_worker)
         arbiter_model = self._resolve_model(preferred_arbiter, base_arbiter)
-        # gemma4:26b ONLY as final arbiter — never as worker.
-        if "gemma4" in worker_model.lower() or worker_model == arbiter_model:
-            worker_model = base_worker if "gemma4" not in base_worker.lower() else "qwen2.5:1.5b"
+        # The heavy arbiter base (gemma3) is ONLY final arbiter — never a worker.
+        if "gemma3" in worker_model.lower() or worker_model == arbiter_model:
+            worker_model = base_worker if "gemma3" not in base_worker.lower() else "nemotron-mini"
+
+        # MEDIUM coder can have its OWN model (e.g. DeepSeek) distinct from the
+        # LIGHTEST researcher. Falls back to the worker if not configured/present.
+        preferred_coder = conc.get("coder_model") or c_cfg.get("model") or preferred_worker
+        base_coder = c_cfg.get("fallback_model") or base_worker
+        coder_model = self._resolve_model(preferred_coder, base_coder)
+        if coder_model == arbiter_model:      # never collide with the exclusive arbiter
+            coder_model = worker_model
 
         self.researcher = ResearcherAgent(
             name=r_cfg["name"],
@@ -84,7 +92,7 @@ class ConsensusOrchestrator:
         self.coder = CoderAgent(
             name=c_cfg["name"],
             role="Programador",
-            model=worker_model,
+            model=coder_model,
             fallback_model=c_cfg.get("fallback_model") or base_worker,
             temperature=c_cfg.get("temperature", 0.2),
             system_prompt=self._augment_system(c_cfg["system_prompt"]),
@@ -132,22 +140,20 @@ class ConsensusOrchestrator:
                 "sentinel-concilio-worker",
                 "concilio-worker",
                 "concilio-lightest",
-                "concilio-medium",
                 getattr(self.researcher, "model", "") or "qwen2.5:1.5b",
             ]
             arbiter_candidates = [
                 "sentinel-concilio-arbitro",
                 "concilio-arbitro",
                 "concilio-heavy",
-                "gemma4:26b",
-                getattr(self.optimizer, "model", "") or "gemma4:26b",
+                "gemma3:4b",
+                getattr(self.optimizer, "model", "") or "gemma3:4b",
             ]
         else:
             # Thin Concilio: prefer worker/arbitro / lightest|medium|heavy over sentinel-* tags
             worker_candidates = [
                 "concilio-worker",
                 "concilio-lightest",
-                "concilio-medium",
                 "sentinel-concilio-worker",
                 getattr(self.researcher, "model", "") or "qwen2.5:1.5b",
                 "qwen2.5:1.5b",
@@ -156,19 +162,29 @@ class ConsensusOrchestrator:
                 "concilio-arbitro",
                 "concilio-heavy",
                 "sentinel-concilio-arbitro",
-                "gemma4:26b",
-                getattr(self.optimizer, "model", "") or "gemma4:26b",
+                "gemma3:4b",
+                getattr(self.optimizer, "model", "") or "gemma3:4b",
             ]
-        worker = next((m for m in worker_candidates if m and exists(m)), "qwen2.5:1.5b")
-        arbitro = next((m for m in arbiter_candidates if m and exists(m)), "gemma4:26b")
-        if "gemma4" in worker.lower() or worker == arbitro:
-            worker = next((m for m in worker_candidates if m and "gemma" not in m.lower() and exists(m)), "qwen2.5:1.5b")
+        worker = next((m for m in worker_candidates if m and exists(m)), "nemotron-mini")
+        arbitro = next((m for m in arbiter_candidates if m and exists(m)), "gemma3:4b")
+        if "gemma3" in worker.lower() or worker == arbitro:
+            worker = next((m for m in worker_candidates if m and "gemma" not in m.lower() and exists(m)), "nemotron-mini")
+        # MEDIUM coder: modelo propio (DeepSeek) distinto del researcher; cae al worker.
+        coder_candidates = [
+            "concilio-medium",
+            "deepseek-r1:8b",
+            getattr(self.coder, "model", "") or worker,
+            worker,
+        ]
+        coder = next((m for m in coder_candidates if m and exists(m)), worker)
+        if coder == arbitro:                 # nunca colisiona con el árbitro exclusivo
+            coder = worker
         self.researcher.model = worker
-        self.coder.model = worker
+        self.coder.model = coder
         self.optimizer.model = arbitro
-        self.researcher.fallback_model = "qwen2.5:1.5b"
-        self.coder.fallback_model = "qwen2.5:1.5b"
-        self.optimizer.fallback_model = "gemma4:26b" if exists("gemma4:26b") else "qwen2.5:1.5b"
+        self.researcher.fallback_model = "nemotron-mini"
+        self.coder.fallback_model = worker   # si DeepSeek falla, cae al worker ligero
+        self.optimizer.fallback_model = "gemma3:4b" if exists("gemma3:4b") else "nemotron-mini"
 
     def _load_config(self, path: str) -> Dict[str, Any]:
         if not os.path.exists(path):
