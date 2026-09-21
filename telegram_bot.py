@@ -15,6 +15,7 @@ import asyncio
 import html
 import json
 import logging
+import re
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -65,6 +66,38 @@ logging.basicConfig(
 # siempre. Callamos a los clientes HTTP; sus errores siguen saliendo.
 for _ruidoso in ("httpx", "httpcore", "telegram.ext", "telegram.request"):
     logging.getLogger(_ruidoso).setLevel(logging.WARNING)
+
+# ...pero callar loggers NO BASTA: python-telegram-bot registra el traceback
+# de InvalidToken a nivel ERROR, y el token viaja DENTRO del texto de la
+# excepcion. Perseguir logger por logger es una carrera que se pierde. En vez
+# de eso redactamos en la salida: el formateador ve el mensaje ya renderizado
+# y el traceback completo, asi que es el ultimo punto por el que todo pasa.
+# Sin \b inicial a proposito: en la URL de la API el token viene pegado al
+# prefijo "bot" (…/bot8460857489:AA…), y una frontera de palabra ahi no
+# existe, asi que \b haria fallar justo el caso mas comun.
+_RE_TOKEN = re.compile(r"\d{6,12}:[A-Za-z0-9_-]{30,}")
+
+
+def _redactar_secretos(texto: str) -> str:
+    """Sustituye cualquier token de Telegram por bot_id + marca.
+
+    Conserva el bot_id (publico) para poder diagnosticar de que bot se
+    trata, y descarta el secreto.
+    """
+    return _RE_TOKEN.sub(lambda m: m.group(0).split(":", 1)[0] + ":<REDACTADO>", texto)
+
+
+class _FormateadorSinSecretos(logging.Formatter):
+    """Formateador que redacta tokens en mensaje Y traceback."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        return _redactar_secretos(super().format(record))
+
+
+for _h in logging.getLogger().handlers:
+    _h.setFormatter(
+        _FormateadorSinSecretos("%(asctime)s | %(levelname)-8s | %(name)s: %(message)s")
+    )
 
 logger = logging.getLogger(__name__)
 
