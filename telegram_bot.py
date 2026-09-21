@@ -59,6 +59,12 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(name)s: %(message)s",
 )
+# httpx registra la URL completa de cada peticion en INFO. Contra la API de
+# Telegram esa URL LLEVA EL TOKEN, y termina en journald en claro y para
+# siempre. Callamos a los clientes HTTP; sus errores siguen saliendo.
+for _ruidoso in ("httpx", "httpcore", "telegram.ext", "telegram.request"):
+    logging.getLogger(_ruidoso).setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 orchestrator: Optional[ConsensusOrchestrator] = None
