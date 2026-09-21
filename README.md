@@ -6,7 +6,7 @@
 
 > **Sequential Concilio (2026-09-03):** lightest → medium → heavy → lightest verify; reentrada si score &lt; **85**; máx. 3 rondas. Un modelo Ollama a la vez. `.concilio` = DATA. `inject_sentinel_architecture: false` por defecto.
 
-> **Modelos:** `concilio-worker` / `concilio-arbitro` (aliases `concilio-lightest|medium|heavy` o `sentinel-concilio-*`); bases `qwen2.5:1.5b` + `gemma4:26b`. Crear con `bash scripts/create_concilio_models.sh`.
+> **Modelos:** `concilio-worker` (nemotron-mini) / `concilio-medium` (deepseek-r1:8b) / `concilio-arbitro` (gemma3:4b). Crear con `bash scripts/create_concilio_models.sh` (+ `ollama create concilio-medium -f modelfiles/Modelfile.medium`).
 
 > **Home workspace:** reglas duras y mapa de proyectos en [`/home/deamon/AGENTS.md`](../AGENTS.md). Guía local: [`AGENTS.md`](./AGENTS.md).
 
@@ -49,11 +49,11 @@ flowchart TD
 
 | Tier | Rol | Modelo Ollama | Responsabilidad |
 | :--- | :--- | :--- | :--- |
-| **LIGHTEST** | Worker-Research | `concilio-worker` → `qwen2.5:1.5b` | Investigación + verify % |
-| **MEDIUM** | Worker-Coder | `concilio-worker` → `qwen2.5:1.5b` | Implementación / refinamiento |
-| **HEAVY** | Arbitro | `concilio-arbitro` → `gemma4:26b` | Auditoría, score, síntesis |
+| **LIGHTEST** | Worker-Research | `concilio-worker` → `nemotron-mini` | Investigación + verify % |
+| **MEDIUM** | Coder | `concilio-medium` → `deepseek-r1:8b` | Implementación / refinamiento |
+| **HEAVY** | Arbitro | `concilio-arbitro` → `gemma3:4b` | Auditoría, score, síntesis |
 
-Medium comparte binario light hasta instalar `concilio-medium` u otro tag distinto.
+El coder MEDIUM ahora tiene modelo propio (DeepSeek R1, razonador); si falta cae al worker ligero. Un modelo a la vez (unload entre etapas), así DeepSeek 5.2GB carga solo.
 
 ---
 

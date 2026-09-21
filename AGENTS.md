@@ -18,7 +18,7 @@ Pipeline **Concilio** multi-agente sobre **Ollama** (secuencial):
 3. HEAVY (arbiter score) → write `.concilio` → unload  
 4. LIGHTEST verify % → si score &lt; **85**, reentrada completa (máx. `max_refinement_rounds`, default 3)
 
-- Modelos: `concilio-worker` / `concilio-arbitro` (aliases `concilio-lightest|medium|heavy`); bases `qwen2.5:1.5b` + `gemma4:26b`.
+- Modelos: `concilio-worker` / `concilio-arbitro` (aliases `concilio-lightest|medium|heavy`); bases `nemotron-mini` + `gemma3:4b`.
 - `inject_sentinel_architecture: **false**` por defecto (sin corpus Sentinel en cada run).
 - Fast Gente/Estado (`POST /api/ask`, `fast_ask`) **fuera** del Concilio.
 - Puente Telegram ↔ alertas Sentinel (tokens solo por env).
@@ -30,7 +30,7 @@ Detalle operativo: [`CONCILIO.md`](./CONCILIO.md). Changelog: [`CHANGELOG.md`](.
 
 ## Reglas locales del Concilio (además del home)
 
-1. **Un solo modelo Ollama cargado** a la vez; nunca `gemma4:26b` + otro chat model.
+1. **Un solo modelo Ollama cargado** a la vez; nunca `gemma3:4b` (árbitro) + otro chat model.
 2. Umbral único **85** (sin zona 80–84). Score: `[PUNTUACION_CONSENSO: XX]`.
 3. **No** forzar inyección de arquitectura Sentinel mientras `inject_sentinel_architecture: false`.
 4. Stub opcional (no auto): `data/memory_packs/home_hard_rules_stub.md`.

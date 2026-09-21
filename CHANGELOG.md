@@ -1,3 +1,30 @@
+## [2.3.1] - 2026-09-15 — Coder MEDIUM propio: DeepSeek R1
+
+### Changed
+- El rol **coder (MEDIUM)** ya no comparte binario con el researcher: usa modelo propio **`concilio-medium` → `deepseek-r1:8b`** (razonador). Researcher sigue en `concilio-worker` (nemotron-mini), árbitro en `concilio-arbitro` (gemma3:4b).
+- `config.yaml`: nuevo `concilio.coder_model: concilio-medium`; `roles.coder` → model `concilio-medium`, fallback `deepseek-r1:8b`, `max_tokens` 800→1600 (espacio para el razonamiento).
+- `engine/orchestrator.py`: resuelve el modelo del coder por separado (candidatos `concilio-medium`/`deepseek-r1:8b`), ya no fuerza `coder = worker`; `concilio-medium` sacado de los candidatos del worker para que el researcher nunca cargue el pesado.
+- `modelfiles/Modelfile.medium`: `FROM deepseek-r1:8b`, recreado.
+
+### Notes
+- Secuencial (un modelo a la vez): DeepSeek 5.2GB carga solo en la etapa de código; verificado en 5.6GB con swap negligible (~20KB). Si falla, cae al worker ligero.
+
+## [2.3.0] - 2026-09-14 — Migración de modelos (gemma4 → gemma3:4b / nemotron-mini)
+
+### Changed
+- **Bases del Concilio actualizadas** tras eliminar `gemma4:26b` (17 GB, no cabía en 5.6 GiB de RAM):
+  - HEAVY / Árbitro: `gemma4:26b` → **`gemma3:4b`** (3.3 GB).
+  - Worker LIGHTEST + MEDIUM: `qwen2.5:1.5b` → **`nemotron-mini`** (2.7 GB).
+- Modelfiles (`Modelfile.concilio-*`, `Modelfile.arbitro|heavy|worker|medium|lightest`, `Modelfile.sentinel-concilio-*`) apuntan a las nuevas bases.
+- `config.yaml`: `fallback_model` researcher/coder → `nemotron-mini` (corrige typo `nemotron:mini`), optimizer → `gemma3:4b`.
+- `engine/orchestrator.py`: defaults y candidatos hardcodeados `gemma4:26b` → `gemma3:4b`; guardas de "no usar árbitro como worker" ahora sobre `gemma3`.
+- `engine/model_lifecycle.py`, `cli.py`, `scripts/create_concilio_models.sh`, `README.md`, `AGENTS.md`, `CONCILIO.md`, `docs/CONCILIO.md`, `modelfiles/README.md` alineados a las nuevas bases.
+- Modelos custom recreados: `ollama create` de `concilio-worker` (nemotron-mini) y `concilio-arbitro` (gemma3:4b) + aliases sentinel.
+
+### Notes
+- Pipeline secuencial (un modelo a la vez, unload entre etapas): con árbitro 3.3 GB y worker 2.7 GB cabe holgado en 5.6 GiB sin swap agresivo.
+- `docs/HANDOFF_GEMMA_MEMORIA.md` queda como referencia histórica del árbitro Gemma anterior.
+
 ## [docs] - 2026-09-13 — Auditoría GitHub (Claude/Copilot)
 
 ### Notes
