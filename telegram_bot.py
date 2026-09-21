@@ -24,6 +24,7 @@ import yaml
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
 from telegram.constants import ParseMode as TGParseMode
+from telegram.error import InvalidToken
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -66,6 +67,18 @@ for _ruidoso in ("httpx", "httpcore", "telegram.ext", "telegram.request"):
     logging.getLogger(_ruidoso).setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
+
+
+def _bot_id_publico(token: str) -> str:
+    """Devuelve solo el bot_id (lo anterior a ':'), que no es secreto.
+
+    Permite identificar en los logs de que bot se habla sin escribir nunca
+    la credencial.
+    """
+    if not token:
+        return "<sin token>"
+    bot_id = token.split(":", 1)[0]
+    return bot_id if bot_id.isdigit() else "<token con formato invalido>"
 
 orchestrator: Optional[ConsensusOrchestrator] = None
 shared_memory: Optional[SharedMemory] = None
@@ -1085,7 +1098,20 @@ def main():
     app.post_init = post_init
 
     logger.info("🤖 Bot iniciado — polling...")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    try:
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
+    except InvalidToken:
+        # python-telegram-bot incrusta el token EN el mensaje de la excepcion
+        # (telegram/_bot.py: "The token `{self._token}` was rejected"). Si la
+        # dejamos propagar, el traceback lo escribe en claro en journald, y
+        # con Restart= lo reimprime en cada reintento. La tragamos aqui y
+        # reportamos solo el bot_id.
+        logger.error(
+            "Telegram rechazo el token del bot %s. Actualiza "
+            "TELEGRAM_BOT_TOKEN en .env y reinicia el servicio.",
+            _bot_id_publico(TELEGRAM_BOT_TOKEN),
+        )
+        raise SystemExit(78)  # EX_CONFIG
 
 
 if __name__ == "__main__":
