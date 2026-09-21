@@ -160,12 +160,33 @@ def format_blackboard(bb: Blackboard) -> str:
     consensus_score = html.escape(str(bb.consensus_score))
     task_id = html.escape(bb.task_id)
     rounds = html.escape(str(bb.refinement_rounds))
-    status = "✅ Consenso" if bb.consensus_reached else "⚠️ Límite rondas"
+    concilio_rounds = html.escape(str(getattr(bb, "concilio_rounds", 0)))
     synthesis = html.escape(bb.final_synthesis[:3500])
+    # El encabezado debe decir lo que paso. Antes rezaba "Consenso Final"
+    # tambien cuando no hubo consenso, con la advertencia degradada a una
+    # vineta de segunda linea: una respuesta de 73 llegaba bajo un titulo
+    # que afirmaba justo lo contrario.
+    if bb.consensus_reached:
+        cabecera = f"✅ <b>Consenso alcanzado</b> (Score: <code>{consensus_score}</code>/100)"
+    else:
+        # Sin default inventado: si la pizarra no trae umbral (snapshot
+        # anterior a este campo) se dice que se desconoce, no un numero
+        # plausible que podria contradecir a config.yaml.
+        _u = getattr(bb, "consensus_threshold", 0)
+        if _u:
+            _bar = f"por debajo del umbral <code>{html.escape(str(_u))}</code>"
+        else:
+            _bar = "no alcanzó el umbral <i>(no registrado en este snapshot)</i>"
+        cabecera = (
+            f"⚠️ <b>SIN CONSENSO</b> — score <code>{consensus_score}</code>/100, "
+            f"{_bar}\n"
+            f"<i>Síntesis entregada como borrador; no aprobada por el Concilio.</i>"
+        )
     lines = [
-        f"🧠 <b>Consenso Final</b> (Score: <code>{consensus_score}</code>/100)",
-        f"🆔 Task: <code>{task_id}</code> | {status}",
-        f"🔄 Rondas refinamiento: <code>{rounds}</code>",
+        cabecera,
+        f"🆔 Task: <code>{task_id}</code>",
+        f"🔄 Rondas del Concilio: <code>{concilio_rounds}</code>"
+        f" | refinamientos de código: <code>{rounds}</code>",
         "",
         synthesis,
     ]

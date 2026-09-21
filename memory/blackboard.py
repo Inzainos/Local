@@ -64,8 +64,19 @@ class Blackboard(BaseModel):
     refinement_history: List[CodeArtifact] = Field(default_factory=list)
     
     # Consenso final
+    # OJO: refinement_rounds solo cuenta refinamientos DE CODIGO (ver
+    # register_code_proposal). En tareas de prosa o analisis el Concilio
+    # reentra de verdad y este contador no se mueve, asi que no sirve para
+    # medir esfuerzo. Para eso esta concilio_rounds, que lleva el
+    # orquestador: rondas completas light->medium->heavy->verify.
     refinement_rounds: int = 0
+    concilio_rounds: int = 0
     consensus_score: int = 0
+    # Umbral contra el que se juzgo ESTA tarea. Se registra en la
+    # pizarra para que quien la lea despues no tenga que adivinarlo
+    # ni asumir un default: si config.yaml cambia, los snapshots
+    # viejos siguen diciendo la verdad de su momento.
+    consensus_threshold: int = 0
     consensus_reached: bool = False
     final_synthesis: str = ""
     

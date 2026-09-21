@@ -410,6 +410,10 @@ class ConsensusOrchestrator:
         while infinite_loop or round_count < self.max_rounds:
             round_count += 1
             doc["round"] = round_count
+            # refinement_rounds solo sube con artefactos de codigo; esta es la
+            # cuenta real de reentradas completas, valida para cualquier tarea.
+            blackboard.concilio_rounds = round_count
+            blackboard.consensus_threshold = self.threshold
             blackboard.log_event(
                 "CONCILIO",
                 "Orchestrator",

@@ -77,8 +77,17 @@ def execute_task(orchestrator: ConsensusOrchestrator, shared_memory: SharedMemor
     table.add_row("ID de Tarea", blackboard.task_id)
     table.add_row("Session ID", blackboard.session_id)
     table.add_row("Puntaje Final", f"{blackboard.consensus_score}/100")
-    table.add_row("Consenso Alcanzado", "Sí ✅" if blackboard.consensus_reached else "Límite Rondas ⚠️")
-    table.add_row("Rondas de Refinamiento", str(blackboard.refinement_rounds))
+    _umbral = getattr(blackboard, "consensus_threshold", 0)
+    if blackboard.consensus_reached:
+        _veredicto = "Sí ✅"
+    else:
+        # "Límite Rondas" sonaba a incidencia de proceso, no a lo que es:
+        # la sintesis no alcanzo el umbral y se entrega como borrador.
+        _bar = f" (umbral {_umbral})" if _umbral else ""
+        _veredicto = f"NO — por debajo del umbral{_bar} ⚠️"
+    table.add_row("Consenso Alcanzado", _veredicto)
+    table.add_row("Rondas del Concilio", str(getattr(blackboard, "concilio_rounds", 0)))
+    table.add_row("Refinamientos de código", str(blackboard.refinement_rounds))
     table.add_row("Session file", f"data/sessions/{blackboard.session_id}.concilio")
     console.print(table)
 
