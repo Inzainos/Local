@@ -55,3 +55,26 @@ class SharedMemory:
 
     def get_conversation_history(self, limit: int = 6) -> List[Dict[str, Any]]:
         return self.store.get_recent_messages(self.session_id, limit=limit)
+
+    def recuperar_tareas_previas(
+        self, limit: int = 5, excluir_task_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Deliberaciones anteriores, de otras sesiones incluidas.
+
+        `blackboard_snapshots` se venia escribiendo desde siempre pero su
+        unico lector (`get_recent_tasks`) no tenia llamadores: el Concilio
+        acumulaba tareas resueltas en disco sin poder consultarlas, y cada
+        sesion arrancaba en frio. Esta es la via de lectura.
+
+        Se pide un margen extra porque la tarea en curso ya puede estar
+        persistida y hay que descartarla para no darle al Concilio su
+        propio enunciado como antecedente.
+        """
+        try:
+            filas = self.store.get_recent_tasks(limit=limit + 1)
+        except Exception:
+            # Memoria historica degradada no debe tumbar la deliberacion.
+            return []
+        if excluir_task_id:
+            filas = [f for f in filas if f.get("task_id") != excluir_task_id]
+        return filas[:limit]

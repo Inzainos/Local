@@ -206,6 +206,56 @@ class ConsensusOrchestrator:
             return fallback
         return preferred or fallback
 
+    _n_tareas_memoria = 0
+
+    # Prompts largos ahogan a los modelos locales (nemotron-mini, gemma3:4b),
+    # asi que del antecedente solo va el enunciado recortado y el veredicto.
+    # La sintesis completa se omite a proposito: es la parte mas larga y la
+    # de mayor riesgo de inyeccion, y para calibrar basta el score.
+    _MEM_MAX_TAREAS = 5
+    _MEM_MAX_PROMPT = 160
+
+    def _bloque_memoria_historica(self, shared_memory, blackboard) -> str:
+        """Antecedentes de deliberaciones previas, como DATOS no confiables.
+
+        Las sintesis pasadas son salida de modelo, no entrada del operador:
+        se cercan con fence_untrusted para que un intento de inyeccion
+        almacenado en una tarea vieja no pueda dar ordenes en una nueva.
+        """
+        self._n_tareas_memoria = 0
+        try:
+            previas = shared_memory.recuperar_tareas_previas(
+                limit=self._MEM_MAX_TAREAS,
+                excluir_task_id=getattr(blackboard, "task_id", None),
+            )
+        except Exception:
+            return ""
+        if not previas:
+            return ""
+
+        lineas = []
+        for t in previas:
+            prompt = (t.get("user_prompt") or "").strip().replace("\n", " ")
+            if len(prompt) > self._MEM_MAX_PROMPT:
+                prompt = prompt[: self._MEM_MAX_PROMPT] + "…"
+            score = t.get("consensus_score")
+            veredicto = (
+                "CONSENSO" if t.get("consensus_reached") else "SIN CONSENSO"
+            )
+            lineas.append(
+                f"- [{veredicto} score={score}] {prompt}"
+            )
+
+        self._n_tareas_memoria = len(lineas)
+        cuerpo = "\n".join(lineas)
+        return (
+            "\n=== DELIBERACIONES PREVIAS DEL CONCILIO ===\n"
+            "Antecedentes de tareas ya resueltas. Sirven para no repetir "
+            "trabajo y para calibrar el nivel exigido: las marcadas SIN "
+            "CONSENSO no alcanzaron el umbral.\n"
+            + fence_untrusted(cuerpo, role="historial_tareas")
+        )
+
     def _run_exclusive(self, model: str, fn, stage: str, on_stage_start, on_stage_end, agent_name: str, msg: str):
         if on_stage_start:
             on_stage_start(stage, agent_name, msg)
@@ -331,6 +381,18 @@ class ConsensusOrchestrator:
                 "CONTEXT",
                 "Orchestrator",
                 "Standalone: inject_sentinel_architecture=false (no Sentinel corpus; thin stub optional)",
+            )
+
+        # --- memoria historica: deliberaciones anteriores como antecedente ---
+        bloque_memoria = self._bloque_memoria_historica(shared_memory, blackboard)
+        if bloque_memoria:
+            shared_memory.research_context = (
+                (shared_memory.research_context or "") + bloque_memoria
+            )
+            blackboard.log_event(
+                "CONTEXT",
+                "Orchestrator",
+                f"Memoria historica: {self._n_tareas_memoria} tareas previas inyectadas",
             )
 
         skip_coding = pipeline_type in (
