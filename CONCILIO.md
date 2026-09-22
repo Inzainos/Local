@@ -23,6 +23,8 @@ Guía de agentes: [`AGENTS.md`](./AGENTS.md) (apunta a `/home/deamon/AGENTS.md`)
 | `engine/orchestrator.py` | Orquestación secuencial + `fast_ask` |
 | `engine/model_lifecycle.py` | warm / stop (`keep_alive=0`) |
 | `memory/concilio_store.py` | `data/sessions/<id>.concilio` |
+| `memory/shared_context.py` | Memoria entre sesiones (antecedentes + hechos) |
+| `memory/persistent_store.py` | SQLite: `blackboard_snapshots`, `knowledge_facts` |
 | `memory/anti_injection.py` | Fences + strip de jailbreaks |
 | `memory/memory_pack.py` | Pack desde docs DEV (sin `.env`) — solo si inject=true |
 | `data/memory_packs/home_hard_rules_stub.md` | Stub thin opcional (home hard rules) |
@@ -74,12 +76,49 @@ Ver comentarios en `config.yaml` y stub `home_hard_rules_stub.md`:
 - Telegram solo por env; git `local/<feature>-vX`; umbral 85
 - REGLA CERO: verificar punta a punta
 
+## Memoria entre sesiones
+
+El Concilio arranca con dos clases de antecedente, inyectadas en
+`research_context` (lo que ya leen Researcher, Coder y Optimizer):
+
+| Qué | De dónde | Contenido |
+|---|---|---|
+| Tareas previas | `blackboard_snapshots` | Enunciado + score + veredicto. Sin contenido. |
+| Hechos aprobados | `knowledge_facts` | Enunciado + síntesis (400 chars). |
+
+**Criterio de archivo: solo se recuerda lo que superó el umbral.** Una
+síntesis reprobada es un borrador; archivarla contaminaría las tareas
+siguientes con material que el propio sistema rechazó. Se compara contra
+el umbral registrado en la pizarra (`consensus_threshold`), nunca contra
+un 85 escrito en el código: si `config.yaml` cambia, cada tarea sigue
+juzgada por la barra de su momento. Sin umbral registrado no se archiva
+nada — ausencia de dato no es permiso.
+
+Todo el bloque va cercado con `fence_untrusted(role="historial_tareas")`.
+Las síntesis pasadas son **salida de modelo**, no entrada del operador:
+un intento de inyección archivado en una tarea vieja no puede dar
+órdenes en una nueva. Y un hecho aprobado sigue siendo dato a verificar,
+no verdad establecida — el Concilio no debe tratar su propio pasado como
+autoridad.
+
+### Rondas: dos contadores distintos
+
+| Campo | Cuenta |
+|---|---|
+| `concilio_rounds` | Reentradas completas `light→medium→heavy→verify`. Vale para cualquier tarea. |
+| `refinement_rounds` | Solo refinamientos **de código**. En tareas de prosa no se mueve aunque el Concilio reentre. |
+
 ## Seguridad
 
 - No se lee ni vuelca `.env`.
 - No se abre la DB de producción de Sentinel Omega desde el Concilio.
 - Memory pack completo: solo con inject=true; orden `workspaces-dev` → `workspaces-test` → `workspaces`.
 - `.concilio` = DATA (`<<<UNTRUSTED_DATA …>>>` / `<<<CONCILIO_DATA_NOT_INSTRUCTIONS>>>`).
+- **Nunca se registra el token de Telegram.** `telegram_bot.py` redacta en el
+  formateador de logging, no callando loggers: `httpx` lo escribía en la URL
+  de cada petición, y `python-telegram-bot` lo incrusta en el mensaje de
+  `InvalidToken`, que sale a nivel ERROR por encima de cualquier `setLevel`.
+  El formateador es el último punto por el que pasan mensaje y traceback.
 
 ## Flujo
 

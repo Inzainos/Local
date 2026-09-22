@@ -1,3 +1,32 @@
+## [2.4.0] - 2026-09-21 — Memoria del Concilio, y tres fugas de token
+
+### Added
+- **El Concilio recuerda entre sesiones.** `blackboard_snapshots` acumulaba tareas resueltas desde siempre (108 en la base al momento del cambio) pero su único lector, `get_recent_tasks()`, no tenía llamadores. Tampoco los tenían `save_fact()`, `search_facts()` ni `get_conversation_history()`: se escribía memoria y no se leía ninguna. Ahora:
+  - `SharedMemory.recuperar_tareas_previas()` — antecedentes de deliberaciones anteriores (enunciado + veredicto), excluyendo la tarea en curso.
+  - `SharedMemory.recordar_consenso()` — archiva enunciado + síntesis en `knowledge_facts` **solo si el score alcanza el umbral**. Criterio del operador: se recuerda lo que el Concilio aprobó; un borrador reprobado no entra a la memoria.
+  - `SharedMemory.buscar_hechos()` — recupera hechos por las palabras de 5+ letras del enunciado (`search_facts` hace `LIKE`; el enunciado completo casi nunca casa).
+  - `ConsensusOrchestrator._bloque_memoria_historica()` inyecta ambos en `research_context`, que ya leían Researcher, Coder y Optimizer.
+- Todo el bloque va cercado con `fence_untrusted(role="historial_tareas")`: las síntesis pasadas son salida de modelo, no entrada del operador. Verificado con hechos envenenados — la orden queda marcada como intento y un `<<<END_UNTRUSTED_DATA>>>` falsificado se degrada a literal.
+- `Blackboard.concilio_rounds` — rondas completas `light→medium→heavy→verify`, que sella el orquestador. `refinement_rounds` solo subía con artefactos de **código** (`blackboard.py`: `if is_refinement and self.code_proposal`), así que en tareas de prosa el contador no se movía aunque el Concilio reentrara: 31 de 40 tareas sin consenso figuraban con 0 rondas.
+- `Blackboard.consensus_threshold` — la barra contra la que se juzgó **esa** tarea. Los snapshots anteriores al campo dicen "no registrado" en vez de un número inventado.
+
+### Fixed
+- **Tres fugas del token de Telegram, en capas distintas.** Medido en el servicio vivo: 75.678 líneas del journal con tokens en claro, y no uno sino dos (el revocado y su reemplazo).
+  1. `logging.basicConfig(level=INFO)` ponía el root logger en INFO y `httpx` registraba la URL completa de cada petición — contra la API de Telegram esa URL lleva el token. Un sondeo cada 10 s.
+  2. `python-telegram-bot` incrusta el token **en el mensaje** de `InvalidToken`; al propagar, el traceback lo escribía en stderr, y con `Restart=` lo reimprimía en cada reintento.
+  3. Callar loggers no bastaba: PTB registra ese traceback a nivel ERROR, por encima de cualquier `setLevel(WARNING)`. Se redacta en el **formateador**, último punto por el que pasan mensaje y traceback. El regex va sin `\b` inicial a propósito: en la URL el token viene pegado al prefijo `bot`, donde no hay frontera de palabra.
+  Verificado contra los tres tokens reales del incidente, por ambas vías: 6/6 redactados, `bot_id` conservado para poder diagnosticar.
+- **El veredicto ahora dice lo que pasó.** El encabezado rezaba "Consenso Final" también sin consenso, con el aviso degradado a viñeta de segunda línea: una respuesta de 73 llegaba bajo un título que afirmaba lo contrario. El CLI decía "Límite Rondas", que sonaba a incidencia de proceso.
+- **MAPEADOR reasignado** a `nemotron-mini`. `profiles/investigacion.yaml` apuntaba a `qwen2.5:1.5b`, desinstalado, y era el único `model:` del archivo sin `fallback_model`. Se descartó `llama3.2:3b` pese a ser más pequeño: es el modelo del LÍDER, y el LÍDER audita al MAPEADOR — mismos pesos es la peor posición para detectar una ruta inventada, que es el bug del 2026-09-16 que el ensemble existe para evitar. Capacidades verificadas con `/api/show`, no con la documentación.
+
+### Removed
+- 476 líneas de tres implementaciones paralelas muertas: `engine/concilio_session.py`, `memory/concilio_session.py`, `memory/session_store.py`, `engine/ollama_lifecycle.py`. El store vivo es `ConcilioStore`; el gestor de modelos vivo es `ModelLifecycle`. Lo que justificaba borrarlas: las dos clases `ConcilioSession` compartían **nombre** y no compartían una sola función.
+
+### Notes
+- El umbral de 85 **no se tocó**. El 37 % de tareas sin consenso no es un defecto: los enunciados que fallan son de una o dos palabras (`status`, `revisa sistema`, `entrenamiento`, 55-78 puntos). El umbral rechaza deliberaciones sobre peticiones mal especificadas, que es su trabajo.
+- Pendiente del operador: purgar el journal histórico y rotar el token, que estuvo expuesto en disco.
+- Sin efecto hasta la próxima deliberación real; `knowledge_facts` sigue en 0 filas por diseño (solo se llena con consensos nuevos).
+
 ## [2.3.1] - 2026-09-15 — Coder MEDIUM propio: DeepSeek R1
 
 ### Changed
