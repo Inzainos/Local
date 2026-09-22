@@ -38,9 +38,9 @@ Construido el 2026-09-16 en `/home/deamon/consensus-expert-agent`.
 ## Modelos — estado de RAM/GPU (máquina: 7.8 GiB RAM, RTX 3050 Laptop 4GB VRAM vía Ollama en Windows host)
 
 - `gemma4:26b` (18 GB) **NO cabe** — confirmado con prueba real (OOM tras 159s). Borrado.
-- Modelos 1-5B (nemotron-mini, llama3.2:3b, qwen2.5:1.5b, gemma3:4b, deepseek-r1:8b): caben individualmente con margen; 3 concurrentes (~5.7GB) caben para el ensemble de `investigacion.yaml`.
+- Modelos 1-5B (nemotron-mini, llama3.2:3b, gemma3:4b, deepseek-r1:8b): caben individualmente con margen; 3 concurrentes (~5.7GB) caben para el ensemble de `investigacion.yaml`. (`qwen2.5:1.5b` ya no está instalado — ver nota del MAPEADOR arriba.)
 - Modelos 7-14B pedidos (`deepseek-r1:14b`, `qwen2.5-coder:7b`, `codegemma:7b`, `mistral:7b`): **ya instalados** (2026-09-16, tras un primer intento cortado por falla de red). `_resolve_model` ya los usa como primarios automáticamente sobre los fallbacks. `deepseek-r1:14b` (9GB, razonador con cadenas de pensamiento largas) es lento con el pack inyectado — confirmado que NO truena la RAM, pero necesitó subir `worker_timeout_seconds` a 900 en `moe_sentinel.yaml` (el default de 180-420s no alcanzaba).
-- Tool-calling nativo de Ollama: soportado por nemotron-mini, llama3.2:3b, qwen2.5:1.5b, deepseek-r1:8b. NO soportado por gemma3:4b (confirmado `/api/show` → capabilities).
+- Tool-calling nativo de Ollama: soportado por nemotron-mini, llama3.2:3b, deepseek-r1:8b. NO soportado por gemma3:4b (confirmado `/api/show` → capabilities). (`qwen2.5:1.5b` también lo soportaba, pero ya no está instalado.)
 
 ## Limitaciones conocidas (no resueltas, no inventar que sí)
 
