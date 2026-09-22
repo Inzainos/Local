@@ -17,12 +17,12 @@ Construido el 2026-09-16 en `/home/deamon/consensus-expert-agent`.
 
 | Archivo | Patrón | Modelos | Estado |
 |---|---|---|---|
-| `investigacion.yaml` | researcher=ensemble concurrente (líder/lector/mapeador) + coder + optimizer | llama3.2:3b, nemotron-mini, qwen2.5:1.5b*, gemma3:4b, deepseek-r1:8b | Probado, funciona pero con calidad inconsistente en el líder/auditor (ver Limitaciones) |
+| `investigacion.yaml` | researcher=ensemble concurrente (líder/lector/mapeador) + coder + optimizer | llama3.2:3b, nemotron-mini*, gemma3:4b, deepseek-r1:8b | Probado, funciona pero con calidad inconsistente en el líder/auditor (ver Limitaciones) |
 | `general.yaml` | researcher/coder/optimizer secuenciales, sin ensemble | nemotron-mini, llama3.2:3b, gemma3:4b, deepseek-r1:8b | Construido, no tan probado como investigacion.yaml |
 | `moe_captain.yaml` | Capitán (nemotron-mini) + work_pool/audit_pool genérico (code/investigacion/general) | Pensado para deepseek-r1:14b, qwen2.5-coder:7b, codegemma:7b, mistral:7b — hoy corre con fallbacks (ver abajo) | Probado end-to-end, funciona |
 | `moe_sentinel.yaml` | Igual que moe_captain.yaml pero EXCLUSIVO a Sentinel Omega, con memoria persistente inyectada | Mismos pools que moe_captain.yaml | Probado — respuestas grounded correctas, PERO el rechazo de tareas fuera de alcance NO es confiable (ver Limitaciones) |
 
-\* `qwen2.5:1.5b` fue borrado por el operador — el rol MAPEADOR de `investigacion.yaml` está roto hasta reasignarlo.
+\* `qwen2.5:1.5b` fue borrado por el operador. El rol MAPEADOR se reasignó a `nemotron-mini` el 2026-09-21, que comparte copia cargada con el LECTOR (pico del ensemble ~4.7GB en vez de 5.7GB). Se descartó `llama3.2:3b` a pesar de ser más pequeño: es el modelo del LÍDER, y el LÍDER audita al MAPEADOR — mismos pesos es la peor posición para detectar una ruta inventada. `mistral:7b` y `qwen2.5-coder:7b` soportan tools pero no caben junto al LECTOR. Capacidades verificadas con `/api/show`, no con esta tabla.
 
 ## CLIs
 

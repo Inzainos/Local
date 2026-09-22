@@ -32,9 +32,10 @@ concilio:
 
 roles:
   # ligero — investigador: ensemble concurrente (excepción al patrón secuencial
-  # del resto del Concilio). Tamaños: llama3.2:3b 2.0GB + nemotron-mini 2.7GB +
-  # qwen2.5:1.5b 0.99GB =~ 5.7GB simultáneos — cabe en los 7.8GB de RAM con
-  # margen, verificado contra `ollama list` el 2026-09-16.
+  # del resto del Concilio). Tamaños: llama3.2:3b 2.0GB (LÍDER, corre después)
+  # + nemotron-mini 2.7GB compartido por LECTOR y MAPEADOR (una sola copia
+  # cargada) =~ 4.7GB de pico — cabe en los 7.8GB de RAM con margen amplio.
+  # Verificado contra /api/tags y /api/ps el 2026-09-21.
   researcher:
     name: Investigación Ligero (ensemble)
     ensemble: true
@@ -75,7 +76,25 @@ roles:
           contenido relevante tal cual lo leíste, sin interpretar ni opinar.
           Si una ruta no existe o está fuera de lo permitido, dilo
           explícitamente en vez de inventar una alternativa.
-      - model: qwen2.5:1.5b
+      - model: nemotron-mini
+        # Reemplaza a qwen2.5:1.5b (desinstalado). Elegido asi:
+        # 1. El MAPEADOR usa list_directory/grep_search, luego NECESITA
+        #    tool-calling nativo. Verificado por /api/show, no por la doc:
+        #    lo tienen nemotron-mini, llama3.2:3b, mistral:7b,
+        #    qwen2.5-coder:7b y los deepseek-r1. NO lo tiene gemma3:4b.
+        # 2. Corre concurrente con el LECTOR (nemotron-mini, 2.70G), asi que
+        #    el techo practico es ~2.5G: mistral:7b (4.37G) y
+        #    qwen2.5-coder:7b (4.68G) no caben con el LECTOR al lado.
+        # 3. Quedaban llama3.2:3b y nemotron-mini. Se descarta llama3.2:3b
+        #    porque es el mismo modelo del LIDER, y el LIDER audita al
+        #    MAPEADOR: mismos pesos y mismos sesgos es la peor posicion
+        #    para detectar una ruta inventada --- justo el bug del
+        #    2026-09-16 que este ensemble existe para evitar.
+        # Compartir modelo con el LECTOR no rompe la auditoria (el LIDER
+        # sigue siendo de otra familia) y Ollama mantiene UNA sola copia
+        # cargada para ambos roles, asi que no suma RAM.
+        # OJO: si OLLAMA_NUM_PARALLEL=1, LECTOR y MAPEADOR se serializan en
+        # vez de correr a la vez. Sigue siendo correcto, solo mas lento.
         role: mapeador
         tools: readonly
         role_prompt: |
