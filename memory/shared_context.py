@@ -78,3 +78,63 @@ class SharedMemory:
         if excluir_task_id:
             filas = [f for f in filas if f.get("task_id") != excluir_task_id]
         return filas[:limit]
+
+    def recordar_consenso(self, blackboard) -> bool:
+        """Archiva como hecho una deliberacion que supero el umbral.
+
+        Criterio fijado por el operador: solo se recuerda lo que el Concilio
+        aprobo. Una sintesis por debajo del umbral es un borrador, y
+        archivarla contaminaria la memoria con material que el propio
+        sistema rechazo.
+
+        Se compara contra el umbral REGISTRADO en la pizarra, no contra un
+        85 escrito aqui: si config.yaml cambia, las tareas viejas siguen
+        juzgadas por la barra de su momento. Sin umbral registrado no se
+        archiva nada --- ausencia de dato no es permiso.
+        """
+        score = int(getattr(blackboard, "consensus_score", 0) or 0)
+        umbral = int(getattr(blackboard, "consensus_threshold", 0) or 0)
+        if not umbral or score < umbral:
+            return False
+        sintesis = (getattr(blackboard, "final_synthesis", "") or "").strip()
+        enunciado = (getattr(blackboard, "user_prompt", "") or "").strip()
+        if not sintesis or not enunciado:
+            return False
+        try:
+            self.store.save_fact(
+                category=getattr(blackboard, "task_type", "") or "CONSENSO",
+                key=enunciado[:200],
+                value=sintesis[:8000],
+                source_agent=f"Concilio score={score}/{umbral}",
+            )
+            return True
+        except Exception:
+            return False
+
+    def buscar_hechos(self, consulta: str, limite: int = 3) -> List[Dict[str, Any]]:
+        """Hechos archivados que se parezcan a la consulta.
+
+        `search_facts` hace LIKE sobre key y value, asi que pasarle el
+        enunciado entero casi nunca casa. Se buscan en cambio sus palabras
+        mas largas, que son las que cargan el tema, y se unen resultados
+        deduplicando por key.
+        """
+        palabras = sorted(
+            {p.strip(".,;:()[]\"'").lower() for p in (consulta or "").split()},
+            key=len,
+            reverse=True,
+        )
+        terminos = [p for p in palabras if len(p) >= 5][:3]
+        if not terminos:
+            return []
+        vistos, salida = set(), []
+        for t in terminos:
+            try:
+                for h in self.store.search_facts(t, limit=limite):
+                    k = h.get("key")
+                    if k not in vistos:
+                        vistos.add(k)
+                        salida.append(h)
+            except Exception:
+                continue
+        return salida[:limite]
