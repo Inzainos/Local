@@ -54,10 +54,12 @@ investigacion:
   ligero:
     techo_ram_gb: 2.7
     turnos:
-      - {model: llama3.2:3b,    rol: explorador, tools: readonly, ctx: 131072}
-      - {model: nemotron-mini,  rol: sintetizador, tools: readonly, ctx: 4096}
-      # nemotron va SEGUNDO y con tarea acotada: su ventana de 4k no aguanta
-      # el material completo, pero sí condensar lo que el explorador ya filtró.
+      # nemotron PRIMERO, no último. Su ventana de 4.096 es la más estrecha de
+      # la instalación, y el acumulado crece con cada turno: ponerlo al final
+      # lo condena a recibir justo cuando menos sitio le queda. En el primer
+      # turno no hay nada acumulado, así que su ventana alcanza.
+      - {model: nemotron-mini, rol: explorador, tools: readonly, ctx: 4096}
+      - {model: llama3.2:3b,   rol: sintetizador, tools: readonly, ctx: 131072}
   intermedio:
     techo_ram_gb: 4.4
     turnos:
@@ -106,6 +108,60 @@ juez:
     model: deepseek-r1:8b       # cuando el normal no decide en max_rondas_juez
     ctx: 131072
     temperature: 0.1
+
+# ---------------------------------------------------------------------------
+# ESCALADO DE CONTEXTO — cuánto material recibe cada turno
+# ---------------------------------------------------------------------------
+# El contexto de un turno son dos cosas distintas:
+#
+#   a) MATERIAL recuperado (fragmentos del índice vectorial). Se DOSIFICA.
+#   b) ACUMULADO de los turnos previos (borradores + objeciones). Siempre va
+#      entero: sin él no hay refinamiento, solo repetición.
+#
+# El acumulado crece turno a turno, así que los turnos tardíos necesitan más
+# sitio. Eso refuerza el orden débil→fuerte por una segunda razón, además del
+# anclaje: el último ve TODO y es quien más ventana debe tener.
+#
+# MÁS CONTEXTO NO ES MEJOR. El tope de cada escalón es por utilidad, no por
+# capacidad: gemma3 admite 131k, pero darle 16k útiles rinde más que 100k donde
+# lo importante queda sepultado a mitad (los modelos largos atienden peor el
+# centro que los extremos). Y cada token cuesta tiempo --- medido: el coder
+# tardó 18 min con ~4.800 tokens.
+#
+# ES UN FILTRO, NO UNA ACUMULACIÓN. Cada turno destila lo que recibió: el
+# siguiente recibe la destilación del anterior MÁS fragmentos nuevos solo de lo
+# que quedó sin resolver. Por eso el material nuevo BAJA mientras el acumulado
+# sube --- si ambos crecieran, el último turno se ahogaría.
+escalado_contexto:
+  # ventana del modelo -> presupuesto de MATERIAL nuevo, en tokens
+  por_ventana:
+    4096:   1200      # nemotron-mini: solo lo imprescindible y ya filtrado
+    8192:   2000      # codegemma
+    32768:  6000      # mistral, qwen2.5-coder
+    131072: 16000     # llama3.2, gemma3, deepseek-r1
+
+  # Multiplicador por posición en el turno. El primero explora en ancho; los
+  # siguientes reciben menos material NUEVO porque heredan lo ya destilado.
+  por_turno:
+    1: 1.00
+    2: 0.60
+    3: 0.35
+
+  # El acumulado nunca se recorta por presupuesto: si no cabe, se DEGRADA el
+  # material nuevo antes que perder lo que dijeron los compañeros. Si aun así
+  # no entra, se sube de nivel (modelo con más ventana) en vez de truncar.
+  # REGLA DE ORDEN --- dos criterios, y cuando chocan manda el segundo:
+  #
+  #   1. Del más DÉBIL al más fuerte (contra el anclaje): el marco inicial debe
+  #      nacer tentativo para que el modelo capaz tenga licencia para romperlo.
+  #   2. De ventana ESTRECHA a ventana ANCHA (contra el ahogo): el acumulado
+  #      crece turno a turno, así que el último necesita la mayor ventana. Un
+  #      modelo angosto al final recibe el máximo con el mínimo sitio.
+  #
+  # El criterio 2 manda porque su fallo es duro --- el contexto no entra y se
+  # trunca en silencio --- mientras el del 1 es un sesgo, degradación suave.
+  acumulado_es_prioritario: true
+  reserva_para_generacion: 0.25   # del total de la ventana
 
 # ---------------------------------------------------------------------------
 # RECUPERACIÓN VECTORIAL (sustituye al pack fijo de 12.000 chars)

@@ -60,7 +60,7 @@ class ConsensusOrchestrator:
 
         preferred_worker = conc.get("worker_model") or r_cfg["model"]
         preferred_arbiter = conc.get("arbiter_model") or o_cfg["model"]
-        base_worker = r_cfg.get("fallback_model") or r_cfg["model"] or "qwen2.5:1.5b"
+        base_worker = r_cfg.get("fallback_model") or r_cfg["model"] or "llama3.2:3b"
         base_arbiter = o_cfg.get("fallback_model") or o_cfg.get("model") or "gemma3:4b"
         # Prefer custom Modelfile tags when present in Ollama.
         worker_model = self._resolve_model(preferred_worker, base_worker)
@@ -135,35 +135,44 @@ class ConsensusOrchestrator:
     def _maybe_prefer_custom_models(self) -> None:
         """Prefer thin concilio-* aliases when inject_sentinel=false; sentinel-* first only if inject on."""
         exists = self._model_exists if hasattr(self, "_model_exists") else self._model_installed
+
+        # LO CONFIGURADO MANDA. Estas listas empezaban por nombres fijos y el
+        # modelo de config.yaml caia en cuarta posicion: cambiarlo no servia de
+        # nada porque "concilio-worker" siempre existe y ganaba. Una preferencia
+        # hardcodeada que pisa al operador en silencio no es preferencia: es bug.
+        cfg_worker = getattr(self.researcher, "model", "") or ""
+        cfg_arbitro = getattr(self.optimizer, "model", "") or ""
+
         if getattr(self, "inject_sentinel", False):
             worker_candidates = [
+                cfg_worker,
                 "sentinel-concilio-worker",
+                "concilio-investigador",
                 "concilio-worker",
                 "concilio-lightest",
-                getattr(self.researcher, "model", "") or "qwen2.5:1.5b",
             ]
             arbiter_candidates = [
                 "sentinel-concilio-arbitro",
                 "concilio-arbitro",
                 "concilio-heavy",
+                cfg_arbitro,
                 "gemma3:4b",
-                getattr(self.optimizer, "model", "") or "gemma3:4b",
             ]
         else:
             # Thin Concilio: prefer worker/arbitro / lightest|medium|heavy over sentinel-* tags
             worker_candidates = [
+                cfg_worker,
+                "concilio-investigador",
                 "concilio-worker",
                 "concilio-lightest",
                 "sentinel-concilio-worker",
-                getattr(self.researcher, "model", "") or "qwen2.5:1.5b",
-                "qwen2.5:1.5b",
             ]
             arbiter_candidates = [
                 "concilio-arbitro",
                 "concilio-heavy",
                 "sentinel-concilio-arbitro",
+                cfg_arbitro,
                 "gemma3:4b",
-                getattr(self.optimizer, "model", "") or "gemma3:4b",
             ]
         worker = next((m for m in worker_candidates if m and exists(m)), "nemotron-mini")
         arbitro = next((m for m in arbiter_candidates if m and exists(m)), "gemma3:4b")
