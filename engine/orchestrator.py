@@ -87,6 +87,7 @@ class ConsensusOrchestrator:
             ollama_host=self.ollama_host,
             timeout_seconds=self.timeout,
             num_predict=r_cfg.get("max_tokens", 1500),
+            num_ctx=r_cfg.get("num_ctx"),
             timeout_retries=self.timeout_retries,
         )
         self.coder = CoderAgent(
@@ -99,6 +100,7 @@ class ConsensusOrchestrator:
             ollama_host=self.ollama_host,
             timeout_seconds=self.timeout,
             num_predict=c_cfg.get("max_tokens", 1500),
+            num_ctx=c_cfg.get("num_ctx"),
             timeout_retries=self.timeout_retries,
         )
         self.optimizer = OptimizerAgent(
@@ -111,6 +113,7 @@ class ConsensusOrchestrator:
             ollama_host=self.ollama_host,
             timeout_seconds=self.timeout,
             num_predict=o_cfg.get("max_tokens", 1500),
+            num_ctx=o_cfg.get("num_ctx"),
             timeout_retries=self.timeout_retries,
         )
 

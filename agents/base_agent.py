@@ -27,6 +27,7 @@ class BaseExpertAgent:
         ollama_host: str = "http://127.0.0.1:11434",
         timeout_seconds: float = 180.0,
         num_predict: int = 800,
+        num_ctx: Optional[int] = None,
         timeout_retries: int = 2,
         keep_alive: Optional[str] = "0",
         lifecycle=None,
@@ -40,6 +41,7 @@ class BaseExpertAgent:
         self.ollama_host = ollama_host.rstrip("/")
         self.timeout_seconds = timeout_seconds
         self.num_predict = num_predict
+        self.num_ctx = num_ctx
         self.timeout_retries = max(0, int(timeout_retries))
         # Default keep_alive=0 so weights drop after each call unless lifecycle manages exclusivity.
         self.keep_alive = keep_alive
@@ -80,6 +82,20 @@ class BaseExpertAgent:
                 "num_predict": self.num_predict,
             },
         }
+        # num_ctx ACOTADO. Sin fijarlo, Ollama reserva cache para la ventana
+        # COMPLETA del modelo. Medido el 2026-09-24 con concilio-medium
+        # (deepseek-r1:8b, ventana 131.072):
+        #
+        #   size          25,7 GB   <- modelo 5,2 + cache de contexto
+        #   size_vram      2,1 GB   <- lo unico que entra en la RTX 3050 (4 GB)
+        #   context_length 131.072  <- para un prompt real de ~5.000 tokens
+        #
+        # El resto se va a RAM del host y de ahi a disco: por eso la etapa del
+        # coder tardaba 20-30 min por vuelta. La cache escala lineal con la
+        # ventana, asi que acotarla a lo que la tarea necesita la reduce ~16x.
+        if self.num_ctx:
+            payload["options"]["num_ctx"] = int(self.num_ctx)
+
         if self.keep_alive is not None:
             payload["keep_alive"] = self.keep_alive
 
