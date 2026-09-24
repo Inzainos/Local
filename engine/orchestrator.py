@@ -365,17 +365,25 @@ class ConsensusOrchestrator:
         if getattr(self, "inject_sentinel", False):
             repo_ctx = load_repository_context()
             pack_path = os.path.join(self._project_root, "data", "memory_packs", "sentinel_omega_pack.md")
-            if os.path.isfile(pack_path):
+            # El pack se REGENERA en cada auditoría. Antes se prefería el
+            # archivo cacheado y solo se construía si faltaba: el de disco era
+            # del 2026-09-16 y describía un sistema de 6 agentes que ya no
+            # existe. Una auditoría que lee un retrato viejo no audita nada ---
+            # informa sobre el pasado creyendo que es el presente.
+            #
+            # El coste es leer cuatro .md (milisegundos) frente a minutos de
+            # inferencia, así que no hay razón para cachear. El archivo en
+            # disco queda como respaldo si la construcción falla.
+            try:
+                pack = build_memory_pack()
+            except Exception:
+                pack = ""
+            if not pack and os.path.isfile(pack_path):
                 with open(pack_path, "r", encoding="utf-8") as fh:
                     pack = fh.read()
-            else:
-                try:
-                    pack = build_memory_pack()
-                except Exception:
-                    pack = ""
             shared_memory.research_context = (
                 build_data_preamble(("repository_context", "memory_pack"))
-                + "\n=== MEMORY PACK (DEV docs, no secrets) ===\n"
+                + "\n=== MEMORY PACK (docs de producción, sin secretos) ===\n"
                 + fence_untrusted(pack, role="memory_pack")
                 + "\n=== REPOSITORY CONTEXT ===\n"
                 + fence_untrusted(repo_ctx, role="repository_context")

@@ -11,11 +11,19 @@ from typing import Dict, List, Optional, Tuple
 
 HOME = Path("/home/deamon")
 
-# Prefer DEV → TEST → PROD docs roots (prod last, never DB).
+# PRODUCCIÓN PRIMERO. El pack alimenta la auditoría del Concilio, y auditar
+# se hace contra el sistema que está corriendo --- no contra un árbol de
+# pruebas. El orden era dev → test → prod, y como el presupuesto de 12.000
+# chars se agota con el primer árbol que tenga los PRIORITY_DOCS, la
+# auditoría NUNCA leía producción: describía 6 agentes cuando hay 9, e
+# ignoraba todo lo corregido en septiembre.
+#
+# Se leen SOLO documentos (nunca la DB). Los árboles dev/test quedan como
+# respaldo por si producción perdiera su documentación.
 DOC_ROOTS: Tuple[Path, ...] = (
+    HOME / "workspaces",        # producción — lo que de verdad corre
     HOME / "workspaces-dev",
     HOME / "workspaces-test",
-    HOME / "workspaces",
     HOME,  # fallback AGENTS.md / README.md at $HOME
 )
 
@@ -75,7 +83,11 @@ HARD_RULES_FALLBACK = """\
 
 def build_memory_pack(
     max_total_chars: int = 12000,
-    max_file_chars: int = 3500,
+    # 3.500 recortaba AGENTS.md justo antes de la tabla de bots: la auditoría
+    # leía las reglas pero no sabía cuántos bots hay ni cuál solo notifica.
+    # AGENTS.md es el documento canónico y se lleva la mitad del presupuesto;
+    # el resto se reparte entre CLAUDE.md y los README.
+    max_file_chars: int = 6000,
     include_hard_rules: bool = True,
 ) -> str:
     """Assemble a redacted memory pack from DEV Sentinel docs."""
