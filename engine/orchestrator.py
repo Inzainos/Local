@@ -631,7 +631,10 @@ class ConsensusOrchestrator:
 
         final_answer = self._run_exclusive(
             self.optimizer.model,
-            lambda: self.optimizer.synthesize_consensus(shared_memory, stream_callback=synth_stream),
+            lambda: self.optimizer.synthesize_consensus(
+                shared_memory, stream_callback=synth_stream,
+                espera_codigo=not skip_coding,
+            ),
             "SYNTHESIS",
             on_stage_start,
             on_stage_end,

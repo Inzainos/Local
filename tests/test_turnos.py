@@ -346,3 +346,50 @@ def test_el_orquestador_avisa_cuando_no_habra_codigo():
     from engine.orchestrator import ConsensusOrchestrator
     fuente = inspect.getsource(ConsensusOrchestrator.run_consensus)
     assert "espera_codigo=not skip_coding" in fuente
+
+
+# ─── estructura de entrega ────────────────────────────────────────────────────
+# Regresión: la plantilla de síntesis era única y pedía "Código final
+# consolidado" + "Guía rápida de uso". Ante una auditoría el modelo rellenaba
+# igual esos apartados: primero inventó un ConfigurationManager y, ya avisado
+# de que no había código, describió módulos que "deberían existir" en un
+# sistema que YA existe. La plantilla arrastraba la respuesta.
+
+def test_la_entrega_de_analisis_pide_hallazgos_no_codigo():
+    from agents.optimizer import OptimizerAgent
+    e = OptimizerAgent._ENTREGA_ANALISIS
+    assert "HALLAZGOS" in e
+    assert "severidad" in e
+    assert "Codigo final consolidado" not in e
+    assert "Guia rapida de uso" not in e
+
+
+def test_la_entrega_de_analisis_prohibe_disenar_de_cero():
+    """Auditar es mirar lo que hay, no proponer lo que debería haber."""
+    from agents.optimizer import OptimizerAgent
+    e = OptimizerAgent._ENTREGA_ANALISIS
+    assert 'deberia' in e.lower()
+    assert "audita el que EXISTE" in e
+
+
+def test_la_entrega_de_analisis_reserva_sitio_para_lo_no_verificado():
+    from agents.optimizer import OptimizerAgent
+    assert "NO se pudo verificar" in OptimizerAgent._ENTREGA_ANALISIS
+
+
+def test_synthesize_consensus_acepta_el_tipo_de_entregable():
+    import inspect
+
+    from agents.optimizer import OptimizerAgent
+    firma = inspect.signature(OptimizerAgent.synthesize_consensus)
+    assert "espera_codigo" in firma.parameters
+    assert firma.parameters["espera_codigo"].default is True
+
+
+def test_el_orquestador_avisa_tambien_en_la_sintesis():
+    import inspect
+
+    from engine.orchestrator import ConsensusOrchestrator
+    fuente = inspect.getsource(ConsensusOrchestrator.run_consensus)
+    assert fuente.count("espera_codigo=not skip_coding") == 2, \
+        "deben avisarse AMBAS: la evaluación y la síntesis"

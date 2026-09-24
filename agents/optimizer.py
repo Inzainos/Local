@@ -64,10 +64,35 @@ obligatorias (umbral único {threshold}; sin zona intermedia).
         artifact = blackboard.add_critique(response_text, score=score, threshold=threshold)
         return artifact
 
+    # Estructuras de entrega. La de codigo era la UNICA, con secciones
+    # "Codigo final consolidado" y "Guia rapida de uso": ante una auditoria el
+    # modelo rellenaba igual esos apartados, primero inventando un
+    # ConfigurationManager y luego --- ya avisado de que no habia codigo ---
+    # describiendo modulos que "deberian existir" en un sistema que YA existe.
+    # Un diseno de cero, no una auditoria. La plantilla arrastraba la respuesta.
+    _ENTREGA_CODIGO = """1. Resumen y enfoque
+2. Codigo final consolidado
+3. Optimizaciones clave
+4. Guia rapida de uso"""
+
+    _ENTREGA_ANALISIS = """1. Resumen: que se audito y con que material
+2. HALLAZGOS, de mayor a menor severidad. Cada uno con:
+   - severidad (CRITICA / ALTA / MEDIA / BAJA)
+   - donde ocurre (archivo o componente, tal como aparece en el contexto)
+   - por que importa
+   - accion sugerida
+3. Lo que NO se pudo verificar con el material disponible
+4. Riesgos abiertos
+
+NO describas el sistema que "deberia" construirse: audita el que EXISTE
+segun el contexto. No inventes archivos, rutas ni metricas que no esten
+en los datos. Si algo no consta, dilo en el apartado 3."""
+
     def synthesize_consensus(
         self,
         shared_memory: SharedMemory,
         stream_callback: Optional[Callable[[str], None]] = None,
+        espera_codigo: bool = True,
     ) -> str:
         blackboard = shared_memory.blackboard
         preamble = build_data_preamble(("task", "research", "code"))
@@ -81,8 +106,11 @@ obligatorias (umbral único {threshold}; sin zona intermedia).
         if blackboard.code_proposal:
             code = fence_untrusted(blackboard.code_proposal.raw_content, role="code")
         else:
-            code = ("(esta tarea es de analisis: no lleva codigo y su ausencia "
-                    "NO es una deficiencia)")
+            code = ""
+        # Sin codigo no se imprime ni el rotulo: un encabezado "CODIGO" vacio
+        # invita al modelo a rellenarlo.
+        seccion_codigo = f"\nCÓDIGO:\n{code}\n" if code else "\n"
+        estructura = self._ENTREGA_CODIGO if espera_codigo else self._ENTREGA_ANALISIS
         prompt = f"""{preamble}
 
 === CONCILIO DE EXPERTOS: SÍNTESIS FINAL ===
@@ -91,19 +119,13 @@ TAREA ORIGINAL:
 
 INVESTIGACIÓN:
 {research}
-
-CÓDIGO:
-{code}
-
+{seccion_codigo}
 AUDITORÍA:
 Puntaje alcanzado: {blackboard.consensus_score}/100
 
 INSTRUCCIÓN:
 Genera la presentación final definitiva para el usuario:
-1. Resumen y enfoque
-2. Código final consolidado
-3. Optimizaciones clave
-4. Guía rápida de uso
+{estructura}
 """
         synthesis = self.generate(prompt=prompt, stream_callback=stream_callback)
         blackboard.final_synthesis = synthesis
