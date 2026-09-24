@@ -27,7 +27,19 @@ ollama:
 
 consensus:
   threshold_score: 85
-  max_refinement_rounds: 3
+  # 0 = SIN TOPE: reentra hasta alcanzar threshold_score. El orquestador ya
+  # lo soporta (`infinite_loop = self.max_rounds == 0`).
+  #
+  # OJO, y esto hay que tenerlo delante: el arbitro corre a temperature 0.2 y
+  # la desviacion tipica medida sobre cuatro corridas del MISMO encargo fue de
+  # 6,9 puntos (62, 75, 78, 72). Un bucle sin tope contra un umbral fijo puede
+  # estar RE-MUESTREANDO ruido en vez de refinando: si la media real ronda 72,
+  # llegara a 85 por azar, no por mejora. Por eso va con deteccion de
+  # estancamiento --- ver `rondas_sin_mejora_para_parar`.
+  max_refinement_rounds: 0
+  # Si tras N rondas el mejor score no sube, se para y se informa. Sin esto un
+  # encargo que el modelo no puede resolver gira para siempre a 12 min la vuelta.
+  rondas_sin_mejora_para_parar: 4
   auto_refine: true
   timeout_retries: 2
 

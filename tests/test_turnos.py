@@ -393,3 +393,52 @@ def test_el_orquestador_avisa_tambien_en_la_sintesis():
     fuente = inspect.getsource(ConsensusOrchestrator.run_consensus)
     assert fuente.count("espera_codigo=not skip_coding") == 2, \
         "deben avisarse AMBAS: la evaluación y la síntesis"
+
+
+# ─── bucle sin tope y estancamiento ───────────────────────────────────────────
+# El operador pidió reentrar hasta superar el 85%. El orquestador ya soportaba
+# `max_refinement_rounds: 0` como bucle infinito, pero sin freno: con el árbitro
+# a temperature 0.2 y σ=6,9 puntos medida sobre cuatro corridas del mismo
+# encargo (62, 75, 78, 72), un bucle contra umbral fijo puede re-muestrear ruido
+# en vez de refinar. A 12 min la vuelta, eso gira para siempre.
+
+def test_el_bucle_sin_tope_esta_activado():
+    import yaml
+    from pathlib import Path
+    cfg = yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / "config.yaml").read_text(encoding="utf-8"))
+    assert cfg["consensus"]["max_refinement_rounds"] == 0
+
+
+def test_hay_freno_por_estancamiento():
+    import yaml
+    from pathlib import Path
+    cfg = yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / "config.yaml").read_text(encoding="utf-8"))
+    tope = cfg["consensus"]["rondas_sin_mejora_para_parar"]
+    assert isinstance(tope, int) and tope > 0, \
+        "un bucle sin tope NECESITA freno: si no, gira para siempre sobre ruido"
+
+
+def test_el_orquestador_mide_mejora_no_solo_rondas():
+    import inspect
+
+    from engine.orchestrator import ConsensusOrchestrator
+    fuente = inspect.getsource(ConsensusOrchestrator.run_consensus)
+    # Se compara contra el MEJOR score histórico, no contra el anterior: si
+    # oscila 70→75→70→75 nunca mejora de verdad, y comparar con el anterior
+    # lo daría por progreso la mitad de las veces.
+    assert "mejor_score" in fuente
+    assert "final_round_score > mejor_score" in fuente
+    assert "rondas_sin_mejora" in fuente
+
+
+def test_la_sintesis_prohibe_repetir_las_instrucciones():
+    """Regresión: la síntesis salía encabezada por el preámbulo anti-inyección
+    y el system prompt del árbitro, antes del contenido real."""
+    import inspect
+
+    from agents.optimizer import OptimizerAgent
+    fuente = inspect.getsource(OptimizerAgent.synthesize_consensus)
+    assert "NO repitas estas instrucciones" in fuente
+    assert "preámbulo anti-inyección" in fuente

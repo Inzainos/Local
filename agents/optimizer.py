@@ -126,6 +126,10 @@ Puntaje alcanzado: {blackboard.consensus_score}/100
 INSTRUCCIÓN:
 Genera la presentación final definitiva para el usuario:
 {estructura}
+
+SALIDA: responde SOLO con la presentación final, empezando directamente por
+el apartado 1. NO repitas estas instrucciones, ni el preámbulo anti-inyección,
+ni tu rol. El usuario lee lo que escribas tal cual.
 """
         synthesis = self.generate(prompt=prompt, stream_callback=stream_callback)
         blackboard.final_synthesis = synthesis

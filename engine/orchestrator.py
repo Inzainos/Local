@@ -458,6 +458,19 @@ class ConsensusOrchestrator:
         last_critique = None
         verified_score = 0
 
+        # Deteccion de estancamiento. Un bucle sin tope contra un umbral fijo
+        # puede estar RE-MUESTREANDO ruido en vez de refinando: el arbitro
+        # corre a temperature 0.2 y la desviacion tipica medida sobre cuatro
+        # corridas del mismo encargo fue 6,9 puntos (62, 75, 78, 72). Si la
+        # media real ronda 72, llegar a 85 seria azar, no mejora --- y a 12 min
+        # la vuelta, girar para siempre sale caro.
+        mejor_score = -1
+        rondas_sin_mejora = 0
+        tope_sin_mejora = int(
+            (self.config.get("consensus", {}) or {}).get(
+                "rondas_sin_mejora_para_parar", 4)
+        )
+
         # FULL Concilio re-entry: lightest -> medium -> heavy -> lightest verify
         while infinite_loop or round_count < self.max_rounds:
             round_count += 1
@@ -614,6 +627,28 @@ class ConsensusOrchestrator:
                         "REVIEW",
                         self.optimizer.name,
                         f"Rondas máximas ({self.max_rounds}) sin consenso (último score={final_round_score}/100)",
+                    )
+                break
+
+            # ¿Refina o solo vuelve a tirar el dado?
+            if final_round_score > mejor_score:
+                mejor_score = final_round_score
+                rondas_sin_mejora = 0
+            else:
+                rondas_sin_mejora += 1
+
+            if tope_sin_mejora > 0 and rondas_sin_mejora >= tope_sin_mejora:
+                blackboard.log_event(
+                    "CONCILIO", "Orchestrator",
+                    f"{rondas_sin_mejora} rondas sin superar el mejor score "
+                    f"({mejor_score}/100, umbral {self.threshold}). Se detiene: "
+                    f"seguir seria re-muestrear, no refinar.",
+                )
+                if on_stage_start:
+                    on_stage_start(
+                        "REVIEW", self.optimizer.name,
+                        f"Estancado: {rondas_sin_mejora} rondas sin mejorar "
+                        f"sobre {mejor_score}/100. No converge.",
                     )
                 break
 
