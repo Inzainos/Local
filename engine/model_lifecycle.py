@@ -80,7 +80,8 @@ class ModelLifecycle:
                 continue
             self.stop_model(name)
 
-    def ensure_exclusive(self, model: str, settle_seconds: float = 1.0) -> None:
+    def ensure_exclusive(self, model: str, settle_seconds: float = 1.0,
+                         num_ctx: Optional[int] = None) -> None:
         """Stop every other loaded model, then optionally warm `model`."""
         self.stop_all_except(keep=None)  # unload everything first (incl. previous role)
         if settle_seconds > 0:
@@ -88,15 +89,20 @@ class ModelLifecycle:
         # Warm load with keep_alive so the next generate is faster; caller still owns stop.
         try:
             with httpx.Client(timeout=max(self.timeout, 120.0)) as client:
-                client.post(
-                    f"{self.ollama_host}/api/generate",
-                    json={
-                        "model": model,
-                        "prompt": "",
-                        "keep_alive": "5m",
-                        "stream": False,
-                    },
-                )
+                cuerpo = {
+                    "model": model,
+                    "prompt": "",
+                    "keep_alive": "5m",
+                    "stream": False,
+                }
+                # La PRECARGA es la que fija la ventana. Sin num_ctx aqui,
+                # Ollama reserva la del modelo (131.072 en deepseek/llama3.2) y
+                # el generate posterior ya no puede reducirla sin recargar:
+                # medido, el modelo quedaba con 18-25 GB reservados y solo un
+                # 8-10% en GPU. Pasarlo solo en generate() no bastaba.
+                if num_ctx:
+                    cuerpo["options"] = {"num_ctx": int(num_ctx)}
+                client.post(f"{self.ollama_host}/api/generate", json=cuerpo)
             logger.info("warm-loaded exclusive model %s", model)
         except Exception as e:
             # Soft-fail: generate() in the agent will still try to load.

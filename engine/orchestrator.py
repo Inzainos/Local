@@ -299,7 +299,13 @@ class ConsensusOrchestrator:
         if on_stage_start:
             on_stage_start(stage, agent_name, msg)
         if self.sequential:
-            self.lifecycle.ensure_exclusive(model, settle_seconds=self.settle_seconds)
+            # El num_ctx del rol que va a usar ese modelo: la precarga es
+            # la que fija la ventana, no el generate posterior.
+            _ctx = next((getattr(a, "num_ctx", None)
+                         for a in (self.researcher, self.coder, self.optimizer)
+                         if getattr(a, "model", None) == model), None)
+            self.lifecycle.ensure_exclusive(model, settle_seconds=self.settle_seconds,
+                                            num_ctx=_ctx)
         result = None
         try:
             result = fn()

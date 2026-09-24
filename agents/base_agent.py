@@ -67,7 +67,7 @@ class BaseExpertAgent:
     ) -> str:
         """Envía un prompt a Ollama y retorna la respuesta (con soporte de streaming)."""
         if self.lifecycle is not None:
-            self.lifecycle.ensure_exclusive(self.model)
+            self.lifecycle.ensure_exclusive(self.model, num_ctx=self.num_ctx)
 
         active_model = self.model
         sys_prompt = system_override if system_override is not None else self.system_prompt
@@ -146,7 +146,7 @@ class BaseExpertAgent:
                 if stream_callback:
                     stream_callback(f"\n[Aviso: Conmutando a modelo alternativo {self.fallback_model}]\n")
                 if self.lifecycle is not None:
-                    self.lifecycle.ensure_exclusive(self.fallback_model)
+                    self.lifecycle.ensure_exclusive(self.fallback_model, num_ctx=self.num_ctx)
                 payload["model"] = self.fallback_model
                 with httpx.Client(timeout=self.timeout_seconds) as client:
                     with client.stream("POST", f"{self.ollama_host}/api/generate", json=payload) as response:
@@ -175,7 +175,7 @@ class BaseExpertAgent:
             fallback_payload = dict(payload)
             fallback_payload["model"] = self.fallback_model
             if self.lifecycle is not None:
-                self.lifecycle.ensure_exclusive(self.fallback_model)
+                self.lifecycle.ensure_exclusive(self.fallback_model, num_ctx=self.num_ctx)
             with httpx.Client(timeout=self.timeout_seconds) as client:
                 with client.stream("POST", f"{self.ollama_host}/api/generate", json=fallback_payload) as response:
                     response.raise_for_status()
