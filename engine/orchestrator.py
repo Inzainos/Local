@@ -371,8 +371,6 @@ class ConsensusOrchestrator:
         # Quien llama y conoce el tipo lo pasa explicitamente.
         if pipeline_type is None:
             pipeline_type = TaskRouter.route_task(user_prompt)
-        else:
-            logger.info("pipeline forzado por el llamante: %s", pipeline_type)
         blackboard = shared_memory.create_task_blackboard(user_prompt, task_type=pipeline_type.value)
 
         # .concilio session file

@@ -249,13 +249,29 @@ def test_auditar_un_fragmento_de_codigo_si_es_optimizacion():
     assert TaskRouter.route_task(prompt) == PipelineType.CODE_OPTIMIZATION
 
 
-def test_audit_project_no_deja_adivinar_al_router():
-    """Quien llama conoce el tipo: no debe depender de palabras clave."""
-    import inspect
+def test_audit_project_no_deja_adivinar_al_router(monkeypatch):
+    """Quien llama conoce el tipo: no debe depender de palabras clave.
 
+    Se EJECUTA la ruta, no se inspecciona el texto: la primera versión de
+    este test solo miraba que la cadena estuviera en el código fuente y pasó
+    en verde mientras audit_project reventaba con NameError al correrla.
+    """
     from engine.orchestrator import ConsensusOrchestrator
-    fuente = inspect.getsource(ConsensusOrchestrator.audit_project)
-    assert "pipeline_type=PipelineType.RESEARCH_AND_ANALYSIS" in fuente
+    from engine.router import PipelineType
+
+    visto = {}
+
+    def falso_run(self, user_prompt, shared_memory=None, on_stage_start=None,
+                  on_token=None, on_stage_end=None, pipeline_type=None):
+        visto["tipo"] = pipeline_type
+        return "blackboard"
+
+    monkeypatch.setattr(ConsensusOrchestrator, "run_consensus", falso_run)
+    orq = ConsensusOrchestrator.__new__(ConsensusOrchestrator)
+    orq.db_path = ":memory:"
+    orq.inject_sentinel = False
+    assert ConsensusOrchestrator.audit_project(orq, focus="tests") == "blackboard"
+    assert visto["tipo"] == PipelineType.RESEARCH_AND_ANALYSIS
 
 
 def test_run_consensus_acepta_el_tipo_forzado():
@@ -265,3 +281,28 @@ def test_run_consensus_acepta_el_tipo_forzado():
     firma = inspect.signature(ConsensusOrchestrator.run_consensus)
     assert "pipeline_type" in firma.parameters
     assert firma.parameters["pipeline_type"].default is None
+
+
+# ─── nombres indefinidos ──────────────────────────────────────────────────────
+
+def test_ningun_nombre_indefinido_en_el_motor():
+    """Guarda contra el NameError que ningún test unitario caza.
+
+    Al forzar `pipeline_type` se coló un `logger.info(...)` en un módulo que
+    no usa logging. Los 21 tests pasaron en verde y la auditoría reventó al
+    lanzarla: el test de audit_project sustituye run_consensus entero, así que
+    su cuerpo real nunca se ejecutaba. Un nombre indefinido es trabajo de
+    análisis estático, no de pruebas.
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    raiz = Path(__file__).resolve().parents[1]
+    objetivos = ["engine", "memory", "telegram_bot.py", "cli.py"]
+    r = subprocess.run(
+        [sys.executable, "-m", "pyflakes", *objetivos],
+        cwd=raiz, capture_output=True, text=True,
+    )
+    indefinidos = [l for l in r.stdout.splitlines() if "undefined name" in l]
+    assert not indefinidos, "nombres indefinidos:\n" + "\n".join(indefinidos)
