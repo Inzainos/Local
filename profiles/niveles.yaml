@@ -42,24 +42,33 @@ memoria:
   turnos_visibles: 6
 
 capitan:
-  model: concilio-investigador  # llama3.2:3b: ventana 131k y tool-calling
-  temperature: 0.1
-  # Solo clasifica (investigación | código) y elige nivel de entrada.
-  # No recibe el pack completo: clasificar no necesita contexto profundo.
+  model: nemotron-mini
+  temperature: 0.0
+  # nemotron-mini NO es un razonador y aquí no hace falta que lo sea. Su
+  # trabajo es DECIDIR rápido: leer el enunciado y devolver una etiqueta
+  # (investigación | código) y un nivel de entrada. Nada de cadenas de
+  # pensamiento, nada de explorar.
+  #
+  # Su ventana de 4.096 --- la más estrecha de la instalación --- deja de ser
+  # un defecto aquí: clasificar no necesita contexto profundo, solo el
+  # enunciado y una nota de alcance. Y es de los más rápidos.
+  #
+  # Se usa decodificación restringida (Ollama `format`) para que devuelva la
+  # etiqueta y ya, en vez de confiar en que obedezca "responde SOLO con...".
+  max_tokens: 64
 
 # ---------------------------------------------------------------------------
 # INVESTIGACIÓN
 # ---------------------------------------------------------------------------
 investigacion:
   ligero:
-    techo_ram_gb: 2.7
+    techo_ram_gb: 3.3
     turnos:
-      # nemotron PRIMERO, no último. Su ventana de 4.096 es la más estrecha de
-      # la instalación, y el acumulado crece con cada turno: ponerlo al final
-      # lo condena a recibir justo cuando menos sitio le queda. En el primer
-      # turno no hay nada acumulado, así que su ventana alcanza.
-      - {model: nemotron-mini, rol: explorador, tools: readonly, ctx: 4096}
-      - {model: llama3.2:3b,   rol: sintetizador, tools: readonly, ctx: 131072}
+      # nemotron-mini ya NO entra aquí. Estaba de "explorador" y ese rol pide
+      # justo lo que no es: rastrear, razonar, sostener contexto largo. Su
+      # sitio es decidir rápido --- ver `capitan` y `portero`.
+      - {model: llama3.2:3b, rol: explorador, tools: readonly, ctx: 131072}
+      - {model: gemma3:4b,   rol: sintetizador, tools: none, ctx: 131072}
   intermedio:
     techo_ram_gb: 4.4
     turnos:
@@ -108,6 +117,29 @@ juez:
     model: deepseek-r1:8b       # cuando el normal no decide en max_rondas_juez
     ctx: 131072
     temperature: 0.1
+
+# ---------------------------------------------------------------------------
+# PORTERO — decide entre turnos, no delibera
+# ---------------------------------------------------------------------------
+# Tras cada turno alguien tiene que responder una pregunta binaria: ¿esto ya
+# está, o hace falta otra vuelta? Ponerla en manos de un razonador es caro y
+# lento --- el coder tardó 30 min en su etapa. Esta decisión debe costar
+# segundos.
+#
+# nemotron-mini encaja exactamente: lee el borrador y las puntuaciones de los
+# turnos previos y devuelve PASO o REFINO. No produce contenido, no razona en
+# cadena, no necesita ventana grande. Solo tiene que ser rápido y no perder el
+# hilo de lo que ya se dijo.
+#
+# Si el portero duda (devuelve algo que no es una de las dos etiquetas) se
+# asume REFINO: equivocarse hacia otra vuelta cuesta tiempo; equivocarse hacia
+# PASO entrega trabajo sin revisar.
+portero:
+  model: nemotron-mini
+  temperature: 0.0
+  max_tokens: 128
+  contexto_tokens: 1200     # borrador del turno + puntuaciones previas
+  ante_la_duda: REFINO
 
 # ---------------------------------------------------------------------------
 # ESCALADO DE CONTEXTO — cuánto material recibe cada turno
