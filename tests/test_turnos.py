@@ -227,3 +227,41 @@ def test_la_memoria_corrupta_no_revienta(tmp_path):
     with ruta.open("a", encoding="utf-8") as f:
         f.write("{esto no es json\n")
     assert len(mem.leer("A")) == 1
+
+
+# ─── enrutado de auditorías ───────────────────────────────────────────────────
+# Regresión: "audita" vivía solo en optimize_keywords y exigía código en el
+# prompt. Auditar un proyecto entero nunca lo cumple, así que caía al default
+# FULL_CONSENSUS_CODING. Medido: 70 de 105 min en el coder, y la síntesis
+# entregó un ConfigurationManager inventado en vez de hallazgos.
+
+def test_auditar_un_proyecto_no_es_programar():
+    from engine.router import PipelineType, TaskRouter
+    prompt = ("AUDITORÍA DEL PROYECTO SENTINEL OMEGA / CONCILIO. Revisa el "
+              "contexto inyectado y produce hallazgos priorizados con "
+              "severidad, archivo y acción sugerida.")
+    assert TaskRouter.route_task(prompt) == PipelineType.RESEARCH_AND_ANALYSIS
+
+
+def test_auditar_un_fragmento_de_codigo_si_es_optimizacion():
+    from engine.router import PipelineType, TaskRouter
+    prompt = "audita este código:\n```python\ndef f(): pass\n```"
+    assert TaskRouter.route_task(prompt) == PipelineType.CODE_OPTIMIZATION
+
+
+def test_audit_project_no_deja_adivinar_al_router():
+    """Quien llama conoce el tipo: no debe depender de palabras clave."""
+    import inspect
+
+    from engine.orchestrator import ConsensusOrchestrator
+    fuente = inspect.getsource(ConsensusOrchestrator.audit_project)
+    assert "pipeline_type=PipelineType.RESEARCH_AND_ANALYSIS" in fuente
+
+
+def test_run_consensus_acepta_el_tipo_forzado():
+    import inspect
+
+    from engine.orchestrator import ConsensusOrchestrator
+    firma = inspect.signature(ConsensusOrchestrator.run_consensus)
+    assert "pipeline_type" in firma.parameters
+    assert firma.parameters["pipeline_type"].default is None

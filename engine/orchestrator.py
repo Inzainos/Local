@@ -357,12 +357,22 @@ class ConsensusOrchestrator:
         on_stage_start: Optional[Callable[[str, str, str], None]] = None,
         on_token: Optional[Callable[[str, str], None]] = None,
         on_stage_end: Optional[Callable[[str, Any], None]] = None,
+        pipeline_type: Optional[PipelineType] = None,
     ) -> Blackboard:
         if shared_memory is None:
             shared_memory = SharedMemory(db_path=self.db_path)
 
         shared_memory.record_user_message(user_prompt)
-        pipeline_type = TaskRouter.route_task(user_prompt)
+        # NO ADIVINAR LO QUE YA SE SABE. El router clasifica por palabras clave
+        # y su default es FULL_CONSENSUS_CODING, asi que cualquier tarea que no
+        # encaje acaba pasando por el coder. Una auditoria medida el 2026-09-24
+        # gasto 70 de sus 105 minutos ahi, generando un ConfigurationManager
+        # que nadie pidio, cuando lo encargado eran hallazgos priorizados.
+        # Quien llama y conoce el tipo lo pasa explicitamente.
+        if pipeline_type is None:
+            pipeline_type = TaskRouter.route_task(user_prompt)
+        else:
+            logger.info("pipeline forzado por el llamante: %s", pipeline_type)
         blackboard = shared_memory.create_task_blackboard(user_prompt, task_type=pipeline_type.value)
 
         # .concilio session file
@@ -714,7 +724,14 @@ class ConsensusOrchestrator:
         if with_sentinel:
             self.inject_sentinel = True
         try:
-            return self.run_consensus(user_prompt=prompt, shared_memory=shared)
+            # Auditar es ANALIZAR, no programar. Sin esto el router caia en su
+            # default de codigo y el coder --- un razonador --- se comia el 75%
+            # del tiempo produciendo codigo que la auditoria nunca pidio.
+            return self.run_consensus(
+                user_prompt=prompt,
+                shared_memory=shared,
+                pipeline_type=PipelineType.RESEARCH_AND_ANALYSIS,
+            )
         finally:
             self.inject_sentinel = prev
 
