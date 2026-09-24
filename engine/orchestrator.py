@@ -533,6 +533,9 @@ class ConsensusOrchestrator:
                     shared_memory,
                     threshold=self.threshold,
                     stream_callback=optimizer_stream,
+                    # En un pipeline de analisis NO se ejecuta el coder, asi
+                    # que exigir codigo es castigar por cumplir el encargo.
+                    espera_codigo=not skip_coding,
                 ),
                 "REVIEW",
                 on_stage_start,

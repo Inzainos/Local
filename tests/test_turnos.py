@@ -306,3 +306,43 @@ def test_ningun_nombre_indefinido_en_el_motor():
     )
     indefinidos = [l for l in r.stdout.splitlines() if "undefined name" in l]
     assert not indefinidos, "nombres indefinidos:\n" + "\n".join(indefinidos)
+
+
+# ─── rúbrica según el entregable ──────────────────────────────────────────────
+# Regresión: la rúbrica del árbitro era SOLO de código (rendimiento,
+# complejidad, optimizaciones). Una auditoría, que a propósito no produce
+# código, se castigaba por "ausencia total de implementación": saltarse el
+# coder bajó el tiempo de 105 a 11 min pero el score cayó de 75 a 62.
+
+def test_la_rubrica_de_analisis_no_exige_codigo():
+    from agents.optimizer import OptimizerAgent
+    r = OptimizerAgent._RUBRICA_ANALISIS
+    assert "NO exijas codigo" in r
+    for termino in ("RENDIMIENTO", "COMPLEJIDAD", "OPTIMIZACIONES"):
+        assert termino not in r, f"criterio de código {termino} en la rúbrica de análisis"
+
+
+def test_la_rubrica_de_analisis_pide_lo_que_una_auditoria_entrega():
+    from agents.optimizer import OptimizerAgent
+    r = OptimizerAgent._RUBRICA_ANALISIS.upper()
+    for esperado in ("FUNDAMENTO", "COBERTURA", "HALLAZGOS ACCIONABLES", "HONESTIDAD"):
+        assert esperado in r
+
+
+def test_evaluate_solution_acepta_el_tipo_de_entregable():
+    import inspect
+
+    from agents.optimizer import OptimizerAgent
+    firma = inspect.signature(OptimizerAgent.evaluate_solution)
+    assert "espera_codigo" in firma.parameters
+    # Por defecto espera código: el comportamiento previo no cambia para
+    # quien no se entere del parámetro nuevo.
+    assert firma.parameters["espera_codigo"].default is True
+
+
+def test_el_orquestador_avisa_cuando_no_habra_codigo():
+    import inspect
+
+    from engine.orchestrator import ConsensusOrchestrator
+    fuente = inspect.getsource(ConsensusOrchestrator.run_consensus)
+    assert "espera_codigo=not skip_coding" in fuente
