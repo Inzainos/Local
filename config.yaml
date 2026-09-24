@@ -40,7 +40,11 @@ concilio:
   inject_sentinel_architecture: false
   sessions_dir: data/sessions
   # Prefer thin aliases; orchestrator falls back to base tags if missing
-  worker_model: concilio-worker   # LIGHTEST researcher (aliases: concilio-lightest, sentinel-concilio-worker)
+  # LIGHTEST investigador. Era concilio-worker (nemotron-mini, ventana 4.096):
+  # el contexto inyectado ronda 4.800 tokens, así que se desbordaba ANTES de
+  # recibir el enunciado y trabajaba con el material truncado.
+  # concilio-investigador (llama3.2:3b) tiene 131.072 y pesa menos.
+  worker_model: concilio-investigador
   coder_model: concilio-medium    # MEDIUM coder propio (DeepSeek R1); si falta cae al worker
   arbiter_model: concilio-arbitro # aliases: concilio-heavy, sentinel-concilio-arbitro
   fast_gente_outside: true
@@ -71,8 +75,8 @@ context_injector:
 roles:
   researcher:
     name: Concilio Worker-Research (LIGHTEST)
-    model: concilio-worker
-    fallback_model: nemotron-mini
+    model: concilio-investigador
+    fallback_model: llama3.2:3b
     temperature: 0.3
     system_prompt: |
       Eres el Investigador (LIGHTEST) del Concilio secuencial.

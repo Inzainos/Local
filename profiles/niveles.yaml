@@ -1,0 +1,135 @@
+# ============================================================================
+# Concilio MoE POR NIVELES y POR TURNOS
+# ============================================================================
+# Un modelo a la vez. Cada uno lee lo que dejaron los anteriores, decide PASO o
+# REFINO, y puntúa su confianza. El nivel sube al Juez cuando la media alcanza
+# el umbral; si tras recorrer a todos no llega, se ESCALA al nivel siguiente.
+#
+# TECHO DE RAM = el modelo más grande del nivel, NO la suma. Por eso
+# deepseek-r1:14b (9 G) es viable aquí e imposible en un ensemble concurrente.
+#
+# ORDEN DENTRO DE CADA NIVEL: del más débil al más fuerte, a propósito. La
+# deliberación secuencial sufre anclaje --- el primero fija el marco y los demás
+# refinan dentro de él. Con el débil primero, el marco nace tentativo y el
+# modelo capaz entra con licencia para romperlo. Al revés, el mejor habla
+# primero y los otros asienten.
+#
+# Ventanas y tool-calling verificados con /api/show el 2026-09-24, no del manual.
+#
+# TECHO REAL DE ESTA MÁQUINA: 7,9 G totales, ~5,5 G disponibles con Sentinel
+# Omega corriendo. Eso deja FUERA a deepseek-r1:14b (9,0 G), que es el modelo
+# más capaz instalado: cargarlo mandaría a swap y tardaría muchísimo. El nivel
+# avanzado usa deepseek-r1:8b (5,2 G), el mayor que cabe de verdad.
+#
+# Para usar el 14b hay que DETENER Sentinel primero. Es una decisión
+# deliberada del operador, nunca automática --- ver perfil `maximo` abajo.
+# ============================================================================
+
+ollama:
+  host: http://127.0.0.1:11434
+  timeout_seconds: 600          # deepseek-r1:14b razona largo con pack inyectado
+
+consenso:
+  umbral_nivel: 85              # media de puntuaciones para subir al Juez
+  umbral_juez: 85               # el Juez aprueba a partir de aquí
+  max_turnos_por_nivel: 2       # vueltas completas antes de escalar
+  max_rondas_juez: 2            # devoluciones antes de escalar al juez avanzado
+
+memoria:
+  store: data/moe_turnos.jsonl
+  # Cuántos turnos previos ve cada modelo al entrar. Cada entrada lleva el
+  # BORRADOR, no solo el marcador --- sin el borrador no hay refinamiento posible.
+  turnos_visibles: 6
+
+capitan:
+  model: concilio-investigador  # llama3.2:3b: ventana 131k y tool-calling
+  temperature: 0.1
+  # Solo clasifica (investigación | código) y elige nivel de entrada.
+  # No recibe el pack completo: clasificar no necesita contexto profundo.
+
+# ---------------------------------------------------------------------------
+# INVESTIGACIÓN
+# ---------------------------------------------------------------------------
+investigacion:
+  ligero:
+    techo_ram_gb: 2.7
+    turnos:
+      - {model: llama3.2:3b,    rol: explorador, tools: readonly, ctx: 131072}
+      - {model: nemotron-mini,  rol: sintetizador, tools: readonly, ctx: 4096}
+      # nemotron va SEGUNDO y con tarea acotada: su ventana de 4k no aguanta
+      # el material completo, pero sí condensar lo que el explorador ya filtró.
+  intermedio:
+    techo_ram_gb: 4.4
+    turnos:
+      - {model: llama3.2:3b,  rol: explorador, tools: readonly, ctx: 131072}
+      - {model: mistral:7b,   rol: contrastador, tools: readonly, ctx: 32768}
+      - {model: gemma3:4b,    rol: sintetizador, tools: none, ctx: 131072}
+      # gemma3 NO tiene tool-calling (verificado): entra al final, cuando ya
+      # solo hay que razonar sobre lo que los otros verificaron.
+  avanzado:
+    techo_ram_gb: 5.2
+    turnos:
+      - {model: llama3.2:3b,    rol: explorador, tools: readonly, ctx: 131072}
+      - {model: mistral:7b,     rol: contrastador, tools: readonly, ctx: 32768}
+      - {model: deepseek-r1:8b, rol: experto, tools: readonly, ctx: 131072}
+
+# ---------------------------------------------------------------------------
+# CÓDIGO
+# ---------------------------------------------------------------------------
+codigo:
+  ligero:
+    techo_ram_gb: 4.7
+    turnos:
+      - {model: llama3.2:3b,        rol: esbozo, tools: readonly, ctx: 131072}
+      - {model: "qwen2.5-coder:7b", rol: programador, tools: readonly, ctx: 32768}
+  intermedio:
+    techo_ram_gb: 5.2
+    turnos:
+      - {model: "qwen2.5-coder:7b", rol: programador, tools: readonly, ctx: 32768}
+      - {model: deepseek-r1:8b,     rol: revisor, tools: readonly, ctx: 131072}
+  avanzado:
+    techo_ram_gb: 5.2
+    turnos:
+      - {model: llama3.2:3b,        rol: esbozo, tools: readonly, ctx: 131072}
+      - {model: "qwen2.5-coder:7b", rol: programador, tools: readonly, ctx: 32768}
+      - {model: deepseek-r1:8b,     rol: experto, tools: readonly, ctx: 131072}
+
+# ---------------------------------------------------------------------------
+# JUEZ — audita el trabajo conjunto del MoE que haya intervenido
+# ---------------------------------------------------------------------------
+juez:
+  normal:
+    model: gemma3:4b            # 131k de ventana; auditar texto dado no pide tools
+    ctx: 131072
+    temperature: 0.1
+  escalado:
+    model: deepseek-r1:8b       # cuando el normal no decide en max_rondas_juez
+    ctx: 131072
+    temperature: 0.1
+
+# ---------------------------------------------------------------------------
+# RECUPERACIÓN VECTORIAL (sustituye al pack fijo de 12.000 chars)
+# ---------------------------------------------------------------------------
+vectorial:
+  habilitado: false             # se activa cuando el índice esté construido
+  modelo_embeddings: nomic-embed-text   # 768 dimensiones, vía /api/embed
+  indice: data/indice_vectorial.db      # sqlite3, sin dependencias externas
+  fragmentos_por_consulta: 8
+  chars_por_fragmento: 1200
+
+# ---------------------------------------------------------------------------
+# MÁXIMO — solo con Sentinel Omega DETENIDO. Nunca se elige automáticamente.
+# ---------------------------------------------------------------------------
+# deepseek-r1:14b es el modelo más capaz instalado (14,8B, ventana 131k, tools)
+# pero pide 9,0 G y esta máquina tiene 7,9 G totales. Con el launcher vivo va a
+# swap. El Capitán NO debe escalar aquí solo: lo pide el operador a sabiendas.
+maximo:
+  requiere_sentinel_detenido: true
+  investigacion:
+    turnos:
+      - {model: mistral:7b,        rol: explorador, tools: readonly, ctx: 32768}
+      - {model: "deepseek-r1:14b", rol: experto, tools: readonly, ctx: 131072}
+  codigo:
+    turnos:
+      - {model: "qwen2.5-coder:7b", rol: programador, tools: readonly, ctx: 32768}
+      - {model: "deepseek-r1:14b",  rol: experto, tools: readonly, ctx: 131072}
