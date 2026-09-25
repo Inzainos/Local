@@ -646,3 +646,50 @@ def test_el_coder_recibe_por_que_no_se_pudo_verificar(monkeypatch):
     assert "no contiene un bloque de codigo" in c.raw_content
     assert "[PUNTUACION_CONSENSO:" not in c.raw_content
     assert not c.passed
+
+
+# ─── la autoridad del informe depende de QUIEN escribio los casos ─────────────
+# 2026-09-25, a_segundos: el modelo derivo `a_segundos('2h')` -> esperado 120
+# (son 7200) y `'2h10m'` -> esperado 0 (es valido). Con eso bloqueo un codigo de
+# qwen que era CORRECTO. Presentar esos casos como «lo que manda» empujaria al
+# coder a romperlo.
+
+_FALSOS_DERIVADOS = [
+    {"entrada": "a_segundos('2h')", "obtenido": "7200", "esperado": "120",
+     "correcto": False},
+    {"entrada": "a_segundos('2h10m')", "obtenido": "7800", "esperado": "0",
+     "correcto": False},
+]
+
+
+def test_casos_derivados_llegan_marcados_como_no_fiables(monkeypatch):
+    from engine.verificador import Veredicto
+    v = Veredicto(10, 12, linea_base=6, detalle=_FALSOS_DERIVADOS)
+    v.via = "derivados"
+    a, mem, bb = _arbitro_con_veredicto(monkeypatch, v)
+    texto = a.evaluate_solution(mem, threshold=85, espera_codigo=True).raw_content
+    assert "PROPUESTOS por un modelo" in texto
+    assert "lo que manda" not in texto, (
+        "casos con el esperado mal no pueden llegar al coder como autoridad")
+    assert "esperado 120" in texto, "la informacion llega, pero rotulada"
+
+
+def test_casos_de_especificacion_si_mandan(monkeypatch):
+    from engine.verificador import Veredicto
+    v = Veredicto(11, 16, linea_base=8, detalle=[
+        {"entrada": "validar_token_telegram('0:AHOVcjqx4-GNUbipw3_FMTahov29ELSZgnu')",
+         "obtenido": "False", "esperado": "True", "correcto": False}])
+    v.via = "especificacion"
+    a, mem, bb = _arbitro_con_veredicto(monkeypatch, v)
+    texto = a.evaluate_solution(mem, threshold=85, espera_codigo=True).raw_content
+    assert "lo que manda" in texto and "PROPUESTOS" not in texto
+
+
+def test_la_orden_confiable_distingue_las_dos_vias():
+    from memory.blackboard import Blackboard
+    bb = Blackboard(task_id="t", session_id="s", user_prompt="x")
+    bb.update_code("```python\ndef f(): pass\n```")
+    bb.add_critique("informe", score=0)
+    confiable = bb.get_context_for_refinement()
+    confiable = confiable[confiable.rfind("INSTRUCCIÓN DEL SISTEMA (confiable)"):]
+    assert "PROPUSO un modelo" in confiable and "no rompas" in confiable

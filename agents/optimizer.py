@@ -212,7 +212,21 @@ obligatorias (umbral único {threshold}; sin zona intermedia).
 
     @staticmethod
     def _informe_verificacion(veredicto, casos, score_leido: int) -> str:
-        lineas = ["=== VERIFICACION POR EJECUCION (esto es lo que manda) ===",
+        # La AUTORIDAD depende de quien escribio los casos. Medido el
+        # 2026-09-25 en a_segundos: el modelo derivo `a_segundos('2h')` ->
+        # esperado 120 (son 7200) y `'2h10m'` -> esperado 0 (es valido), y con
+        # eso bloqueo un codigo CORRECTO. Presentar esos casos como «lo que
+        # manda» empujaria al coder a romper lo que estaba bien.
+        if getattr(veredicto, "via", "") == "especificacion":
+            cabecera = ("=== VERIFICACION POR EJECUCION (esto es lo que manda: los "
+                        "casos los construyo el sistema desde el enunciado) ===")
+            titulo_fallos = "Casos que falla:"
+        else:
+            cabecera = ("=== VERIFICACION POR EJECUCION (ATENCION: casos PROPUESTOS "
+                        "por un modelo, pueden tener el ESPERADO mal) ===")
+            titulo_fallos = ("Casos que falla (antes de cambiar tu codigo, comprueba "
+                             "con el enunciado si el ESPERADO es correcto):")
+        lineas = [cabecera,
                   f"Resultado: {veredicto.resumen()}",
                   f"El arbitro habia puntuado {score_leido} LEYENDO el codigo."]
         if not veredicto.supera_la_base:
@@ -220,7 +234,7 @@ obligatorias (umbral único {threshold}; sin zona intermedia).
                           "la misma respuesta. Acierta por omision.")
         fallidos = [f for f in (veredicto.detalle or []) if not f.get("correcto")]
         if fallidos:
-            lineas.append("Casos que falla:")
+            lineas.append(titulo_fallos)
             for f in fallidos[:8]:
                 lineas.append(f"  - {f['entrada']} -> {f['obtenido']} "
                               f"(esperado {f['esperado']})")
