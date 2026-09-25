@@ -1082,6 +1082,73 @@ async def run_audit(update: Update, focus: str, edit: bool = False):
         )
 
 
+def _texto_interrumpidas(pendientes: List[Dict[str, Any]]) -> str:
+    """El aviso, en texto plano a proposito: el enunciado lo escribio el
+    operador y puede traer *, _ o backticks que romperian el formateo."""
+    n = len(pendientes)
+    cabeza = ("⚠️ Se interrumpio una tarea y no llegue a responderte."
+              if n == 1 else
+              f"⚠️ Se interrumpieron {n} tareas y no llegue a responderte.")
+    lineas = [cabeza, ""]
+    for s in pendientes[:5]:
+        cuando = datetime.fromtimestamp(s["updated_at"]).strftime("%d/%m %H:%M") if s["updated_at"] else "?"
+        ronda = s.get("round")
+        donde = f"ronda {ronda} del concilio" if ronda else "antes de la primera ronda"
+        lineas.append(f"• {cuando} — se corto en la {donde}.")
+        tarea = (s["task"] or "").strip().replace("\n", " ")
+        if tarea:
+            lineas.append(f"  {tarea[:300]}")
+    if n > 5:
+        lineas.append(f"… y {n - 5} mas.")
+    lineas += ["", "No se entrego nada: si la quieres, vuelve a mandarla."]
+    return "\n".join(lineas)
+
+
+async def avisar_sesiones_interrumpidas(application: Application):
+    """Al arrancar, avisa de las tareas que murieron a medias.
+
+    Pasa de verdad: el 2026-09-25 un reinicio de Windows corto una tarea del
+    concilio a los 10 minutos, con el codigo ya correcto en la pizarra, y el
+    operador se quedo esperando una respuesta que nunca iba a llegar.
+
+    Las sesiones solo se marcan cerradas si el aviso SALIO. Si no hay a quien
+    avisar, se quedan para el proximo arranque.
+    """
+    try:
+        store = orchestrator.concilio_store
+        pendientes = store.sesiones_interrumpidas()
+    except Exception as e:  # noqa: BLE001
+        logger.error("no se pudieron revisar las sesiones: %s: %s", type(e).__name__, e)
+        return
+    if not pendientes:
+        logger.info("sin tareas interrumpidas")
+        return
+
+    chat_ids = [c.strip() for c in TELEGRAM_CHAT_ID.split(",") if c.strip()] if TELEGRAM_CHAT_ID else []
+    if not chat_ids:
+        logger.warning("%d tareas interrumpidas pero TELEGRAM_CHAT_ID esta vacio: "
+                       "quedan para el proximo arranque", len(pendientes))
+        return
+
+    texto = _texto_interrumpidas(pendientes)
+    entregado = False
+    for chat_id in chat_ids:
+        try:
+            await application.bot.send_message(chat_id=int(chat_id), text=texto)
+            entregado = True
+        except Exception as e:  # noqa: BLE001
+            logger.error("no se pudo avisar a %s: %s", chat_id, e)
+    if not entregado:
+        return
+    for s in pendientes:
+        try:
+            doc = store.load(s["session_id"])
+            store.cerrar(doc, motivo="interrumpida; avisado al operador al arrancar")
+        except Exception as e:  # noqa: BLE001
+            logger.error("no se pudo cerrar %s: %s: %s", s["session_id"], type(e).__name__, e)
+    logger.info("avisadas %d tareas interrumpidas", len(pendientes))
+
+
 async def poll_alert_queue(application: Application):
     logger.info("🔄 Alert queue poller started")
     while True:
@@ -1162,6 +1229,7 @@ def main():
     async def post_init(application: Application):
         application.create_task(poll_alert_queue(application))
         logger.info("🔄 Alert queue poller scheduled")
+        await avisar_sesiones_interrumpidas(application)
 
     app.post_init = post_init
 

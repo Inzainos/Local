@@ -16,7 +16,12 @@ import time
 from typing import Any, Dict, List, Optional
 
 
-CONCILIO_SCHEMA_VERSION = 1
+# 2: se añade `cerrado`. Una sesión sin cerrar es una tarea que se quedó a
+# medias (el 2026-09-25 un reinicio de Windows cortó una a los 10 minutos y el
+# operador no recibió nada: ni respuesta ni aviso). Las sesiones de la versión
+# 1 NO se pueden juzgar --- se escribieron sin el campo --- así que
+# `sesiones_interrumpidas` las ignora en vez de inventar que se cortaron.
+CONCILIO_SCHEMA_VERSION = 2
 
 
 def default_concilio(session_id: str, task: str, round_num: int = 0) -> Dict[str, Any]:
@@ -32,6 +37,9 @@ def default_concilio(session_id: str, task: str, round_num: int = 0) -> Dict[str
         "critique": "",
         "scores": [],  # list of {round, score, passed, model, role}
         "timeline": [],  # list of {ts, role, event, detail}
+        # None mientras la tarea corre; {ts, motivo} cuando termina, pase lo
+        # que pase (entregada, sin consenso o con error).
+        "cerrado": None,
         "meta": {
             "permissions": "concilio-roles-only",
             "web_ui_executable": False,
@@ -90,6 +98,45 @@ class ConcilioStore:
         except OSError:
             pass
         return path
+
+    def cerrar(self, doc: Dict[str, Any], motivo: str = "terminada") -> None:
+        """Marca la sesión como terminada. Lo llama el orquestador en un
+        `finally`: si no se llamó, la tarea murió a medias."""
+        if doc.get("cerrado"):
+            return
+        doc["cerrado"] = {"ts": time.time(), "motivo": motivo[:200]}
+        self.save(doc)
+
+    def sesiones_interrumpidas(self) -> List[Dict[str, Any]]:
+        """Las sesiones que empezaron y nunca se cerraron, de más antigua a
+        más reciente. Un archivo ilegible NO se reporta como interrumpido: no
+        se sabe, y avisar de algo falso es peor que callar."""
+        fuera = []
+        try:
+            nombres = os.listdir(self.sessions_dir)
+        except OSError:
+            return fuera
+        for nombre in nombres:
+            if not nombre.endswith(".concilio"):
+                continue
+            try:
+                with open(os.path.join(self.sessions_dir, nombre), "r", encoding="utf-8") as f:
+                    doc = json.load(f)
+            except (OSError, ValueError):
+                continue
+            if not isinstance(doc, dict):
+                continue
+            if int(doc.get("schema_version") or 1) < 2 or doc.get("cerrado"):
+                continue
+            fuera.append({
+                "session_id": str(doc.get("session_id") or nombre[:-9]),
+                "task": str(doc.get("task") or ""),
+                "round": doc.get("round"),
+                "updated_at": float(doc.get("updated_at") or 0.0),
+                "tiene_codigo": bool(doc.get("code")),
+            })
+        fuera.sort(key=lambda d: d["updated_at"])
+        return fuera
 
     def append_timeline(self, doc: Dict[str, Any], role: str, event: str, detail: str = "") -> None:
         doc.setdefault("timeline", []).append(

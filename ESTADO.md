@@ -73,11 +73,10 @@ Detalle y porqués: `CHANGELOG.md` y los mensajes de commit (cada uno explica su
 2. ~~CHANGELOG 3.0.0~~ — hecho. 3. ~~Etiqueta `v1.0-estable`~~ — hecha.
 4. ~~Desplegar~~ — hecho el 25-sep 09:46.
 
-**Hueco descubierto el 25-sep 13:16 (reinicio de Windows):** una tarea en vuelo se **pierde sin avisar**.
-No hay cola ni reanudación: el `.concilio` guarda la última ronda, pero al arrancar nadie lo mira y el
-operador se queda esperando una respuesta que no va a llegar. Lo mínimo: al arrancar, buscar sesiones
-`.concilio` sin cierre y avisar por Telegram («se interrumpió, ¿la repito?»). Ocurre de verdad: los
-reinicios de Windows son parte del entorno.
+**Hueco del 25-sep 13:16 (reinicio de Windows), AVISO YA HECHO en 3.0.2 (`%s`):** el bot avisa al
+arrancar de las tareas que quedaron a medias, y sólo las marca cerradas si el aviso salió. Lo que
+sigue sin existir es **reanudar**: la tarea hay que volver a mandarla a mano. Reanudarla de verdad
+exige decidir desde dónde (el código de la última ronda está en el `.concilio`) y no está medido.
 
 **v2** (acordado con el operador que queda fuera de la v1). Orden recomendado tras medir: primero
 «segundo intento con otro modelo» (codegemma repitió el mismo código en sus dos intentos de

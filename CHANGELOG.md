@@ -1,3 +1,21 @@
+## [3.0.2] - 2026-09-25 — una tarea interrumpida ya no se pierde en silencio
+
+El 25-sep a las 13:16 un reinicio de Windows cortó una tarea del concilio a los 10 minutos,
+con el código ya correcto en la pizarra (16/16 al re-verificarlo). No se entregó nada y el
+operador se quedó esperando una respuesta que nunca iba a llegar.
+
+- `memory/concilio_store.py`: esquema 2 con `cerrado`. `cerrar()` lo marca; `sesiones_interrumpidas()`
+  devuelve las que empezaron y nunca se cerraron. Las sesiones del esquema 1 se **ignoran**: se
+  escribieron sin el campo y darlas por cortadas sería inventar.
+- `engine/orchestrator.py`: el cuerpo pasa a `_run_consensus` y `run_consensus` lo envuelve en un
+  `finally` que cierra la sesión — salida normal, vía directa y excepción. La lista de sesiones
+  abiertas es local a la llamada, no un atributo: dos tareas a la vez no se pisan.
+- `telegram_bot.py`: al arrancar avisa de lo que quedó a medias, en texto plano (el enunciado es
+  del operador y puede traer `*` o backticks). Sólo cierra lo que **se pudo enviar**: si Telegram
+  no responde o no hay `TELEGRAM_CHAT_ID`, el aviso queda para el próximo arranque.
+- 16 tests nuevos; las 5 piezas nuevas sobreviven a mutación. Probado contra una copia de la
+  sesión real que se cortó.
+
 ## [3.0.1] - 2026-09-25 — el verificador rechazaba código correcto por otra redacción
 
 Primera tarea real tras desplegar la v1, por Telegram: «validar_token_telegram … que acepte

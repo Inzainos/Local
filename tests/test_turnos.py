@@ -369,7 +369,9 @@ def test_el_orquestador_avisa_cuando_no_habra_codigo():
     import inspect
 
     from engine.orchestrator import ConsensusOrchestrator
-    fuente = inspect.getsource(ConsensusOrchestrator.run_consensus)
+    # El cuerpo vive en _run_consensus; run_consensus solo lo envuelve
+    # para cerrar la sesión del concilio pase lo que pase.
+    fuente = inspect.getsource(ConsensusOrchestrator._run_consensus)
     assert "espera_codigo=not skip_coding" in fuente
 
 
@@ -415,7 +417,9 @@ def test_el_orquestador_avisa_tambien_en_la_sintesis():
     import inspect
 
     from engine.orchestrator import ConsensusOrchestrator
-    fuente = inspect.getsource(ConsensusOrchestrator.run_consensus)
+    # El cuerpo vive en _run_consensus; run_consensus solo lo envuelve
+    # para cerrar la sesión del concilio pase lo que pase.
+    fuente = inspect.getsource(ConsensusOrchestrator._run_consensus)
     assert fuente.count("espera_codigo=not skip_coding") == 2, \
         "deben avisarse AMBAS: la evaluación y la síntesis"
 
@@ -449,7 +453,9 @@ def test_el_orquestador_mide_mejora_no_solo_rondas():
     import inspect
 
     from engine.orchestrator import ConsensusOrchestrator
-    fuente = inspect.getsource(ConsensusOrchestrator.run_consensus)
+    # El cuerpo vive en _run_consensus; run_consensus solo lo envuelve
+    # para cerrar la sesión del concilio pase lo que pase.
+    fuente = inspect.getsource(ConsensusOrchestrator._run_consensus)
     # Se compara contra el MEJOR score histórico, no contra el anterior: si
     # oscila 70→75→70→75 nunca mejora de verdad, y comparar con el anterior
     # lo daría por progreso la mitad de las veces.

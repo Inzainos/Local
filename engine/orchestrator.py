@@ -1,10 +1,11 @@
 import yaml
 import httpx
 import hashlib
+import logging
 import os
 import time
 import re
-from typing import Optional, Callable, Dict, Any
+from typing import Optional, Callable, Dict, List, Any
 
 from memory.shared_context import SharedMemory
 from memory.blackboard import Blackboard, TaskStatus
@@ -18,6 +19,8 @@ from agents.researcher import ResearcherAgent
 from agents.coder import CoderAgent
 from agents.optimizer import OptimizerAgent
 from .router import TaskRouter, PipelineType
+
+logger = logging.getLogger("Concilio.Orquestador")
 from .model_lifecycle import ModelLifecycle
 
 
@@ -657,6 +660,36 @@ class ConsensusOrchestrator:
         on_stage_end: Optional[Callable[[str, Any], None]] = None,
         pipeline_type: Optional[PipelineType] = None,
     ) -> Blackboard:
+        """Envoltura que CIERRA la sesión pase lo que pase.
+
+        Una sesión sin cerrar significa «esta tarea murió a medias», y de eso
+        avisa el bot al arrancar. Para que eso no mienta, el cierre va en un
+        `finally`: sirve para la salida normal, para la vía directa y para una
+        excepción. La lista es local a la llamada, no un atributo: dos tareas
+        a la vez no se cierran la sesión la una a la otra.
+        """
+        abiertas: List[Dict[str, Any]] = []
+        try:
+            return self._run_consensus(
+                user_prompt, shared_memory, on_stage_start, on_token,
+                on_stage_end, pipeline_type, _sesiones_abiertas=abiertas)
+        finally:
+            for doc in abiertas:
+                try:
+                    self.concilio_store.cerrar(doc)
+                except Exception as e:  # noqa: BLE001
+                    logger.warning("no se pudo cerrar la sesion: %s: %s", type(e).__name__, e)
+
+    def _run_consensus(
+        self,
+        user_prompt: str,
+        shared_memory: Optional[SharedMemory] = None,
+        on_stage_start: Optional[Callable[[str, str, str], None]] = None,
+        on_token: Optional[Callable[[str, str], None]] = None,
+        on_stage_end: Optional[Callable[[str, Any], None]] = None,
+        pipeline_type: Optional[PipelineType] = None,
+        _sesiones_abiertas: Optional[List[Dict[str, Any]]] = None,
+    ) -> Blackboard:
         if shared_memory is None:
             shared_memory = SharedMemory(db_path=self.db_path)
 
@@ -674,6 +707,8 @@ class ConsensusOrchestrator:
         # .concilio session file
         session_id = getattr(blackboard, "session_id", None) or getattr(blackboard, "task_id", None) or str(int(time.time()))
         doc = self.concilio_store.create(session_id, user_prompt)
+        if _sesiones_abiertas is not None:
+            _sesiones_abiertas.append(doc)
         blackboard.shared_notes["concilio_path"] = self.concilio_store.path_for(session_id)
         blackboard.log_event("CONCILIO", "Orchestrator", f"Session file {blackboard.shared_notes['concilio_path']}")
 
