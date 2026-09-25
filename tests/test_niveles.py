@@ -46,17 +46,26 @@ MODELOS = {
     "gemma3:4b":        (3.11, 34, 4, 256, 131072),
     "mistral:7b":       (4.07, 32, 8, 128,  32768),
     "qwen2.5-coder:7b": (4.36, 28, 4, 128,  32768),
+    "codegemma:7b":     (4.67, 28, 16, 256,  8192),
     "deepseek-r1:8b":   (4.87, 36, 8, 128, 131072),
     "deepseek-r1:14b":  (8.37, 48, 8, 128, 131072),
 }
 
 
-def huella(modelo: str, ctx: int) -> float:
-    """peso + cache KV, en GiB. cache = 2(K,V) x capas x kv_heads x hd x ctx x 2B."""
+# Bytes por elemento de la cache KV. El servidor corre q8_0 desde el
+# 2026-09-25 (OLLAMA_KV_CACHE_TYPE, verificado en el log de arranque): 34 bytes
+# por bloque de 32 valores. Antes era f16. Un test que dimensiona contra f16
+# estaria validando una maquina que ya no existe.
+BYTES_KV = {"f16": 2.0, "q8_0": 34 / 32}
+CACHE_VIGENTE = "q8_0"
+
+
+def huella(modelo: str, ctx: int, cache: str = CACHE_VIGENTE) -> float:
+    """peso + cache KV, en GiB. cache = 2(K,V) x capas x kv_heads x hd x ctx x bytes."""
     peso, capas, kvh, hd, _ = MODELOS[modelo]
-    cache = 2 * capas * kvh * hd * ctx * 2 / 2**30
-    cache *= FRACCION_CACHE.get(modelo, 1.0)
-    return (peso + cache) * SOBRECARGA
+    kv = 2 * capas * kvh * hd * ctx * BYTES_KV[cache] / 2**30
+    kv *= FRACCION_CACHE.get(modelo, 1.0)
+    return (peso + kv) * SOBRECARGA
 
 
 @pytest.fixture(scope="module")
@@ -149,11 +158,16 @@ def test_el_material_deja_sitio_al_acumulado(perfil):
 
 def test_el_modelo_de_huella_predice_lo_medido():
     """La formula se valida contra /api/ps, si no es aritmetica sin anclaje."""
-    for modelo, ctx, medido in [("llama3.2:3b", 16384, 3.80),
-                                ("deepseek-r1:8b", 16384, 7.28),
-                                ("deepseek-r1:8b", 131072, 23.93),
-                                ("gemma3:4b", 16384, 3.57)]:
-        calc = huella(modelo, ctx)
+    # Cada formula contra SUS mediciones: las f16 se tomaron antes de cambiar
+    # la cache; las q8_0, despues.
+    for modelo, ctx, cache, medido in [("llama3.2:3b", 16384, "f16", 3.80),
+                                       ("deepseek-r1:8b", 16384, "f16", 7.28),
+                                       ("deepseek-r1:8b", 131072, "f16", 23.93),
+                                       ("gemma3:4b", 16384, "f16", 3.57),
+                                       ("deepseek-r1:8b", 16384, "q8_0", 6.21),
+                                       ("codegemma:7b", 8192, "q8_0", 6.78),
+                                       ("qwen2.5-coder:7b", 8192, "q8_0", 4.80)]:
+        calc = huella(modelo, ctx, cache)
         err = abs(calc - medido) / medido
         assert err < 0.05, (f"{modelo}@{ctx}: calculado {calc:.2f} contra "
                             f"{medido} medido, error {100*err:.1f}%")

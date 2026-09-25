@@ -22,7 +22,7 @@ def render_banner():
     ╔══════════════════════════════════════════════════════════════════╗
     ║       CONCILIO — cadena secuencial (standalone)                  ║
     ║   • Investigador    (llama3.2:3b / concilio-investigador)        ║
-    ║   • Coder           (deepseek-r1:8b / concilio-medium)           ║
+    ║   • Coder           (codegemma:7b, respaldo qwen2.5-coder)       ║
     ║   • Árbitro         (gemma3:4b / concilio-arbitro)               ║
     ║   Umbral 85 · num_ctx 16.384 · unload entre roles                ║
     ╚══════════════════════════════════════════════════════════════════╝

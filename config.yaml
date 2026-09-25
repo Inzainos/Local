@@ -61,13 +61,16 @@ concilio:
   # recibir el enunciado y trabajaba con el material truncado.
   # concilio-investigador (llama3.2:3b) tiene 131.072 y pesa menos.
   worker_model: concilio-investigador
-  # CODER: qwen2.5-coder:7b desde el 2026-09-25, decision del operador tras
-  # medir. deepseek-r1:8b (concilio-medium) es un modelo de RAZONAMIENTO: en
-  # la linea base se gasto 4.000 tokens pensando (15 min) sin escribir la
-  # funcion; qwen la escribio correcta en 21 s. En la bateria A/B qwen tardo
-  # casi la mitad y quedo mas cerca en las dos tareas. Solo dos funciones
-  # sencillas: en tareas de razonamiento largo deepseek no esta medido.
-  coder_model: qwen2.5-coder:7b
+  # CODER: codegemma:7b desde el 2026-09-25, decision del operador tras medir
+  # siete tareas con verdad escrita a mano, una llamada, temperatura 0:
+  #   codegemma:7b      6/7 tareas, 72/73 casos, 222 s
+  #   qwen2.5-coder:7b  5/7 tareas, 60/73 casos,  79 s
+  #   deepseek-r1:8b    se gasto 15 min pensando sin escribir la funcion
+  # En un concilio con verificador la exactitud a la primera pesa mas que la
+  # velocidad: cada fallo cuesta una ronda entera (6-10 min con intercambios).
+  # Su ventana maxima es 8.192; el peor contexto real medido del coder son
+  # ~3.700 tokens. Para codigo grande, qwen (32.768) queda de respaldo.
+  coder_model: codegemma:7b
   arbiter_model: concilio-arbitro # aliases: concilio-heavy, sentinel-concilio-arbitro
   fast_gente_outside: true
   telegram_preload_sentinel_pack: true
@@ -124,9 +127,9 @@ roles:
     # tokens; 16.384 deja holgura de 3x sin desperdiciar cache.
     num_ctx: 16384
   coder:
-    name: Concilio Coder (MEDIUM · qwen2.5-coder)
-    model: qwen2.5-coder:7b
-    fallback_model: concilio-medium
+    name: Concilio Coder (MEDIUM · codegemma)
+    model: codegemma:7b
+    fallback_model: qwen2.5-coder:7b
     temperature: 0.2
     system_prompt: |
       Eres el Programador (MEDIUM) del Concilio secuencial.
@@ -145,7 +148,10 @@ roles:
       Responde en español; delimita código en bloques markdown.
     max_tokens: 1600
     # Idem: el coder recibe investigacion + enunciado, no un repositorio entero.
-    num_ctx: 16384
+    # 8.192 es el MAXIMO de codegemma. Con 16.384 Ollama reservaria cache para
+    # esa ventana: codegemma tiene 16 cabezales KV de 256, ~8,8 GiB en total,
+    # por encima del techo de 7,3. Medido a 8.192 con q8_0: 6,78 GiB.
+    num_ctx: 8192
   optimizer:
     name: Concilio Arbitro (HEAVY)
     model: concilio-arbitro

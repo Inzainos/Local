@@ -20,6 +20,13 @@
 #     libre              0,46
 #
 # TECHO ÚTIL PARA UN MODELO, con Sentinel Omega corriendo: ~7,3 GiB.
+#
+# CACHÉ q8_0 DESDE EL 2026-09-25 (OLLAMA_KV_CACHE_TYPE + flash attention,
+# verificado en el log de arranque del servidor). Parte la caché KV por la
+# mitad: concilio-medium a 16.384 pasó de 7,28 a 6,21 GiB medidos, con +13% de
+# velocidad de generación y sin pérdida en las sondas de calidad. Los techos de
+# abajo están recalculados con q8_0; la fórmula se valida contra mediciones de
+# cada tipo de caché en tests/test_niveles.py.
 # Con margen de trabajo: 6,8 GiB. Deteniendo Sentinel: ~9,2 GiB.
 #
 # Y el segundo error, más grave: el techo se escribía como el PESO del modelo.
@@ -122,7 +129,7 @@ capitan:
 # ---------------------------------------------------------------------------
 investigacion:
   ligero:
-    techo_ram_gb: 3.8    # llama3.2:3b @16384; gemma3:4b mide 3,57 medido
+    techo_ram_gb: 3.4    # gemma3:4b @16384 (q8_0)
     turnos:
       # nemotron-mini ya NO entra aquí. Estaba de "explorador" y ese rol pide
       # justo lo que no es: rastrear, razonar, sostener contexto largo. Su
@@ -130,7 +137,7 @@ investigacion:
       - {model: llama3.2:3b, rol: explorador, tools: readonly, ctx: 16384}
       - {model: gemma3:4b,   rol: sintetizador, tools: none, ctx: 16384}
   intermedio:
-    techo_ram_gb: 6.4    # mistral:7b @16384
+    techo_ram_gb: 5.4    # mistral:7b @16384 (q8_0)
     turnos:
       - {model: llama3.2:3b,  rol: explorador, tools: readonly, ctx: 16384}
       - {model: mistral:7b,   rol: contrastador, tools: readonly, ctx: 16384}
@@ -138,32 +145,32 @@ investigacion:
       # gemma3 NO tiene tool-calling (verificado): entra al final, cuando ya
       # solo hay que razonar sobre lo que los otros verificaron.
   avanzado:
-    techo_ram_gb: 6.9    # deepseek-r1:8b @12288
+    techo_ram_gb: 6.4    # deepseek-r1:8b @16384 (q8_0)
     turnos:
       - {model: llama3.2:3b,    rol: explorador, tools: readonly, ctx: 16384}
       - {model: mistral:7b,     rol: contrastador, tools: readonly, ctx: 16384}
-      - {model: deepseek-r1:8b, rol: experto, tools: readonly, ctx: 12288}
+      - {model: deepseek-r1:8b, rol: experto, tools: readonly, ctx: 16384}
 
 # ---------------------------------------------------------------------------
 # CÓDIGO
 # ---------------------------------------------------------------------------
 codigo:
   ligero:
-    techo_ram_gb: 6.4    # qwen2.5-coder:7b @32768
+    techo_ram_gb: 6.9    # codegemma:7b @8192 (q8_0)
     turnos:
       - {model: llama3.2:3b,        rol: esbozo, tools: readonly, ctx: 16384}
-      - {model: "qwen2.5-coder:7b", rol: programador, tools: readonly, ctx: 32768}
+      - {model: "codegemma:7b",     rol: programador, tools: readonly, ctx: 8192}
   intermedio:
-    techo_ram_gb: 6.9    # deepseek-r1:8b @12288
+    techo_ram_gb: 6.9    # codegemma:7b @8192 (q8_0)
     turnos:
-      - {model: "qwen2.5-coder:7b", rol: programador, tools: readonly, ctx: 32768}
-      - {model: deepseek-r1:8b,     rol: revisor, tools: readonly, ctx: 12288}
+      - {model: "codegemma:7b",     rol: programador, tools: readonly, ctx: 8192}
+      - {model: deepseek-r1:8b,     rol: revisor, tools: readonly, ctx: 16384}
   avanzado:
-    techo_ram_gb: 6.9    # deepseek-r1:8b @12288
+    techo_ram_gb: 6.9    # codegemma:7b @8192 (q8_0)
     turnos:
       - {model: llama3.2:3b,        rol: esbozo, tools: readonly, ctx: 16384}
-      - {model: "qwen2.5-coder:7b", rol: programador, tools: readonly, ctx: 32768}
-      - {model: deepseek-r1:8b,     rol: experto, tools: readonly, ctx: 12288}
+      - {model: "codegemma:7b",     rol: programador, tools: readonly, ctx: 8192}
+      - {model: deepseek-r1:8b,     rol: experto, tools: readonly, ctx: 16384}
 
 # ---------------------------------------------------------------------------
 # JUEZ — audita el trabajo conjunto del MoE que haya intervenido
@@ -175,7 +182,7 @@ juez:
     temperature: 0.1
   escalado:
     model: deepseek-r1:8b       # cuando el normal no decide en max_rondas_juez
-    ctx: 12288                  # huella 6,9 GiB --- al filo del margen
+    ctx: 16384                  # huella 6,4 GiB con cache q8_0
     temperature: 0.1
 
 # ---------------------------------------------------------------------------
@@ -239,7 +246,8 @@ escalado_contexto:
   por_ventana:
     4096:   1200      # nemotron-mini (portero): ya filtrado
     2048:    600      # el capitán clasifica; no necesita más
-    12288:  3000      # deepseek-r1:8b --- el experto es quien MENOS sitio tiene
+    8192:   2000      # codegemma:7b, el programador
+    12288:  3000      # (sin uso tras pasar deepseek a 16.384 con q8_0)
     16384:  4000      # llama3.2, gemma3, mistral
     24576:  6000      # deepseek-r1:8b en el perfil `maximo` (Sentinel parado)
     32768:  8000      # qwen2.5-coder
@@ -270,7 +278,13 @@ escalado_contexto:
   #      máquina: el modelo más FUERTE es el que MENOS ventana admite.
   #
   #        llama3.2:3b     (el débil)   admite 32.768
-  #        deepseek-r1:8b  (el fuerte)  admite 12.288
+  #        deepseek-r1:8b  (el fuerte)  admitía 12.288 con caché f16
+  #
+  #      Actualización 2026-09-25: con la caché en q8_0 deepseek sube a 16.384,
+  #      pero el programador pasa a ser codegemma:7b, cuyo MÁXIMO es 8.192. En
+  #      codigo/avanzado va detrás de llama3.2 (16.384): la regla 3 es aquí
+  #      obligatoria, no una optimización. Peor contexto real medido del coder:
+  #      ~3.700 tokens, así que para tareas del tamaño actual cabe.
   #
   #      Aplicar el criterio 2 al pie de la letra pondría al experto PRIMERO,
   #      que es justo maximizar el anclaje que el criterio 1 existe para
@@ -321,5 +335,5 @@ maximo:
       - {model: deepseek-r1:8b, rol: experto, tools: readonly, ctx: 24576}
   codigo:
     turnos:
-      - {model: "qwen2.5-coder:7b", rol: programador, tools: readonly, ctx: 32768}
+      - {model: "codegemma:7b",     rol: programador, tools: readonly, ctx: 8192}
       - {model: deepseek-r1:8b,     rol: experto, tools: readonly, ctx: 24576}
