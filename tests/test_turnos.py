@@ -442,3 +442,38 @@ def test_la_sintesis_prohibe_repetir_las_instrucciones():
     fuente = inspect.getsource(OptimizerAgent.synthesize_consensus)
     assert "NO repitas estas instrucciones" in fuente
     assert "preámbulo anti-inyección" in fuente
+
+
+# ─── robustez del respaldo ────────────────────────────────────────────────────
+# Regresión: el camino del fallback_model no tenía try/except. El 2026-09-24 la
+# verificación se pasó de los 180 s, cayó al respaldo, ese se pasó también, y
+# el httpx.ReadTimeout tumbó la corrida tras 34 minutos de trabajo hecho. El
+# camino principal tenía reintentos y captura; el de respaldo, ninguna.
+
+def test_el_respaldo_no_tumba_la_corrida():
+    import inspect
+
+    from agents.base_agent import BaseAgent
+    fuente = inspect.getsource(BaseAgent.generate)
+    tras_fallback = fuente.split('payload["model"] = self.fallback_model', 1)[1]
+    assert "try:" in tras_fallback.split("raise e", 1)[0], \
+        "la llamada al modelo de respaldo debe ir protegida"
+
+
+def test_el_error_que_se_propaga_es_el_original():
+    """El del respaldo solo dice que el plan B también falló; la causa raíz
+    está en el primero."""
+    import inspect
+
+    from agents.base_agent import BaseAgent
+    assert "raise e from e_fb" in inspect.getsource(BaseAgent.generate)
+
+
+def test_el_tiempo_limite_cubre_las_etapas_medidas():
+    """Medido: investigador 5,1 min, coder 8,7 min, árbitro 4,0 min."""
+    import yaml
+    from pathlib import Path
+    cfg = yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / "config.yaml").read_text(encoding="utf-8"))
+    t = cfg["ollama"]["timeout_seconds"]
+    assert t >= 600, f"timeout_seconds={t} no cubre una etapa de 8,7 min"

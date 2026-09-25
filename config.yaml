@@ -23,7 +23,11 @@
 
 ollama:
   host: http://127.0.0.1:11434
-  timeout_seconds: 180
+  # 180 s era irreal: las etapas medidas el 2026-09-24 tardaron 5,1 min el
+  # investigador, 8,7 el coder y 4,0 el arbitro. Con 3 minutos de tope, la
+  # verificacion se pasaba, caia al modelo de respaldo, ese se pasaba tambien y
+  # la corrida moria tras 34 min de trabajo hecho.
+  timeout_seconds: 900
 
 consensus:
   threshold_score: 85

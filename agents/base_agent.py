@@ -148,22 +148,35 @@ class BaseExpertAgent:
                 if self.lifecycle is not None:
                     self.lifecycle.ensure_exclusive(self.fallback_model, num_ctx=self.num_ctx)
                 payload["model"] = self.fallback_model
-                with httpx.Client(timeout=self.timeout_seconds) as client:
-                    with client.stream("POST", f"{self.ollama_host}/api/generate", json=payload) as response:
-                        for line in response.iter_lines():
-                            if not line:
-                                continue
-                            try:
-                                chunk = json.loads(line)
-                                token = chunk.get("response", "")
-                                if token:
-                                    full_response.append(token)
-                                    if stream_callback:
-                                        stream_callback(token)
-                            except Exception:
-                                continue
-                if self.lifecycle is not None:
-                    self.lifecycle.mark_loaded(self.fallback_model)
+                # El respaldo TAMBIEN puede agotar el tiempo, y aqui no habia
+                # try/except: el 2026-09-24 la etapa de verificacion se paso de
+                # los 180 s, cayo al fallback, este se paso tambien y el
+                # httpx.ReadTimeout tumbo la corrida completa tras 34 minutos de
+                # trabajo ya hecho. El camino principal tiene reintentos y
+                # captura; el de respaldo no tenia ninguna de las dos.
+                try:
+                    with httpx.Client(timeout=self.timeout_seconds) as client:
+                        with client.stream("POST", f"{self.ollama_host}/api/generate",
+                                           json=payload) as response:
+                            for line in response.iter_lines():
+                                if not line:
+                                    continue
+                                try:
+                                    chunk = json.loads(line)
+                                    token = chunk.get("response", "")
+                                    if token:
+                                        full_response.append(token)
+                                        if stream_callback:
+                                            stream_callback(token)
+                                except Exception:
+                                    continue
+                    if self.lifecycle is not None:
+                        self.lifecycle.mark_loaded(self.fallback_model)
+                except Exception as e_fb:
+                    # Ni el principal ni el respaldo respondieron. Se propaga el
+                    # error ORIGINAL, que describe la causa raiz; el del
+                    # respaldo solo dice que el plan B tambien fallo.
+                    raise e from e_fb
             else:
                 raise e
 

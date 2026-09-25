@@ -103,7 +103,29 @@ class ModelLifecycle:
                 if num_ctx:
                     cuerpo["options"] = {"num_ctx": int(num_ctx)}
                 client.post(f"{self.ollama_host}/api/generate", json=cuerpo)
-            logger.info("warm-loaded exclusive model %s", model)
+            # Registrar lo PEDIDO y lo CONCEDIDO. Sin esto, diagnosticar por
+            # que un modelo quedo con la ventana completa obliga a muestrear
+            # /api/ps a ciegas y a inventar hipotesis --- que es exactamente lo
+            # que paso el 2026-09-24: cargas inconsistentes del mismo modelo,
+            # unas con 16.384 y otras con 131.072, sin forma de saber quien las
+            # hizo.
+            concedido = None
+            try:
+                with httpx.Client(timeout=20.0) as c2:
+                    for m in c2.get(f"{self.ollama_host}/api/ps").json().get("models", []):
+                        if m.get("name", "").split(":")[0] == model.split(":")[0]:
+                            concedido = m.get("context_length")
+                            break
+            except Exception:
+                pass
+            if num_ctx and concedido and int(concedido) != int(num_ctx):
+                logger.warning(
+                    "warm-load %s: se pidio num_ctx=%s y Ollama concedio %s "
+                    "--- la cache reservada no es la esperada",
+                    model, num_ctx, concedido)
+            else:
+                logger.info("warm-loaded exclusive model %s (num_ctx pedido=%s, "
+                            "concedido=%s)", model, num_ctx, concedido)
         except Exception as e:
             # Soft-fail: generate() in the agent will still try to load.
             logger.warning("warm-load %s failed (will lazy-load): %s", model, e)
