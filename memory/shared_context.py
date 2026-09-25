@@ -1,7 +1,131 @@
+import math
+import re
 import uuid
 from typing import Optional, Dict, Any, List
 from .blackboard import Blackboard
 from .persistent_store import PersistentMemoryStore
+
+# ─── RELEVANCIA ENTRE ENUNCIADOS ─────────────────────────────────────────────
+# El 2026-09-24, en una tarea de validación de tokens, el Concilio entregó
+# `validar_token_telegram` Y ADEMÁS `es_palindromo`. La causa: la memoria
+# histórica inyectaba las 5 tareas MÁS RECIENTES, por fecha y sin filtro
+# ninguno, y dos de ellas eran de otras baterías:
+#
+#   [CONSENSO 88] ... validar_token_telegram ...
+#   [CONSENSO 88] ... es_palindromo ...          <- nada que ver
+#   [SIN CONSENSO 78] ... a_segundos ...         <- nada que ver
+#
+# El modelo leyó ese enunciado en su contexto y lo resolvió también. Ruido
+# inyectado en una tarea cuyo problema es la precisión.
+#
+# POR QUÉ NO SIRVE CONTAR PALABRAS EN COMÚN
+# Todos estos enunciados empiezan igual: «Escribe una funcion Python llamada
+# ... que devuelva ...». Un parecido por palabras crudas los declara a todos
+# semejantes, porque la mayoría de lo que comparten es plantilla.
+#
+# Se pesa cada palabra por lo INFORMATIVA que es: las que aparecen en casi
+# todos los antecedentes no distinguen nada y valen ~0; las que aparecen en
+# pocos («telegram», «palindromo», «segundos») son las que cargan el tema.
+# Es el idf de toda la vida, calculado sobre los propios antecedentes y sin
+# dependencias.
+#
+# Esto es un SUELO, no el destino: `vectorial` en profiles/niveles.yaml
+# prevé hacerlo con nomic-embed-text, que captura parecido semántico y no
+# solo léxico. Mientras eso no exista, esto ya impide la fuga.
+
+_CORTE_PALABRA = 4          # palabras más cortas no discriminan
+
+# EL CORTE, MEDIDO sobre los 20 antecedentes reales del 2026-09-24. Hay un
+# hueco amplio entre «misma plantilla, otro tema» y «mismo tema»:
+#
+#   mismo tema (validar_token)      1,000
+#   misma plantilla, otro tema      0,267   <- es_palindromo, la fuga
+#                                   0,216   <- a_segundos
+#   auditorías frente a código      0,034
+#   saludos («hola», «status»)      0,000
+#
+# 0,50 cae en medio de ese hueco, lejos de ambos lados. Mi primer intento fue
+# 0,12 y habría dejado pasar el palíndromo: sólo se salvó porque había cinco
+# antecedentes con 1,0 que ordenaban delante. Calibrado con ESTOS datos; si
+# aparecen familias de tareas más parecidas entre sí, hay que volver a mirarlo.
+RELEVANCIA_MINIMA = 0.50
+
+
+def palabras_informativas(texto: str) -> set:
+    """Palabras en minúscula, sin signos, de más de `_CORTE_PALABRA` letras."""
+    limpio = re.sub(r"[^\w\s]", " ", (texto or "").lower(), flags=re.UNICODE)
+    return {p for p in limpio.split() if len(p) > _CORTE_PALABRA}
+
+
+def pesos_idf(corpus: List[str]) -> Dict[str, float]:
+    """Cuánto distingue cada palabra, sobre el corpus de antecedentes.
+
+    Una palabra en TODOS los documentos pesa 0: no separa nada. Una en uno
+    solo pesa el máximo.
+    """
+    docs = [palabras_informativas(t) for t in corpus]
+    n = len(docs)
+    if not n:
+        return {}
+    frec: Dict[str, int] = {}
+    for d in docs:
+        for w in d:
+            frec[w] = frec.get(w, 0) + 1
+    # idf SUAVIZADO: log((1+n)/(1+f)) + 1. El «+1» final importa --- mi primera
+    # version usaba log(n/f) y daba 0 a las palabras presentes en todos los
+    # documentos. Consecuencia: con un corpus homogeneo (solo tareas de token)
+    # TODAS las palabras pesaban 0, la relevancia salia 0 y se descartaban los
+    # antecedentes BUENOS. Lo cazaron sus propios tests.
+    #
+    # Suavizado, una palabra comun pesa 1 y una distintiva mas, asi que se
+    # conserva el orden relativo sin anular nada.
+    return {w: math.log((1 + n) / (1 + f)) + 1.0 for w, f in frec.items()}
+
+
+def relevancia(consulta: str, candidato: str, idf: Dict[str, float]) -> float:
+    """0..1. Peso compartido sobre el peso de la consulta.
+
+    Se normaliza por la CONSULTA y no por la unión: lo que importa es cuánto
+    del tema de la tarea en curso cubre el antecedente, no que se parezcan
+    en longitud.
+    """
+    a, b = palabras_informativas(consulta), palabras_informativas(candidato)
+    if not a or not b:
+        return 0.0
+    # Palabras nuevas, que no están en el corpus, cuentan como distintivas.
+    por_defecto = max(idf.values(), default=1.0) or 1.0
+    peso = lambda w: idf.get(w, por_defecto)  # noqa: E731
+    total = sum(peso(w) for w in a)
+    if total <= 0:
+        return 0.0
+    return sum(peso(w) for w in a & b) / total
+
+
+def filtrar_por_relevancia(
+    consulta: str,
+    tareas: List[Dict[str, Any]],
+    limite: int,
+    minimo: float = RELEVANCIA_MINIMA,
+) -> List[Dict[str, Any]]:
+    """Antecedentes que de verdad se parecen, de mayor a menor.
+
+    Si ninguno pasa el mínimo devuelve LISTA VACÍA. «No hay antecedente
+    relevante» no es lo mismo que «aquí van los cinco últimos»: inyectar los
+    más recientes por no tener mejores es precisamente el fallo que esto
+    corrige.
+    """
+    if not consulta or not tareas:
+        return []
+    idf = pesos_idf([t.get("user_prompt") or "" for t in tareas])
+    puntuadas = [
+        (relevancia(consulta, t.get("user_prompt") or "", idf), t) for t in tareas
+    ]
+    puntuadas = [(r, t) for r, t in puntuadas if r >= minimo]
+    puntuadas.sort(key=lambda par: par[0], reverse=True)
+    for r, t in puntuadas:
+        t["relevancia"] = round(r, 3)
+    return [t for _, t in puntuadas[:limite]]
+
 
 class SharedMemory:
     """

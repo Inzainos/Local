@@ -9,6 +9,7 @@ from memory.shared_context import SharedMemory
 from memory.blackboard import Blackboard, TaskStatus
 from memory.repository_context import load_repository_context, project_metadata
 from memory.concilio_store import ConcilioStore
+from memory.shared_context import filtrar_por_relevancia
 from memory.anti_injection import fence_untrusted, build_data_preamble
 from memory.memory_pack import build_memory_pack, memory_pack_metadata
 from agents.researcher import ResearcherAgent
@@ -235,6 +236,8 @@ class ConsensusOrchestrator:
     # La sintesis completa se omite a proposito: es la parte mas larga y la
     # de mayor riesgo de inyeccion, y para calibrar basta el score.
     _MEM_MAX_TAREAS = 5
+    # Pozo del que se filtra por relevancia; no es cuanto se inyecta.
+    _MEM_POZO_CANDIDATOS = 40
     _MEM_MAX_PROMPT = 160
     # Los hechos si llevan contenido, pero recortado: el presupuesto
     # de contexto de gemma3:4b y nemotron-mini no da para sintesis
@@ -249,13 +252,24 @@ class ConsensusOrchestrator:
         almacenado en una tarea vieja no pueda dar ordenes en una nueva.
         """
         self._n_tareas_memoria = 0
+        enunciado = (getattr(blackboard, "user_prompt", "") or "").strip()
         try:
-            previas = shared_memory.recuperar_tareas_previas(
-                limit=self._MEM_MAX_TAREAS,
+            # Se pide un POZO amplio y se filtra por parecido. Antes se pedian
+            # las 5 mas recientes y se inyectaban tal cual: el 2026-09-24 eso
+            # metio los enunciados de `es_palindromo` y `a_segundos` en una
+            # tarea de validacion de tokens, y el Concilio devolvio
+            # `validar_token_telegram` Y ADEMAS `es_palindromo`.
+            candidatos = shared_memory.recuperar_tareas_previas(
+                limit=self._MEM_POZO_CANDIDATOS,
                 excluir_task_id=getattr(blackboard, "task_id", None),
+            )
+            previas = filtrar_por_relevancia(
+                enunciado, candidatos, limite=self._MEM_MAX_TAREAS
             )
         except Exception:
             return ""
+        # Ningun antecedente relevante NO es lo mismo que "van los ultimos".
+        # Sin bloque de memoria es mejor que con ruido.
         if not previas:
             return ""
 
@@ -268,8 +282,10 @@ class ConsensusOrchestrator:
             veredicto = (
                 "CONSENSO" if t.get("consensus_reached") else "SIN CONSENSO"
             )
+            rel = t.get("relevancia")
+            marca = f" rel={rel}" if rel is not None else ""
             lineas.append(
-                f"- [{veredicto} score={score}] {prompt}"
+                f"- [{veredicto} score={score}{marca}] {prompt}"
             )
 
         self._n_tareas_memoria = len(lineas)
