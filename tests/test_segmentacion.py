@@ -146,8 +146,27 @@ def test_el_orquestador_segmenta_una_vez_y_guarda_el_bloque(monkeypatch):
     assert "acepta el sufijo h" in bb.shared_notes["reglas_enunciado"]
 
 
-def test_el_orquestador_real_lee_el_segmentador_de_la_configuracion():
+def test_la_v1_va_sin_segmentador():
+    """Desactivado por medicion: las reglas empeoraron al coder (72 -> 68/73).
+
+    Si alguien lo reactiva, que sea a sabiendas y midiendo: este test falla y
+    remite a la nota de config.yaml.
+    """
     from engine.orchestrator import ConsensusOrchestrator
     raiz = Path(__file__).resolve().parents[1]
     orq = ConsensusOrchestrator(config_path=str(raiz / "config.yaml"))
-    assert orq._segmentador == "qwen2.5-coder:7b"
+    assert orq._segmentador == "", ("segmentador reactivado: ver la medicion en "
+                                    "config.yaml antes de hacerlo")
+
+
+def test_sin_segmentador_no_se_llama_a_ningun_modelo(monkeypatch):
+    import engine.tool_agent as ta
+    from engine.orchestrator import ConsensusOrchestrator
+    from memory.blackboard import Blackboard
+    monkeypatch.setattr(ta, "run_with_tools",
+                        lambda **k: (_ for _ in ()).throw(AssertionError("se llamo")))
+    orq = ConsensusOrchestrator.__new__(ConsensusOrchestrator)
+    orq._segmentador = ""
+    bb = Blackboard(task_id="t", session_id="s", user_prompt=SEGUNDOS)
+    orq._segmentar_enunciado(bb)
+    assert "reglas_enunciado" not in bb.shared_notes
