@@ -5,7 +5,7 @@
 > modelo) no deje a nadie sin saber dónde se quedó. **Se actualiza cada vez que algo avanza.**
 > Si lo que dice aquí contradice al código, manda el código: verifícalo y corrige este archivo.
 
-**Última actualización:** 2026-09-25 13:00. v1.0-estable desplegada 09:46; **arreglo 3.0.1 (`88951e8`) hecho, FALTA reiniciar servicios** para que llegue al bot.
+**Última actualización:** 2026-09-25 13:40. v1.0-estable + arreglo 3.0.1 **desplegados y vistos funcionar en vivo**. Pendiente: una tarea que TERMINE (la última la cortó un reinicio de Windows).
 **Rama:** `local/concilio` (nunca push a `main`). **Operador:** Elán (responder en español).
 
 ---
@@ -26,7 +26,7 @@ Historial: [`CHANGELOG.md`](./CHANGELOG.md).
 
 ## 2. EN CURSO ahora mismo
 
-### Servicios: corren la v1 desde el 25-sep 09:46 — SIN el arreglo 3.0.1 (falta reiniciar)
+### Servicios: corren la v1 + 3.0.1 (reinicio del operador 13:04; Windows reinició la máquina 13:19)
 `consensus-telegram` (bot) y `consensus-web` son **servicios del sistema** y cargan el código **al
 arrancar**: cualquier cambio posterior no llega al teléfono ni a la web hasta reiniciarlos. El
 operador los reinició a las 09:46 (10 min después de la etiqueta, `1687f4c` 09:36). Verificado:
@@ -40,7 +40,8 @@ contra `git log -1 --format=%ci`.
 |---|---|---|
 | **v1.0-estable** | **ETIQUETADA** en `local/concilio`. Aceptación: cero consensos falsos en la 2.ª pasada y en la comprobación del mejor intento (`es_matricula`: el concilio llegó a 0/16 y se entregó el 15/16 de la vía directa) | `git show v1.0-estable` |
 | **Desplegar** | **HECHO** 25-sep 09:46 | `journalctl -u consensus-telegram -n 50` |
-| **1.ª tarea real (12:18)** | token con la redacción «que acepte…»: vía directa falló BIEN (codegemma escribió `len(token)==39 and isalnum()` dos veces); el concilio acertó en la ronda 1 pero se entregó «SIN CONSENSO 15/16» por un caso MAL construido (el extractor puso tope 1 al identificador; «un secreto» lo justificaba). **Arreglado en 3.0.1** (`88951e8`, ver CHANGELOG) y medido con `bench/extractor_redacciones.py` 10/10 | reiniciar servicios y repetir la misma tarea: debe dar «Verificado» |
+| **1.ª tarea real (12:18)** | token con la redacción «que acepte…»: vía directa falló BIEN (codegemma escribió `len(token)==39 and isalnum()` dos veces); el concilio acertó en la ronda 1 pero se entregó «SIN CONSENSO 15/16» por un caso MAL construido (el extractor puso tope 1 al identificador; «un secreto» lo justificaba). **Arreglado en 3.0.1** (`88951e8`, ver CHANGELOG) y medido con `bench/extractor_redacciones.py` 10/10 | hecho: reinicio 13:04 |
+| **2.ª tarea real (13:05)** | misma redacción, con el arreglo. La defensa **funcionó**: rechazó el tope 1 y el reintento construyó los 16 casos buenos. La vía directa falló bien (codegemma, 8/16 = la base). Concilio ronda 1: código que **no compila** (`from typing import str`) y el árbitro le había leído 92 → el verificador lo paró. Ronda 2: código CORRECTO (16/16, re-verificado a mano el 25-sep 13:35) pero **un reinicio de Windows a las 13:16 cortó la tarea mientras el árbitro lo revisaba**: no se entregó nada y el operador no recibió aviso | `data/sessions/91bce515.concilio` (última escritura 13:16) y `journalctl -b -1 -u consensus-telegram --since 13:05` |
 | **Aprendizaje de errores** | idea del operador (25-sep, ver apartado 4, v2): que el sistema aprenda de sus aciertos y fallos como los modelos ONNX de Sentinel | sin empezar |
 
 **1.ª pasada de aceptación** (antes de `2565dfc`): 7 tareas en 12,4 min, **1 consenso falso**
@@ -71,6 +72,12 @@ Detalle y porqués: `CHANGELOG.md` y los mensajes de commit (cada uno explica su
 1b. ~~Mejor intento verificado~~ — construido (`51c0ba4`); falta verlo en vivo con `es_matricula`.
 2. ~~CHANGELOG 3.0.0~~ — hecho. 3. ~~Etiqueta `v1.0-estable`~~ — hecha.
 4. ~~Desplegar~~ — hecho el 25-sep 09:46.
+
+**Hueco descubierto el 25-sep 13:16 (reinicio de Windows):** una tarea en vuelo se **pierde sin avisar**.
+No hay cola ni reanudación: el `.concilio` guarda la última ronda, pero al arrancar nadie lo mira y el
+operador se queda esperando una respuesta que no va a llegar. Lo mínimo: al arrancar, buscar sesiones
+`.concilio` sin cierre y avisar por Telegram («se interrumpió, ¿la repito?»). Ocurre de verdad: los
+reinicios de Windows son parte del entorno.
 
 **v2** (acordado con el operador que queda fuera de la v1). Orden recomendado tras medir: primero
 «segundo intento con otro modelo» (codegemma repitió el mismo código en sus dos intentos de
