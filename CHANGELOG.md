@@ -1,3 +1,80 @@
+## [3.0.0] - 2026-09-25 — v1.0-estable: los modelos comprueban su trabajo ejecutándolo
+
+Primera versión estable de la arquitectura de verificación. 50 commits en dos días, casi todos
+con una medición detrás. La idea central: **un modelo no decide si su código funciona
+leyéndolo**. Medido: el árbitro leyendo puso 92, 93 y 96 a tres códigos que rechazaban todos los
+tokens válidos (acierto real 78 %, 38 %, 78 %), y 97–99 a otro que ni compilaba.
+
+### La v1 en una línea
+Tarea de código → el coder escribe la función en **una** llamada → el **verificador la ejecuta**
+contra casos construidos desde el enunciado → se entrega **verificada**, o **rotulada SIN
+VERIFICAR** si el enunciado no admite casos fiables, y sólo si falla con casos fiables entra el
+concilio.
+
+### Aceptación
+Siete tareas con verdad escrita a mano, por `run_consensus` real (`bench/aceptacion.py`). Criterio
+de «estable»: **cero consensos falsos** (nada verificado que la vara independiente no confirme).
+
+| pasada | tareas | tiempo | consensos falsos |
+|---|---|---|---|
+| 1.ª (antes de «todos o ninguno») | 7 | 12,4 min | **1**: `es_matricula` aprobada con 15/16 por el umbral de 85 (aceptaba `'!OV-3074'`) |
+| **2.ª** | 7 | 26,0 min | **0** |
+| comprobación del mejor intento | `es_matricula` | 16,4 min | **0** |
+
+En la 2.ª pasada: `validar_token` **verificada 16/16 en 1,1 min** (el 24, por el concilio: 44,8 min
+sin cerrar); cinco tareas sin verificar —no admiten casos fiables— y **las cinco correctas** según
+la vara; `es_matricula` escaló al concilio y no cerró. El concilio empeoró su código (15/16 → 8/16,
+y en la comprobación → 0/16); con el mejor intento se entrega el 15/16 con el caso que falla.
+
+### Added
+- **Verificador por ejecución** (`engine/verificador.py`): casos derivados del ENUNCIADO, nunca
+  de la solución; ejecución en proceso aparte con límite de tiempo y memoria y sin red.
+- **Especificación de formato** (`engine/especificacion.py`): un modelo extrae campos, longitudes
+  y separadores con decodificación restringida; Python construye casos balanceados de frontera.
+  Ninguno de 5 modelos locales construyó un solo caso válido para «EXACTAMENTE 35 caracteres»;
+  `len()` sí. Defensas medidas: números que el enunciado no dice, separadores que no nombra,
+  funciones que no devuelven `bool`.
+- **Vía directa** en `run_consensus`: una llamada + verificar; 2.º intento con los casos fallidos;
+  concilio sólo si falla. Bot, CLI y web muestran sus desenlaces sin decir nada falso.
+- **Frenos de estancamiento**: entregable idéntico dos rondas, o 4 rondas sin mejorar por encima
+  del ruido medido (σ 6,9).
+- **Filtro de relevancia de la memoria** (idf) para antecedentes y hechos.
+- **Mejor intento medido**: si nadie cierra, se entrega el candidato con más casos acertados de
+  todos los medidos (vía directa y rondas del concilio), rotulado con lo que falla.
+- **`ESTADO.md`** (set point para retomar si se corta una sesión) y **`bench/`** (los arneses que
+  decidieron cada elección, con sus resultados).
+- Motor de turnos, adaptador y capitán por niveles (`engine/turnos*.py`): escritos y probados,
+  no cableados (v2). Segmentador (`engine/segmentacion.py`): escrito, desactivado por medición.
+
+### Changed
+- **Coder: `codegemma:7b`** (7 tareas, 72/73 casos a la primera; qwen 60/73; deepseek-r1:8b se
+  gastó 15 min pensando sin escribir la función). Extractor de formato: `qwen2.5-coder:7b`.
+- **nemotron-mini sólo como portero**; capitán `llama3.2:3b`.
+- **Caché KV de Ollama en `q8_0` + flash attention**: 7,28 → 6,21 GiB, +13 % de generación.
+- Con casos de especificación se exigen **todos**; los derivados por un modelo **no aprueban**.
+- `profiles/niveles.yaml` redimensionado con la máquina correcta (host 11,71 GiB medido en
+  Windows, no con `free` de WSL) y con caché `q8_0`.
+- Tuberías viejas (`run_moe`, `run_profile`) retiradas a `legacy/` con `git mv`.
+
+### Fixed (los que cambiaban resultados)
+- `num_ctx` no llegaba a la precarga: Ollama reservaba 25,7 GB para prompts de 5.000 tokens.
+- El score de LECTURA cerraba rondas cuando el verificador no podía ejecutar.
+- Conjuntos de casos con 7 de 8 iguales daban 88 % a código que rechazaba todo.
+- El verificador ejecutaba prosa y bloques de código pegados: cuatro «no compila» falsos.
+- El coder recibía el elogio de 99 primero y el fallo al final, en un bloque que se le manda
+  ignorar.
+- La memoria inyectaba las 5 tareas más recientes sin filtro, y archivaba como «aprobado» código
+  roto: 8 hechos en `knowledge_facts_cuarentena`, ninguno borrado.
+- `run_with_tools` no enviaba temperatura: el `0.0` del capitán nunca llegó a Ollama.
+- El freno comparaba con `>` estricto contra una señal con σ 6,9.
+- El guardián de pyflakes pasaba en vacío si la herramienta no estaba instalada.
+- Seis «hermanos» de arreglos que se habían quedado con la versión vieja (barrido completo).
+- `scripts/create_concilio_models.sh` no creaba `concilio-investigador`, el investigador de la v1.
+
+### Despliegue
+Los servicios `consensus-telegram` y `consensus-web` **cargan el código al arrancar**: hasta
+`sudo systemctl restart consensus-telegram consensus-web` siguen con la versión anterior.
+
 ## [2.4.0] - 2026-09-21 — Memoria del Concilio, y tres fugas de token
 
 ### Added

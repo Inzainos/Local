@@ -5,7 +5,7 @@
 > modelo) no deje a nadie sin saber dónde se quedó. **Se actualiza cada vez que algo avanza.**
 > Si lo que dice aquí contradice al código, manda el código: verifícalo y corrige este archivo.
 
-**Última actualización:** 2026-09-25, tras la 2.ª pasada de aceptación (cero consensos falsos).
+**Última actualización:** 2026-09-25, **v1.0-estable etiquetada**. Falta desplegarla (servicios).
 **Rama:** `local/concilio` (nunca push a `main`). **Operador:** Elán (responder en español).
 
 ---
@@ -36,10 +36,9 @@ Regla: no se toca systemd sin orden del operador. **Desplegar la v1 =**
 
 | qué | estado | cómo retomarlo si se cortó |
 |---|---|---|
-| **Aceptación v1, 2.ª pasada** | **HECHA: cero consensos falsos**, 26,0 min. `validar_token` verificada 16/16 (1,1 min); `a_segundos`, `es_palindromo`, `es_bisiesto`, `a_romano`, `es_ipv4` sin verificar y las cinco correctas por la vara independiente; `es_matricula` escaló al concilio y no cerró (14,3 min) | — |
-| **Mejor intento verificado** (`51c0ba4`) | construido y probado; **corriendo su verificación en vivo** con `bench/aceptacion.py es_matricula`: debe entregar el 15/16 de la vía directa, no el 8/16 del concilio | relanzar `.venv/bin/python bench/aceptacion.py es_matricula` con Ollama libre; mirar la vara y que la síntesis diga «mejor intento medido» |
-| **CHANGELOG 3.0.0** | borrador fuera del repo; cifras ya disponibles salvo la del mejor intento | reescribir desde `git log --since=2026-09-24` y el apartado 3 |
-| **Etiqueta `v1.0-estable`** | lista para poner en cuanto el mejor intento se verifique en vivo | `git tag -a v1.0-estable` en `local/concilio`, sin push |
+| **v1.0-estable** | **ETIQUETADA** en `local/concilio`. Aceptación: cero consensos falsos en la 2.ª pasada y en la comprobación del mejor intento (`es_matricula`: el concilio llegó a 0/16 y se entregó el 15/16 de la vía directa) | `git show v1.0-estable` |
+| **Desplegar** | **pendiente del operador**: `sudo systemctl restart consensus-telegram consensus-web` | tras reiniciar, `/status` en Telegram y probar una tarea |
+| **Aprendizaje de errores** | idea del operador (25-sep, ver apartado 4, v2): que el sistema aprenda de sus aciertos y fallos como los modelos ONNX de Sentinel | sin empezar |
 
 **1.ª pasada de aceptación** (antes de `2565dfc`): 7 tareas en 12,4 min, **1 consenso falso**
 (`es_matricula` aprobada con 15/16 por el umbral de 85). Corregido: con casos de especificación
@@ -64,13 +63,19 @@ Detalle y porqués: `CHANGELOG.md` y los mensajes de commit (cada uno explica su
 
 ## 4. Qué falta
 
-**Para cerrar la v1** (antes de la etiqueta):
+**Para cerrar la v1** — HECHO salvo el despliegue:
 1. ~~2.ª pasada de aceptación con cero consensos falsos~~ — hecha.
 1b. ~~Mejor intento verificado~~ — construido (`51c0ba4`); falta verlo en vivo con `es_matricula`.
-2. CHANGELOG 3.0.0 con sus cifras, y la cifra del README si cambió.
-3. Commit + etiqueta `v1.0-estable`.
+2. ~~CHANGELOG 3.0.0~~ — hecho. 3. ~~Etiqueta `v1.0-estable`~~ — hecha.
+4. **Desplegar** (el operador): `sudo systemctl restart consensus-telegram consensus-web`.
 
-**v2** (acordado con el operador que queda fuera de la v1):
+**v2** (acordado con el operador que queda fuera de la v1). Orden recomendado tras medir: primero
+«segundo intento con otro modelo» (codegemma repitió el mismo código en sus dos intentos de
+`es_matricula`), luego la opción C, luego rediseñar el concilio para código (empeoró 15/16 → 0/16).
+- **Aprender de los propios errores** (idea del operador): casos fallidos como pruebas de
+  regresión permanentes, marcador de acierto por modelo y tipo de tarea (como el Juez de
+  Sentinel), soluciones verificadas como ejemplos, y feedback del operador donde no hay nada que
+  ejecutar. Sólo con resultados VERIFICADOS: los hechos falsos archivados envenenaron la memoria.
 - **Opción C**: verificar tareas que no son validadores de formato con **relaciones** sin oráculo
   (`f('1h30m') == f('1h') + f('30m')`, entradas inválidas → 0). Hoy salen «SIN VERIFICAR».
 - **Investigación/análisis**: no hay nada que ejecutar; la independencia no está resuelta ahí.
