@@ -196,3 +196,56 @@ def test_el_capitan_cabe_de_sobra(perfil):
     assert huella(m, 4096) < 3.0, (
         f"{m} a 4096 mide {huella(m, 4096):.1f} GiB; el capitan se paga en cada "
         f"encargo y por encima de ~2,5 no cabe entero en la VRAM de 4 GiB")
+
+
+# ─── freno de estancamiento ───────────────────────────────────────────────────
+# El 2026-09-24 la tarea `horas_a_segundos` giro mas de nueve rondas sin que el
+# freno disparara, mientras la linea de tiempo de la sesion mostraba el MISMO
+# tamano de codigo ronda tras ronda (5763, 5763, 5763, 5753, 5753, 5753) y el
+# arbitro lo puntuaba en 8-10.
+#
+# Causa: el freno comparaba `final_round_score > mejor_score`, estricto y sin
+# margen. La desviacion tipica medida del arbitro sobre cuatro corridas del
+# mismo encargo es 6,9 puntos (62, 75, 78, 72), asi que el azar producia
+# "mejoras" --- en esa corrida hubo una ronda con 0 y otra con 8, y ese 8>0
+# reiniciaba el contador. El comentario del bloque CITABA esa medicion del
+# ruido y la comparacion la ignoraba.
+
+def test_una_subida_menor_que_el_ruido_no_es_mejora():
+    from engine.orchestrator import ConsensusOrchestrator as O
+    m = O._MARGEN_MEJORA
+    assert not O._es_mejora(73, 72, m), "un punto no se distingue del azar"
+    assert not O._es_mejora(78, 72, m), "6 puntos siguen por debajo de sigma=6,9"
+    assert not O._es_mejora(79, 72, m), "7 puntos es justo el ruido, no lo supera"
+
+
+def test_una_subida_real_si_es_mejora():
+    from engine.orchestrator import ConsensusOrchestrator as O
+    m = O._MARGEN_MEJORA
+    assert O._es_mejora(80, 72, m), "8 puntos superan el ruido"
+    assert O._es_mejora(95, 40, m)
+
+
+def test_el_margen_cubre_el_ruido_medido():
+    """sigma medida = 6,9. Un margen por debajo deja pasar el azar."""
+    from engine.orchestrator import ConsensusOrchestrator as O
+    assert O._MARGEN_MEJORA >= 7, (
+        f"margen {O._MARGEN_MEJORA} por debajo de la desviacion tipica medida "
+        f"(6,9): el freno vuelve a ser derrotable por ruido")
+
+
+def test_el_mismo_entregable_da_la_misma_firma():
+    from engine.orchestrator import ConsensusOrchestrator as O
+    a = O._firma_entregable("def f(x):\n    return x + 1")
+    b = O._firma_entregable("  def f(x):\n    return x + 1  ")
+    assert a == b, "el espacio de los extremos no debe cambiar la firma"
+    assert a != O._firma_entregable("def f(x):\n    return x + 2")
+
+
+def test_la_firma_de_vacio_no_cuenta_como_repeticion():
+    """Dos rondas sin entregable no son «el mismo entregable»."""
+    from engine.orchestrator import ConsensusOrchestrator as O
+    # El bucle exige `entregable.strip()` no vacio antes de declarar repeticion;
+    # esta prueba fija que la firma de vacio existe y es estable, para que ese
+    # guardia sea el unico responsable de la decision.
+    assert O._firma_entregable("") == O._firma_entregable("   ")

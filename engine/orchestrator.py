@@ -1,5 +1,6 @@
 import yaml
 import httpx
+import hashlib
 import os
 import time
 import re
@@ -238,6 +239,27 @@ class ConsensusOrchestrator:
     _MEM_MAX_TAREAS = 5
     # Pozo del que se filtra por relevancia; no es cuanto se inyecta.
     _MEM_POZO_CANDIDATOS = 40
+    # Cuanto tiene que subir un score para contar como MEJORA y no como ruido.
+    # La desviacion tipica medida del arbitro sobre cuatro corridas del mismo
+    # encargo fue 6,9 puntos (62, 75, 78, 72). Por debajo de eso, una subida no
+    # se distingue del azar.
+    _MARGEN_MEJORA = 7
+
+    @staticmethod
+    def _es_mejora(score: int, mejor: int, margen: int) -> bool:
+        """Si la subida no supera el ruido medido, no es mejora.
+
+        Con `>` estricto, una subida de un punto reiniciaba el contador de
+        estancamiento. La desviacion tipica medida del arbitro es 6,9 puntos,
+        asi que el azar producia "mejoras" indefinidamente y el freno no
+        llegaba a disparar nunca.
+        """
+        return score > mejor + margen
+
+    @staticmethod
+    def _firma_entregable(texto: str) -> str:
+        """Huella exacta del entregable, para detectar repeticion literal."""
+        return hashlib.sha256((texto or "").strip().encode("utf-8")).hexdigest()
     _MEM_MAX_PROMPT = 160
     # Los hechos si llevan contenido, pero recortado: el presupuesto
     # de contexto de gemma3:4b y nemotron-mini no da para sintesis
@@ -501,6 +523,7 @@ class ConsensusOrchestrator:
         # la vuelta, girar para siempre sale caro.
         mejor_score = -1
         rondas_sin_mejora = 0
+        firma_previa = None
         tope_sin_mejora = int(
             (self.config.get("consensus", {}) or {}).get(
                 "rondas_sin_mejora_para_parar", 4)
@@ -675,11 +698,46 @@ class ConsensusOrchestrator:
                 break
 
             # ¿Refina o solo vuelve a tirar el dado?
-            if final_round_score > mejor_score:
+            #
+            # SEÑAL 1 --- ENTREGABLE IDÉNTICO. Exacta, sin ruido: si el coder
+            # reemite el mismo texto, no está refinando. Medido el 2026-09-24
+            # en la tarea `horas_a_segundos`, la línea de tiempo de la sesión
+            # mostraba seis rondas seguidas con el MISMO tamaño de código
+            # (5763, 5763, 5763, 5753, 5753, 5753) mientras el árbitro lo
+            # puntuaba en 8-10. Dos rondas iguales bastan para saberlo.
+            entregable = ""
+            if blackboard.code_proposal is not None:
+                entregable = (getattr(blackboard.code_proposal, "code", "") or
+                              getattr(blackboard.code_proposal, "raw_content", "") or "")
+            if not entregable:
+                entregable = getattr(critique, "raw_content", "") or ""
+            firma = self._firma_entregable(entregable)
+            repetido = bool(entregable.strip()) and firma == firma_previa
+            firma_previa = firma
+
+            # SEÑAL 2 --- MEJORA POR ENCIMA DEL RUIDO. La versión anterior usaba
+            # `>` estricto, así que una subida de un punto reiniciaba el
+            # contador. Con la desviación típica medida del árbitro en 6,9
+            # puntos, eso lo derrota el azar: en esta misma corrida hubo una
+            # ronda con score 0 y otra con 8, y ese 8>0 contaba como mejora.
+            # Citaba la medición del ruido en el comentario y luego comparaba
+            # como si no existiera.
+            if self._es_mejora(final_round_score, mejor_score, self._MARGEN_MEJORA):
                 mejor_score = final_round_score
                 rondas_sin_mejora = 0
             else:
+                mejor_score = max(mejor_score, final_round_score)
                 rondas_sin_mejora += 1
+
+            if repetido:
+                blackboard.log_event(
+                    "CONCILIO", "Orchestrator",
+                    "el entregable es IDÉNTICO al de la ronda anterior: no hay "
+                    "refinamiento, solo repetición. Se detiene.")
+                if on_stage_start:
+                    on_stage_start("REVIEW", self.optimizer.name,
+                                   "Entregable repetido: el Concilio no avanza.")
+                break
 
             if tope_sin_mejora > 0 and rondas_sin_mejora >= tope_sin_mejora:
                 blackboard.log_event(

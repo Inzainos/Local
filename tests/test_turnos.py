@@ -454,8 +454,16 @@ def test_el_orquestador_mide_mejora_no_solo_rondas():
     # oscila 70→75→70→75 nunca mejora de verdad, y comparar con el anterior
     # lo daría por progreso la mitad de las veces.
     assert "mejor_score" in fuente
-    assert "final_round_score > mejor_score" in fuente
     assert "rondas_sin_mejora" in fuente
+    # La comparación pasa por `_es_mejora`, que exige superar el MARGEN del
+    # ruido medido. La versión anterior comparaba `final_round_score >
+    # mejor_score` a pelo y el azar la derrotaba: ver
+    # test_una_subida_menor_que_el_ruido_no_es_mejora.
+    assert "_es_mejora(" in fuente, "la comparación ya no pasa por el margen"
+    assert "final_round_score > mejor_score" not in fuente, (
+        "volvió la comparación sin margen, derrotable por una subida de un punto")
+    # Y la señal exacta: entregable idéntico dos rondas seguidas.
+    assert "_firma_entregable(" in fuente
 
 
 def test_la_sintesis_prohibe_repetir_las_instrucciones():
