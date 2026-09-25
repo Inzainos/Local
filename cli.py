@@ -78,7 +78,15 @@ def execute_task(orchestrator: ConsensusOrchestrator, shared_memory: SharedMemor
     table.add_row("Session ID", blackboard.session_id)
     table.add_row("Puntaje Final", f"{blackboard.consensus_score}/100")
     _umbral = getattr(blackboard, "consensus_threshold", 0)
-    if blackboard.consensus_reached:
+    # La via directa no pasa por el concilio; mismos desenlaces que el bot.
+    _via = (getattr(blackboard, "shared_notes", None) or {}).get("via", "")
+    if _via == "directa_verificada":
+        table.add_row("Via", "directa (sin concilio)")
+        _veredicto = "VERIFICADO por ejecucion ✅"
+    elif _via == "directa_sin_verificar":
+        table.add_row("Via", "directa (sin concilio)")
+        _veredicto = "SIN VERIFICAR — revisar antes de usar ⚠️"
+    elif blackboard.consensus_reached:
         _veredicto = "Sí ✅"
     else:
         # "Límite Rondas" sonaba a incidencia de proceso, no a lo que es:

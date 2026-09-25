@@ -166,7 +166,17 @@ def format_blackboard(bb: Blackboard) -> str:
     # tambien cuando no hubo consenso, con la advertencia degradada a una
     # vineta de segunda linea: una respuesta de 73 llegaba bajo un titulo
     # que afirmaba justo lo contrario.
-    if bb.consensus_reached:
+    # La VIA DIRECTA no pasa por el concilio: decir «consenso» o «no aprobada
+    # por el Concilio» seria falso. Tiene sus propios dos desenlaces.
+    via = (getattr(bb, "shared_notes", None) or {}).get("via", "")
+    if via == "directa_verificada":
+        cabecera = (f"✅ <b>Verificado por ejecución</b> · vía directa "
+                    f"(<code>{consensus_score}</code>% sobre la línea base)")
+    elif via == "directa_sin_verificar":
+        cabecera = ("⚠️ <b>SIN VERIFICAR</b> · vía directa\n"
+                    "<i>El enunciado no permite construir casos fiables: el código "
+                    "no se comprobó ejecutándolo. Revísalo antes de usarlo.</i>")
+    elif bb.consensus_reached:
         cabecera = f"✅ <b>Consenso alcanzado</b> (Score: <code>{consensus_score}</code>/100)"
     else:
         # Sin default inventado: si la pizarra no trae umbral (snapshot
@@ -182,11 +192,15 @@ def format_blackboard(bb: Blackboard) -> str:
             f"{_bar}\n"
             f"<i>Síntesis entregada como borrador; no aprobada por el Concilio.</i>"
         )
+    if via.startswith("directa"):
+        linea_rondas = "⚡ Vía directa: sin concilio"
+    else:
+        linea_rondas = (f"🔄 Rondas del Concilio: <code>{concilio_rounds}</code>"
+                        f" | refinamientos de código: <code>{rounds}</code>")
     lines = [
         cabecera,
         f"🆔 Task: <code>{task_id}</code>",
-        f"🔄 Rondas del Concilio: <code>{concilio_rounds}</code>"
-        f" | refinamientos de código: <code>{rounds}</code>",
+        linea_rondas,
         "",
         synthesis,
     ]

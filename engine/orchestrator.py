@@ -11,6 +11,7 @@ from memory.blackboard import Blackboard, TaskStatus
 from memory.repository_context import load_repository_context, project_metadata
 from memory.concilio_store import ConcilioStore
 from memory.shared_context import filtrar_por_relevancia
+from agents.base_agent import BaseExpertAgent
 from memory.anti_injection import fence_untrusted, build_data_preamble
 from memory.memory_pack import build_memory_pack, memory_pack_metadata
 from agents.researcher import ResearcherAgent
@@ -60,6 +61,18 @@ class ConsensusOrchestrator:
         # Segmentador del enunciado (tarea / reglas / limites / rechazar) para
         # el coder. Vacio lo desactiva.
         self._segmentador = str(conc.get("segmentador", "") or "")
+        # VIA DIRECTA: una llamada al coder, verificacion por ejecucion, y solo
+        # si no pasa, el concilio. Medido el 2026-09-25: codegemma resolvio 6 de
+        # 7 tareas a la primera en ~30 s cada una; el concilio tardo 25-50 min
+        # y no cerro ninguna. Para tareas claras, el concilio sobra.
+        self._via_directa = bool(conc.get("via_directa", True))
+        self._intentos_directos = max(1, int(conc.get("intentos_directos", 2)))
+        # Si el enunciado no permite verificacion FIABLE (no es un validador de
+        # formato): "entregar" el codigo rotulado SIN VERIFICAR, o pasar al
+        # "concilio". El concilio tampoco puede verificarlo --- su lectura puso
+        # 97-99 a codigo roto --- asi que solo anadiria 25-50 minutos.
+        self._sin_verificacion = str(conc.get("sin_verificacion_confiable", "entregar"))
+        self.__coder_directo = None
         self.lifecycle = ModelLifecycle(ollama_host=self.ollama_host)
 
         r_cfg = self.config["roles"]["researcher"]
@@ -297,6 +310,111 @@ class ConsensusOrchestrator:
     # de contexto de gemma3:4b y nemotron-mini no da para sintesis
     # completas, y el valor esta en el hallazgo, no en la redaccion.
     _MEM_MAX_HECHO = 400
+
+    SISTEMA_DIRECTO = ("Escribes el codigo que pide el enunciado. Respondes con la "
+                       "funcion completa en UN solo bloque de codigo Python, sin "
+                       "explicaciones ni ejemplos de uso.")
+
+    def _coder_directo(self):
+        """El coder de la via directa: mismo modelo y ventana, temperatura 0.
+
+        Temperatura 0 porque asi se midio (6/7 tareas); el coder del concilio
+        corre a la suya.
+        """
+        if self.__coder_directo is None or self.__coder_directo.model != self.coder.model:
+            self.__coder_directo = BaseExpertAgent(
+                name="Coder directo", role="Coder", model=self.coder.model,
+                fallback_model=None, temperature=0.0,
+                system_prompt=self.SISTEMA_DIRECTO, ollama_host=self.ollama_host,
+                timeout_seconds=self.timeout, num_predict=1500,
+                num_ctx=self.coder.num_ctx, keep_alive="5m", lifecycle=None)
+        return self.__coder_directo
+
+    @staticmethod
+    def _realimentacion_directa(veredicto) -> str:
+        """Lo que se le dice al coder en el segundo intento. Solo casos FIABLES."""
+        if veredicto.error:
+            return ("\n\nTu version anterior no se pudo ejecutar: " + veredicto.error
+                    + ". Entrega la funcion completa en un bloque de codigo Python.")
+        fallidos = [f for f in (veredicto.detalle or []) if not f.get("correcto")]
+        lineas = ["\n\nTu version anterior FALLO estos casos, construidos desde el "
+                  "enunciado. Tu funcion debe devolver el valor esperado en cada uno:"]
+        for f in fallidos[:8]:
+            lineas.append(f"  - {f['entrada']} devolvio {f['obtenido']}, "
+                          f"esperado {f['esperado']}")
+        return "\n".join(lineas)
+
+    def _intentar_via_directa(self, blackboard, on_stage_start=None,
+                              on_stage_end=None) -> str:
+        """Una llamada al coder y verificacion por ejecucion, hasta N intentos.
+
+        Devuelve:
+          "verificado"        entregado, verificado con casos del sistema
+          "sin_verificacion"  entregado ROTULADO: el enunciado no admite
+                              verificacion fiable
+          "concilio"          hay que pasar al concilio
+        """
+        from engine.verificador import extraer_codigo, nombre_funcion
+        enunciado = blackboard.user_prompt
+        funcion = nombre_funcion(enunciado)
+        if not funcion:
+            blackboard.log_event("DIRECTO", "Orchestrator",
+                                 "el enunciado no nombra una funcion: se pasa al concilio")
+            return "concilio"
+        blackboard.consensus_threshold = self.threshold
+        coder = self._coder_directo()
+        realimentacion, veredicto = "", None
+        for intento in range(1, self._intentos_directos + 1):
+            prompt = (enunciado + realimentacion
+                      + "\n\nDevuelve solo la funcion en un bloque de codigo.")
+            respuesta = self._run_exclusive(
+                coder.model, lambda: coder.generate(prompt=prompt), "DIRECTO",
+                on_stage_start, on_stage_end, coder.name,
+                f"via directa: intento {intento} de {self._intentos_directos}")
+            blackboard.update_code(respuesta or "", is_refinement=intento > 1)
+            veredicto, _ = self.optimizer._verificar_ejecutando(blackboard)
+            if veredicto is None:
+                break
+            blackboard.log_event("DIRECTO", "Orchestrator",
+                                 f"intento {intento} [via {veredicto.via}]: {veredicto.resumen()}")
+            fiable = veredicto.via == "especificacion"
+            if (fiable and not veredicto.error and veredicto.discrimina
+                    and veredicto.puntuacion_util >= self.threshold):
+                codigo = extraer_codigo(respuesta, funcion)
+                blackboard.consensus_score = veredicto.puntuacion_util
+                blackboard.consensus_reached = True
+                blackboard.status = TaskStatus.CONSENSUS_REACHED
+                blackboard.shared_notes["via"] = "directa_verificada"
+                blackboard.final_synthesis = (
+                    f"**Via directa · VERIFICADO por ejecucion** --- "
+                    f"{veredicto.aciertos}/{veredicto.total} casos construidos desde el "
+                    f"enunciado, {veredicto.puntuacion_util}% sobre la linea base, "
+                    f"intento {intento}.\n\n```python\n{codigo}\n```")
+                return "verificado"
+            # Sin verificacion fiable no hay realimentacion fiable: no se reintenta
+            # con casos que pueden tener el esperado mal.
+            if not fiable and not veredicto.error:
+                break
+            realimentacion = self._realimentacion_directa(veredicto)
+
+        fiable = veredicto is not None and veredicto.via == "especificacion"
+        if fiable or self._sin_verificacion != "entregar":
+            blackboard.log_event("DIRECTO", "Orchestrator",
+                                 "la via directa no paso la verificacion: se pasa al concilio")
+            return "concilio"
+        codigo = extraer_codigo(blackboard.code_proposal.raw_content if blackboard.code_proposal
+                                else "", funcion)
+        blackboard.consensus_score = 0
+        blackboard.consensus_reached = False
+        blackboard.status = TaskStatus.COMPLETED
+        blackboard.shared_notes["via"] = "directa_sin_verificar"
+        blackboard.final_synthesis = (
+            "**Via directa · SIN VERIFICAR** --- este enunciado no permite construir "
+            "casos de prueba fiables (no es un validador de formato), asi que el "
+            "codigo NO se ha comprobado ejecutandolo. Revisalo antes de usarlo.\n\n"
+            + (f"```python\n{codigo}\n```" if codigo else
+               "(el coder no entrego un bloque de codigo)"))
+        return "sin_verificacion"
 
     def _segmentar_enunciado(self, blackboard) -> None:
         """Segmenta el enunciado UNA vez por tarea y deja las reglas al coder.
@@ -582,6 +700,19 @@ class ConsensusOrchestrator:
             PipelineType.RESEARCH_AND_ANALYSIS,
             PipelineType.GENERAL_QA,
         )
+
+        # VIA DIRECTA, dentro de run_consensus a proposito: la usan el bot, el
+        # CLI y cualquier entrada futura sin tocarlas.
+        if not skip_coding and self._via_directa:
+            desenlace = self._intentar_via_directa(blackboard, on_stage_start, on_stage_end)
+            if desenlace in ("verificado", "sin_verificacion"):
+                shared_memory.persist_current_state()
+                # recordar_consenso exige consenso real: lo SIN VERIFICAR no se
+                # archiva como hecho aprobado.
+                if shared_memory.recordar_consenso(blackboard):
+                    blackboard.log_event("MEMORIA", "Orchestrator",
+                                         "Archivado como hecho (via directa verificada)")
+                return blackboard
 
         round_count = 0
         consensus_achieved = False
