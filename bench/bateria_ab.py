@@ -4,8 +4,8 @@ La sustitucion de qwen se hace SOLO dentro de este script: config.yaml no se
 toca. Mi vara es independiente del verificador: casos escritos a mano y
 balanceados, con la linea base trivial reportada.
 """
-import sys
-from pathlib import Path, time
+import sys, time
+from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from engine.orchestrator import ConsensusOrchestrator      # noqa

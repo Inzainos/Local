@@ -25,7 +25,7 @@ flowchart TD
     V2 -- no --> C
     V -- el enunciado no admite<br/>casos fiables --> SV([SIN VERIFICAR,<br/>rotulado])
     R -- no --> C[Concilio: investigador → coder →<br/>árbitro + verificador, con frenos]
-    C --> F([Resultado del concilio])
+    C --> F([Consenso verificado, o el MEJOR<br/>intento medido, rotulado])
 ```
 
 **El verificador** construye los casos de prueba **desde el enunciado**, nunca desde la solución:
@@ -39,8 +39,9 @@ flowchart TD
   SIN VERIFICAR** en vez de aprobarse mal.
 
 Por qué la vía directa: codegemma resolvió 6 de 7 tareas a la primera en ~30 s cada una; el
-concilio tardaba 25–50 minutos por tarea. En la batería de aceptación de la v1 las siete tareas
-salieron en ~12 minutos en total.
+concilio tardaba 25–50 minutos por tarea. En la batería de aceptación de la v1, seis de las siete
+tareas salieron por la vía directa en 11,7 minutos entre todas; la séptima escaló al concilio
+(14,3 min) y no cerró — sin consenso falso, que es el criterio de «estable».
 
 ---
 

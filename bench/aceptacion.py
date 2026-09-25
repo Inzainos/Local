@@ -8,8 +8,8 @@ Criterio de la v1:
   - Ningun «verificado» sobre codigo roto: cero consensos falsos.
   - SIN VERIFICAR solo donde el enunciado no admite casos fiables.
 """
-import sys
-from pathlib import Path, time
+import sys, time
+from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from engine.orchestrator import ConsensusOrchestrator   # noqa
@@ -31,8 +31,12 @@ def mi_vara(texto, fn, casos):
         except Exception: pass
     return ok
 
+# Uso: aceptacion.py [tarea ...]  --- sin argumentos corre las siete.
+SOLO = set(sys.argv[1:])
 filas = []
 for nombre, fn, prompt, casos in TAREAS:
+    if SOLO and nombre not in SOLO:
+        continue
     orq = ConsensusOrchestrator(config_path=str(Path(__file__).resolve().parents[1] / "config.yaml"))
     orq.max_rounds = 6            # tope de seguridad solo si se escala al concilio
     t0 = time.time()

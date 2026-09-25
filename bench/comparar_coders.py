@@ -4,8 +4,8 @@ Mismas condiciones: una llamada, temperatura 0, ventana 8192. Casos
 balanceados cuando la salida es booleana. Se cuenta la tarea como APROBADA
 solo si acierta TODOS sus casos.
 """
-import sys
-from pathlib import Path, time, httpx
+import sys, time, httpx
+from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from engine.especificacion import parsear_formato, generar_valores       # noqa
 from engine.model_lifecycle import ModelLifecycle                        # noqa
