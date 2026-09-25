@@ -106,8 +106,8 @@ obligatorias (umbral único {threshold}; sin zona intermedia).
                     # la misma: la ejecucion no demostro nada.
                     blackboard.log_event(
                         "VERIFY", self.name,
-                        f"{veredicto.resumen()} | el arbitro habia leido "
-                        f"{score_leido}. La ronda NO puede declarar consenso: "
+                        f"[via {veredicto.via}] {veredicto.resumen()} | el arbitro "
+                        f"habia leido {score_leido}. La ronda NO puede declarar consenso: "
                         f"hacen falta casos balanceados")
                 else:
                     verificado = True
@@ -118,8 +118,8 @@ obligatorias (umbral único {threshold}; sin zona intermedia).
                              else "  ATENCION: no supera la linea base trivial")
                     blackboard.log_event(
                         "VERIFY", self.name,
-                        f"ejecutado: {veredicto.resumen()} | el arbitro habia "
-                        f"leido {score_leido}{aviso}")
+                        f"ejecutado [via {veredicto.via}]: {veredicto.resumen()} | "
+                        f"el arbitro habia leido {score_leido}{aviso}")
                     response_text += self._informe_verificacion(
                         veredicto, casos, score_leido)
 
