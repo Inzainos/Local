@@ -188,3 +188,113 @@ def test_los_casos_llevan_la_frase_que_los_justifica():
     )
     assert err is None
     assert casos[0].porque
+
+
+# ─── el cableado: la ejecución manda sobre la lectura ─────────────────────────
+
+def _blackboard_con(codigo, enunciado):
+    from memory.blackboard import Blackboard, CodeArtifact
+    bb = Blackboard(task_id="t", session_id="s", user_prompt=enunciado)
+    bb.code_proposal = CodeArtifact(language="python", code=codigo,
+                                    raw_content=codigo)
+    return bb
+
+
+ENUNCIADO = ("Escribe validar_token_telegram(token) que devuelva True solo si el "
+             "token tiene identificador numerico, DOS PUNTOS, y un secreto de "
+             "EXACTAMENTE 35 caracteres del alfabeto [A-Za-z0-9_-].")
+
+
+def _arbitro_falso(score_leido, casos_json):
+    """Árbitro que LEE y pone `score_leido`, y que deriva `casos_json`."""
+    from agents.optimizer import OptimizerAgent
+    a = OptimizerAgent.__new__(OptimizerAgent)
+    a.name = "arbitro"
+    llamadas = []
+
+    def generate(prompt, system_override=None, stream_callback=None):
+        llamadas.append((prompt, system_override))
+        if system_override:                       # derivando casos
+            return casos_json
+        return f"auditoria leida [PUNTUACION_CONSENSO: {score_leido}]"
+
+    a.generate = generate
+    a._llamadas = llamadas
+    return a
+
+
+CASOS_JSON = json.dumps([
+    {"entrada": 'validar_token_telegram("8460857489:AAEQkX3PMiZvPw7W8Fwtx9HhotZmBZqwUdo")',
+     "esperado": "True", "porque": "dos puntos y 35 caracteres"},
+    {"entrada": 'validar_token_telegram("123456:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghi")',
+     "esperado": "True", "porque": "identificador mas corto"},
+    {"entrada": 'validar_token_telegram("8460857489.AAEQkX3PMiZvPw7W8Fwtx9HhotZmBZqwUdo")',
+     "esperado": "False", "porque": "el separador son DOS PUNTOS"},
+    {"entrada": 'validar_token_telegram("8460857489:AAEQkX3PMiZvPw7W8Fwtx9HhotZmBZqwUdoX")',
+     "esperado": "False", "porque": "36 viola EXACTAMENTE 35"},
+])
+
+
+def test_la_ejecucion_corrige_al_arbitro_que_aprobaba_codigo_roto():
+    """El escenario real del 2026-09-24: leyendo puso 96 a roto_3."""
+    from memory.shared_context import SharedMemory
+    a = _arbitro_falso(96, CASOS_JSON)
+    sm = SharedMemory.__new__(SharedMemory)
+    sm.active_blackboard = _blackboard_con(ROTO_3, ENUNCIADO)
+    sm.research_context = None
+
+    art = a.evaluate_solution(sm, threshold=85, espera_codigo=True)
+    assert art.score < 85, f"el arbitro seguiria aprobando con {art.score}"
+    assert art.score != 96, "el score debe venir de la ejecucion, no de la lectura"
+
+
+def test_el_codigo_correcto_sigue_aprobando():
+    from memory.shared_context import SharedMemory
+    a = _arbitro_falso(60, CASOS_JSON)   # el arbitro lo suspende LEYENDO
+    sm = SharedMemory.__new__(SharedMemory)
+    sm.active_blackboard = _blackboard_con(CORRECTO, ENUNCIADO)
+    sm.research_context = None
+
+    art = a.evaluate_solution(sm, threshold=85, espera_codigo=True)
+    assert art.score == 100, "la ejecucion debe rescatar codigo bueno mal leido"
+
+
+def test_el_que_deriva_casos_no_recibe_el_codigo():
+    from memory.shared_context import SharedMemory
+    a = _arbitro_falso(96, CASOS_JSON)
+    sm = SharedMemory.__new__(SharedMemory)
+    sm.active_blackboard = _blackboard_con(ROTO_3, ENUNCIADO)
+    sm.research_context = None
+    a.evaluate_solution(sm, threshold=85, espera_codigo=True)
+
+    derivacion = [p for p, sysov in a._llamadas if sysov]
+    assert derivacion, "no hubo derivacion de casos"
+    assert "isdigit" not in derivacion[0], "el codigo se colo en el prompt de casos"
+    assert "len(token)" not in derivacion[0]
+
+
+def test_sin_casos_derivables_se_conserva_la_lectura_pero_queda_anotado():
+    """No verificable no es lo mismo que verificado y correcto."""
+    from memory.shared_context import SharedMemory
+    a = _arbitro_falso(90, "no hay json")
+    sm = SharedMemory.__new__(SharedMemory)
+    sm.active_blackboard = _blackboard_con(ROTO_3, ENUNCIADO)
+    sm.research_context = None
+    art = a.evaluate_solution(sm, threshold=85, espera_codigo=True)
+    assert art.score == 90, "sin verificacion posible se conserva la lectura"
+    eventos = [e for e in sm.active_blackboard.execution_timeline
+               if e.get("stage") == "VERIFY"]
+    assert eventos and "no verificable" in eventos[-1]["message"]
+
+
+def test_en_tareas_sin_codigo_no_se_verifica():
+    from memory.shared_context import SharedMemory
+    a = _arbitro_falso(78, CASOS_JSON)
+    sm = SharedMemory.__new__(SharedMemory)
+    bb = _blackboard_con(ROTO_3, ENUNCIADO)
+    bb.code_proposal = None
+    sm.active_blackboard = bb
+    sm.research_context = None
+    art = a.evaluate_solution(sm, threshold=85, espera_codigo=False)
+    assert art.score == 78
+    assert not [p for p, sysov in a._llamadas if sysov], "no debio derivar casos"

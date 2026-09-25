@@ -1,7 +1,12 @@
 import re
 from typing import Optional, Callable
 from .base_agent import BaseExpertAgent
+import logging
+
+from engine.verificador import verificar
 from memory.shared_context import SharedMemory
+
+logger = logging.getLogger("Concilio.Optimizer")
 from memory.blackboard import CritiqueArtifact
 from memory.anti_injection import fence_untrusted, build_data_preamble
 
@@ -60,9 +65,80 @@ Si XX >= {threshold}, declara consenso APROBADO. Si XX < {threshold}, indica cor
 obligatorias (umbral único {threshold}; sin zona intermedia).
 """
         response_text = self.generate(prompt=prompt, stream_callback=stream_callback)
-        score = self._extract_score(response_text, threshold=threshold)
+        score_leido = self._extract_score(response_text, threshold=threshold)
+
+        # LA EJECUCION MANDA SOBRE LA LECTURA. Medido el 2026-09-24 sobre el
+        # mismo encargo: el arbitro leyendo puso 92, 93 y 96 a tres codigos que
+        # rechazaban todos los tokens validos. Leer solo dice si PARECE
+        # correcto; ejecutar dice si LO ES.
+        score = score_leido
+        veredicto = None
+        if espera_codigo and blackboard.code_proposal:
+            veredicto, casos = self._verificar_ejecutando(blackboard)
+            if veredicto is not None:
+                if veredicto.error and "no compila" not in veredicto.error:
+                    # No se pudo verificar (sin casos, salida ilegible...). Eso
+                    # NO es lo mismo que verificado y correcto: se conserva la
+                    # lectura pero queda anotado que nadie lo comprobo.
+                    blackboard.log_event(
+                        "VERIFY", self.name,
+                        f"no verificable ({veredicto.error}): el score {score_leido} "
+                        f"viene de LEER el codigo, no de ejecutarlo")
+                else:
+                    score = veredicto.puntuacion
+                    aviso = ("" if veredicto.supera_la_base
+                             else "  ATENCION: no supera la linea base trivial")
+                    blackboard.log_event(
+                        "VERIFY", self.name,
+                        f"ejecutado: {veredicto.resumen()} | el arbitro habia "
+                        f"leido {score_leido}{aviso}")
+                    response_text += self._informe_verificacion(
+                        veredicto, casos, score_leido)
+
         artifact = blackboard.add_critique(response_text, score=score, threshold=threshold)
         return artifact
+
+    def _verificar_ejecutando(self, blackboard):
+        """Deriva casos del ENUNCIADO y ejecuta el codigo contra ellos.
+
+        El modelo que deriva los casos recibe solo el enunciado --- nunca el
+        codigo. Si viera la solucion, anclaria las pruebas a lo que hace y
+        aprobaria el mismo error que venia a cazar.
+        """
+        codigo = getattr(blackboard.code_proposal, "code", "") or \
+            getattr(blackboard.code_proposal, "raw_content", "") or ""
+        if not codigo.strip():
+            return None, []
+
+        def invocar(prompt_casos: str) -> str:
+            # system_override: aqui no actua de auditor, solo deriva casos.
+            return self.generate(
+                prompt=prompt_casos,
+                system_override=("Derivas casos de prueba de un enunciado. "
+                                 "Devuelves solo JSON. No resuelves nada."),
+            )
+
+        try:
+            return verificar(blackboard.user_prompt, codigo, invocar)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("la verificacion fallo: %s: %s", type(e).__name__, e)
+            return None, []
+
+    @staticmethod
+    def _informe_verificacion(veredicto, casos, score_leido: int) -> str:
+        lineas = ["\n\n=== VERIFICACION POR EJECUCION ===",
+                  f"Resultado: {veredicto.resumen()}",
+                  f"El arbitro habia puntuado {score_leido} LEYENDO el codigo."]
+        if not veredicto.supera_la_base:
+            lineas.append("ATENCION: no supera lo que lograria devolver siempre "
+                          "la misma respuesta. Acierta por omision.")
+        fallidos = [f for f in (veredicto.detalle or []) if not f.get("correcto")]
+        if fallidos:
+            lineas.append("Casos que falla:")
+            for f in fallidos[:8]:
+                lineas.append(f"  - {f['entrada']} -> {f['obtenido']} "
+                              f"(esperado {f['esperado']})")
+        return "\n".join(lineas)
 
     # Estructuras de entrega. La de codigo era la UNICA, con secciones
     # "Codigo final consolidado" y "Guia rapida de uso": ante una auditoria el
