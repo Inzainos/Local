@@ -57,6 +57,9 @@ class ConsensusOrchestrator:
         # Extractor de formato para el verificador. Vacio desactiva la via de
         # especificacion y el verificador vuelve a derivar casos con un modelo.
         self._extractor_formato = str(conc.get("extractor_formato", "qwen2.5-coder:7b") or "")
+        # Segmentador del enunciado (tarea / reglas / limites / rechazar) para
+        # el coder. Vacio lo desactiva.
+        self._segmentador = str(conc.get("segmentador", "") or "")
         self.lifecycle = ModelLifecycle(ollama_host=self.ollama_host)
 
         r_cfg = self.config["roles"]["researcher"]
@@ -294,6 +297,41 @@ class ConsensusOrchestrator:
     # de contexto de gemma3:4b y nemotron-mini no da para sintesis
     # completas, y el valor esta en el hallazgo, no en la redaccion.
     _MEM_MAX_HECHO = 400
+
+    def _segmentar_enunciado(self, blackboard) -> None:
+        """Segmenta el enunciado UNA vez por tarea y deja las reglas al coder.
+
+        Medido el 2026-09-25 con cinco modelos sobre siete enunciados y 27
+        hechos clave escritos a mano: qwen2.5-coder:7b recogio 27/27; gemma3
+        25 (y convertia los ejemplos en lista cerrada de lo valido); llama3.2,
+        el capitan, 22, con seis reglas descartadas por traer numeros
+        calculados.
+        """
+        if not self._segmentador or blackboard.shared_notes.get("reglas_enunciado"):
+            return
+        from engine.segmentacion import bloque_para_coder, segmentar
+        from engine.tool_agent import run_with_tools
+        if self.sequential:
+            self.lifecycle.ensure_exclusive(self._segmentador,
+                                            settle_seconds=self.settle_seconds,
+                                            num_ctx=4096)
+        seg = segmentar(
+            blackboard.user_prompt,
+            lambda p, e: run_with_tools(
+                model=self._segmentador,
+                system_prompt="Segmentas enunciados. Devuelves solo JSON. No resuelves nada.",
+                user_prompt=p, ollama_host=self.ollama_host, tools_schema=None,
+                tool_impls=None, max_iterations=1, num_ctx=4096, format_schema=e,
+                temperature=0.0))
+        bloque = bloque_para_coder(seg)
+        if bloque:
+            blackboard.shared_notes["reglas_enunciado"] = bloque
+        blackboard.log_event(
+            "SEGMENTACION", "Orchestrator",
+            f"{len(seg.reglas)} reglas, {len(seg.limites)} limites, "
+            f"{len(seg.rechazar)} rechazos; {len(seg.descartadas)} descartadas por "
+            f"traer cantidades que el enunciado no dice" if bloque else
+            "el segmentador no devolvio reglas utilizables; el coder sigue sin ellas")
 
     def _bloque_memoria_historica(self, shared_memory, blackboard) -> str:
         """Antecedentes de deliberaciones previas, como DATOS no confiables.
@@ -601,6 +639,8 @@ class ConsensusOrchestrator:
                     if on_token:
                         on_token("CODING" if round_count == 1 or not blackboard.code_proposal else "REFINING", tok)
 
+                if round_count == 1 and not blackboard.code_proposal:
+                    self._segmentar_enunciado(blackboard)
                 if round_count == 1 or not blackboard.code_proposal:
                     self._run_exclusive(
                         self.coder.model,

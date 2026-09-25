@@ -81,6 +81,11 @@ concilio:
   # 2026-09-24: de cinco modelos, solo qwen2.5-coder:7b extrajo bien el formato
   # del token de Telegram. Vacio = sin via de especificacion.
   extractor_formato: qwen2.5-coder:7b
+  # Segmenta el enunciado en tarea / reglas / limites / rechazar para el coder.
+  # Medido el 2026-09-25 (7 enunciados, 27 hechos clave a mano): qwen2.5-coder
+  # 27/27; gemma3 25; codegemma 25; mistral 23; llama3.2 22. Vacio = sin
+  # segmentacion.
+  segmentador: qwen2.5-coder:7b
   # Optional stub path (documentation / future opt-in; not forced when inject=false)
   hard_rules_stub: data/memory_packs/home_hard_rules_stub.md
 
