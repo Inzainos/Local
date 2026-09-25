@@ -1,27 +1,29 @@
-# Thin Modelfiles (Concilio)
+# Modelfiles thin (Concilio)
 
-Optional Ollama aliases without Sentinel architecture corpus.
+Alias de Ollama con un system prompt delgado, sin corpus de arquitectura Sentinel.
+
+## Qué usa la v1 (2026-09-25)
+
+| rol | modelo en `config.yaml` | Modelfile |
+|---|---|---|
+| investigador | `concilio-investigador` | `Modelfile.concilio-investigador` (`FROM llama3.2:3b`) |
+| árbitro | `concilio-arbitro` | `Modelfile.concilio-arbitro` (`FROM gemma3:4b`) |
+| coder | `codegemma:7b` | ninguno: tag base |
+| extractor de formato | `qwen2.5-coder:7b` | ninguno: tag base |
+
+El coder y el extractor van **sin Modelfile propio** a propósito: se midieron como tags base
+(ver `CHANGELOG.md`), y un system prompt embebido cambiaría lo que se midió. Estos modelos
+son sensibles al texto que reciben —añadir reglas correctas y redundantes bajó a codegemma de
+72/73 a 68/73 casos—, así que cualquier Modelfile nuevo se mide antes de usarse.
 
 ```bash
 cd /home/deamon/consensus-expert-agent
-ollama create concilio-lightest -f modelfiles/Modelfile.lightest
-ollama create concilio-medium   -f modelfiles/Modelfile.medium
-ollama create concilio-heavy    -f modelfiles/Modelfile.heavy
+bash scripts/create_concilio_models.sh      # crea los alias concilio-*
 ```
 
-Then set in `config.yaml`:
+## Modelfiles que quedan de versiones anteriores
 
-```yaml
-roles:
-  researcher:
-    model: concilio-lightest
-  coder:
-    model: concilio-medium
-  optimizer:
-    model: concilio-heavy
-```
-
-Default config uses base tags `nemotron-mini` / `gemma3:4b` with thin system prompts in YAML (same effect without `ollama create`).
-
-Default Concilio uses thin Modelfile.lightest|medium|heavy or base tags.
-Do not use Modelfile.sentinel-concilio-* while inject_sentinel_architecture: false.
+`Modelfile.lightest|medium|heavy|worker|arbitro` y `concilio-worker`: el esquema anterior
+(nemotron-mini de investigador, deepseek-r1:8b de coder). `Modelfile.medium` sigue siendo el
+respaldo lejano del coder vía `concilio-medium`. No usar `Modelfile.sentinel-concilio-*`
+mientras `inject_sentinel_architecture: false`.

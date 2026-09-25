@@ -1,5 +1,12 @@
 # Handoff — Cargar memoria al modelo Gemma (árbitro del Concilio)
 
+> **Documento histórico (2026-09-03).** Describe el esquema de entonces: `qwen2.5:1.5b` /
+> `concilio-worker` de investigador, `concilio-medium` de coder, verificación leyendo. **Nada de
+> eso es el estado actual.** La v1 (2026-09-25) verifica ejecutando, usa `codegemma:7b` de coder
+> y `concilio-investigador` de investigador. Estado vigente: [`../AGENTS.md`](../AGENTS.md).
+> Se conserva sin reescribir porque es el registro de lo que se decidió en su momento.
+
+
 **Para:** otro agente que va a “enseñar” / crear el Modelfile de Gemma  
 **Proyecto:** `/home/deamon/consensus-expert-agent`  
 **Base Ollama:** `gemma4:26b` (17 GB) → tag destino `sentinel-concilio-arbitro` (o `concilio-heavy` / `concilio-arbitro`)  

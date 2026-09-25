@@ -1,6 +1,11 @@
 # Funcionamiento — Bot Telegram + Mini App (Consensus / Concilio)
 
-Version documentada: **2.2.5** (2026-09-13)
+Version documentada: **2.2.5** (2026-09-13) · **actualizado a la v1 (2026-09-25)** en el flujo de
+`/concilio`. Estado vivo del proyecto: [`../ESTADO.md`](../ESTADO.md).
+
+> **Tras actualizar el código hay que reiniciar los servicios** (`sudo systemctl restart
+> consensus-telegram consensus-web`): cargan el código al arrancar. El 25-sep el bot seguía
+> corriendo el código del 24 por la mañana y la web el del 20.
 Codigo: `telegram_bot.py`, `alert_queue.py`, `web_ui.py`, `static/mini.html`
 Docs hermanas: `TELEGRAM_BOT_README.md`, `CONCILIO.md`, `docs/HANDOFF_GEMMA_MEMORIA.md`
 
@@ -31,8 +36,9 @@ telegram_bot.py  (solo chat_ids autorizados)
     +---> /task  -> fast_ask (ligero + pack Sentinel thin)
     |         eventos/precursores -> DB Sentinel (no LLM inventando)
     |
-    +---> /concilio|/audit -> ConsensusOrchestrator (Concilio secuencial)
-    |         lightest -> medium -> heavy(Gemma) -> light verify
+    +---> /concilio|/audit -> ConsensusOrchestrator.run_consensus
+    |         v1: VIA DIRECTA (coder + verificador por ejecucion);
+    |             concilio solo si no verifica: investigador -> coder -> arbitro + verificador
     |         /audit: inject_sentinel temporal; /concilio: config inject=false
     |         escribe data/sessions/<id>.concilio
     |         unload Ollama entre roles
@@ -74,11 +80,15 @@ Este bot Consensus no redefine esa politica: entrega lo que llega a la cola + tu
 
 ## Concilio por dentro (cuando usas /concilio o /audit)
 
-1. Ligero (qwen / concilio-worker) investiga, escribe `.concilio`, se descarga.
-2. Mediano (coder) implementa/refina, escribe, se descarga.
-3. Pesado (Gemma / concilio-arbitro) puntua `[PUNTUACION_CONSENSO: XX]`, se descarga.
-4. Ligero vuelve a leer el `.concilio` y verifica el porcentaje.
-5. Si queda bajo 85, otra vuelta completa hasta max rondas (default 3).
+0. **v1:** si es una tarea de código con una función nombrada, primero la **vía directa**: el coder
+   escribe la función y el verificador la ejecuta. Verificada → se entrega sin concilio. El bot
+   muestra «Verificado por ejecución · vía directa» o «SIN VERIFICAR · vía directa».
+1. Investigador (`concilio-investigador`, llama3.2) investiga, escribe `.concilio`, se descarga.
+2. Coder (`codegemma:7b`) implementa/refina —recibe primero los casos que falló—, se descarga.
+3. Árbitro (`concilio-arbitro`, gemma3) lee y puntúa; **el verificador ejecuta el código y su
+   resultado manda sobre la lectura**.
+4. El investigador verifica el porcentaje del `.concilio`.
+5. Sin tope fijo de rondas: paran los frenos (entregable idéntico, o 4 rondas sin mejora).
 
 Anti-inyeccion: el contenido del `.concilio` y del usuario se cerca como DATA, no como ordenes al system de Gemma.
 

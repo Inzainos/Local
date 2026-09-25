@@ -2,6 +2,9 @@
 
 Guía local para agentes que trabajen en `/home/deamon/consensus-expert-agent/`.
 
+> **¿Entras a mitad de algo? Lee primero [`ESTADO.md`](./ESTADO.md):** qué se está haciendo
+> ahora, qué se hizo, qué falta y cómo retomar cada cosa si se cortó.
+
 **Leer primero el home:** [`/home/deamon/AGENTS.md`](../AGENTS.md) — reglas duras del workspace,
 mapa Sentinel Omega + Padrón + Concilio, secretos, git, workspace roots.
 

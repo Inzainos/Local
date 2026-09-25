@@ -28,3 +28,7 @@ data/sessions/*.tmp
 *.bak*
 *.broken*
 *.quarantined*
+
+# Salidas de los arneses de medicion (bench/): datos generados, pueden contener
+# codigo escrito por modelos. Los numeros que importan estan en bench/README.md.
+bench/resultados/

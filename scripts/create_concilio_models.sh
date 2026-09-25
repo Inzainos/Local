@@ -8,7 +8,22 @@ MF="$ROOT/modelfiles"
 echo "== ollama list (before) =="
 ollama list || true
 
-echo "== Creating concilio-worker LIGHTEST (FROM nemotron-mini) =="
+# v1 (2026-09-25): el INVESTIGADOR es concilio-investigador (llama3.2:3b). Este
+# script no lo creaba: en una maquina nueva no existiria y el orquestador caeria
+# al respaldo sin avisar. El coder (codegemma:7b) y el extractor (qwen2.5-coder:7b)
+# se usan como tags base, sin Modelfile: asi se midieron.
+echo "== Creating concilio-investigador (FROM llama3.2:3b) --- investigador de la v1 =="
+if ollama create concilio-investigador -f "$MF/Modelfile.concilio-investigador"; then
+  echo "OK concilio-investigador"
+else
+  echo "FAIL concilio-investigador — need base llama3.2:3b"
+fi
+for base in codegemma:7b qwen2.5-coder:7b; do
+  if ollama list | grep -q "^${base}"; then echo "OK base $base"; else
+    echo "FALTA $base (coder / extractor de la v1): ollama pull $base"; fi
+done
+
+echo "== Creating concilio-worker LIGHTEST (FROM nemotron-mini) --- esquema anterior =="
 if ollama create concilio-worker -f "$MF/Modelfile.concilio-worker"; then
   echo "OK concilio-worker"
 else
