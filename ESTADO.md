@@ -5,7 +5,7 @@
 > modelo) no deje a nadie sin saber dónde se quedó. **Se actualiza cada vez que algo avanza.**
 > Si lo que dice aquí contradice al código, manda el código: verifícalo y corrige este archivo.
 
-**Última actualización:** 2026-09-25 13:40. v1.0-estable + arreglo 3.0.1 **desplegados y vistos funcionar en vivo**. Pendiente: una tarea que TERMINE (la última la cortó un reinicio de Windows).
+**Última actualización:** 2026-09-25 14:15. v1 + 3.0.1 + 3.0.2 **desplegados** (servicios reiniciados 14:12). Pendiente: una tarea del concilio que TERMINE (las dos últimas no cerraron).
 **Rama:** `local/concilio` (nunca push a `main`). **Operador:** Elán (responder en español).
 
 ---
@@ -26,7 +26,10 @@ Historial: [`CHANGELOG.md`](./CHANGELOG.md).
 
 ## 2. EN CURSO ahora mismo
 
-### Servicios: corren la v1 + 3.0.1 (reinicio del operador 13:04; Windows reinició la máquina 13:19)
+### Servicios: corren la v1 + 3.0.1 + 3.0.2 (reiniciados por el operador a las 14:12)
+El aviso de tareas interrumpidas está vivo (en el journal: «sin tareas interrumpidas»), pero **no vio
+la sesión cortada de las 13:05**: es del esquema 1 y `sesiones_interrumpidas()` ignora esas a
+propósito. El aviso empieza a contar desde las sesiones creadas por este código.
 `consensus-telegram` (bot) y `consensus-web` son **servicios del sistema** y cargan el código **al
 arrancar**: cualquier cambio posterior no llega al teléfono ni a la web hasta reiniciarlos. El
 operador los reinició a las 09:46 (10 min después de la etiqueta, `1687f4c` 09:36). Verificado:
