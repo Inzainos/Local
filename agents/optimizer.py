@@ -131,6 +131,15 @@ obligatorias (umbral único {threshold}; sin zona intermedia).
                     # LA GANANCIA SOBRE LA BASE, no el acierto crudo. 7/8 con
                     # base 7/8 es un 88% que vale cero.
                     score = veredicto.puntuacion_util
+                    # CON CASOS DE ESPECIFICACION, TODOS O NINGUNO. Cada caso es
+                    # un requisito del enunciado: fallar uno es violarlo. El
+                    # umbral de 85 viene de cuando la nota era una LECTURA
+                    # subjetiva. Medido en la aceptacion de la v1: 15/16 da 88%
+                    # sobre la base y se aprobo un es_matricula que aceptaba
+                    # '!OV-3074'. Se deja la cifra real pero por debajo del
+                    # umbral, para que el informe diga cuanto le falto.
+                    if verificado and veredicto.aciertos < veredicto.total:
+                        score = min(score, threshold - 1)
                     aviso = ("" if veredicto.supera_la_base
                              else "  ATENCION: no supera la linea base trivial")
                     blackboard.log_event(

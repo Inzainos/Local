@@ -378,8 +378,11 @@ class ConsensusOrchestrator:
             blackboard.log_event("DIRECTO", "Orchestrator",
                                  f"intento {intento} [via {veredicto.via}]: {veredicto.resumen()}")
             fiable = veredicto.via == "especificacion"
+            # TODOS los casos, no el umbral: cada caso de especificacion es un
+            # requisito. Con >= 85 se aprobo un es_matricula que fallaba 1 de 16
+            # (acepto '!OV-3074') en la aceptacion de la v1.
             if (fiable and not veredicto.error and veredicto.discrimina
-                    and veredicto.puntuacion_util >= self.threshold):
+                    and veredicto.aciertos == veredicto.total):
                 codigo = extraer_codigo(respuesta, funcion)
                 blackboard.consensus_score = veredicto.puntuacion_util
                 blackboard.consensus_reached = True

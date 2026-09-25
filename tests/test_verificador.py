@@ -714,3 +714,14 @@ def test_casos_derivados_no_declaran_consenso_ni_con_100(monkeypatch):
     c = a.evaluate_solution(mem, threshold=85, espera_codigo=True)
     assert c.score == 100
     assert not c.passed and c.verificado_por_ejecucion is False
+
+
+def test_el_arbitro_no_aprueba_con_un_caso_de_especificacion_fallado(monkeypatch):
+    """Mismo fallo por el concilio: 15/16 -> 88 sobre la base no puede cerrar."""
+    from engine.verificador import Veredicto
+    v = Veredicto(15, 16, linea_base=8)
+    v.via = "especificacion"
+    a, mem, bb = _arbitro_con_veredicto(monkeypatch, v)
+    c = a.evaluate_solution(mem, threshold=85, espera_codigo=True)
+    assert not c.passed, "un requisito incumplido no puede declarar consenso"
+    assert c.score == 84, f"la cifra queda justo por debajo del umbral: {c.score}"

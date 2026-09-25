@@ -112,3 +112,20 @@ def test_un_conjunto_que_no_discrimina_no_aprueba():
     bb = _pizarra()
     assert orq._intentar_via_directa(bb) == "concilio"
     assert not bb.consensus_reached
+
+
+def test_quince_de_dieciseis_no_es_verificado():
+    """ACEPTACION v1, 2026-09-25: es_matricula salio VERIFICADO con 15/16.
+
+    15/16 con base 8 son 88% sobre la base, por encima de 85, y el codigo
+    aceptaba '!OV-3074'. Con casos de especificacion cada caso es un requisito:
+    fallar uno es violar el enunciado.
+    """
+    uno_fallado = _veredicto(15, 16, 8, fallos=["es_matricula('!OV-3074')"])
+    orq, prompts = _orquestador([uno_fallado, uno_fallado])
+    bb = Blackboard(task_id="t", session_id="s", user_prompt=(
+        "Escribe una funcion Python llamada es_matricula(s: str) -> bool con "
+        "tres letras mayusculas, un guion y cuatro digitos."))
+    assert orq._intentar_via_directa(bb) == "concilio"
+    assert not bb.consensus_reached
+    assert "es_matricula('!OV-3074')" in prompts[1], "el segundo intento debe saber cual fallo"
