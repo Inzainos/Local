@@ -299,11 +299,36 @@ def test_ningun_nombre_indefinido_en_el_motor():
     from pathlib import Path
 
     raiz = Path(__file__).resolve().parents[1]
-    objetivos = ["engine", "memory", "telegram_bot.py", "cli.py"]
+    objetivos = ["engine", "memory", "agents", "telegram_bot.py", "cli.py"]
+
+    # ESTE GUARDIAN PASABA EN VACIO. Si pyflakes no esta instalado en el
+    # interprete que corre las pruebas, subprocess devuelve stdout vacio, la
+    # lista de indefinidos queda en [] y el assert pasa sin haber analizado
+    # nada. Comprobado el 2026-09-24 con /usr/bin/python3: returncode 1,
+    # stderr "No module named pyflakes", test en verde.
+    #
+    # Es el mismo error que el guardian existe para cazar: la ausencia de
+    # evidencia tomada como evidencia de ausencia. Asi que primero se verifica
+    # que la herramienta EXISTE, y si no, el test falla en vez de aprobar.
+    disponible = subprocess.run(
+        [sys.executable, "-m", "pyflakes", "--version"],
+        capture_output=True, text=True,
+    )
+    assert disponible.returncode == 0, (
+        f"pyflakes no esta disponible en {sys.executable}: este guardian no "
+        f"puede analizar nada y pasaria en vacio. Instalalo o corre las "
+        f"pruebas con el interprete del entorno. stderr: "
+        f"{disponible.stderr.strip()[:200]}")
+
     r = subprocess.run(
         [sys.executable, "-m", "pyflakes", *objetivos],
         cwd=raiz, capture_output=True, text=True,
     )
+    # pyflakes devuelve 0 sin hallazgos y 1 con hallazgos; cualquier otro codigo
+    # (o un stderr con traza) significa que no llego a analizar.
+    assert r.returncode in (0, 1), (
+        f"pyflakes no completo el analisis (rc={r.returncode}): "
+        f"{r.stderr.strip()[:300]}")
     indefinidos = [l for l in r.stdout.splitlines() if "undefined name" in l]
     assert not indefinidos, "nombres indefinidos:\n" + "\n".join(indefinidos)
 

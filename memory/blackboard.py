@@ -49,6 +49,17 @@ class CritiqueArtifact(BaseModel):
     optimizations_suggested: List[str] = Field(default_factory=list)
     raw_content: str = ""
     created_at: float = Field(default_factory=time.time)
+    # TRES estados, no dos:
+    #   None  -> el entregable no lleva codigo (analisis, prosa). No aplica.
+    #   True  -> el codigo se EJECUTO contra casos derivados del enunciado.
+    #   False -> se esperaba codigo y NO se pudo verificar. El score viene de
+    #            LEER. Con este valor la ronda no puede declarar consenso.
+    #
+    # Sin este campo, una ronda en la que el verificador no logra derivar casos
+    # cae al score de lectura --- 92, 93, 96 en las tres corridas del
+    # 2026-09-24 --- y ese numero cruza el umbral de 85 sin que nadie haya
+    # ejecutado una linea. Quedaba anotado en la pizarra y no frenaba nada.
+    verificado_por_ejecucion: Optional[bool] = None
 
 class Blackboard(BaseModel):
     task_id: str
@@ -145,13 +156,16 @@ class Blackboard(BaseModel):
         self.status = TaskStatus.REVIEWING
         return artifact
 
-    def add_critique(self, raw_content: str, score: int, threshold: int = 85) -> CritiqueArtifact:
-        passed = score >= threshold
+    def add_critique(self, raw_content: str, score: int, threshold: int = 85,
+                     verificado_por_ejecucion: Optional[bool] = None) -> CritiqueArtifact:
+        # No verificado NO es aprobado. Ver CritiqueArtifact.
+        passed = score >= threshold and verificado_por_ejecucion is not False
         critique = CritiqueArtifact(
             round_num=len(self.critiques) + 1,
             score=score,
             passed=passed,
-            raw_content=raw_content
+            raw_content=raw_content,
+            verificado_por_ejecucion=verificado_por_ejecucion,
         )
         self.critiques.append(critique)
         self.consensus_score = score
@@ -160,6 +174,12 @@ class Blackboard(BaseModel):
         if passed:
             self.status = TaskStatus.CONSENSUS_REACHED
             self.log_event("REVIEW", "Optimizer", f"Consenso ALCANZADO (Puntaje: {score}/100)")
+        elif verificado_por_ejecucion is False and score >= threshold:
+            self.status = TaskStatus.REFINING
+            self.log_event(
+                "REVIEW", "Optimizer",
+                f"Puntaje {score}/100 alcanza el umbral {threshold} pero viene de "
+                f"LEER el codigo, no de ejecutarlo. NO se declara consenso.")
         else:
             self.status = TaskStatus.REFINING
             self.log_event("REVIEW", "Optimizer", f"Revisión completada (Puntaje: {score}/100). Requiere refinamiento.")

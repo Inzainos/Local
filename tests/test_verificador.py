@@ -298,3 +298,53 @@ def test_en_tareas_sin_codigo_no_se_verifica():
     art = a.evaluate_solution(sm, threshold=85, espera_codigo=False)
     assert art.score == 78
     assert not [p for p, sysov in a._llamadas if sysov], "no debio derivar casos"
+
+
+# ─── EL AGUJERO DEL 2026-09-24: no verificado colandose como aprobado ────────
+# El arbitro puntuaba con la EJECUCION cuando podia ejecutar, y con la LECTURA
+# cuando no. Pero nada distinguia los dos casos aguas abajo: una ronda en la
+# que el verificador no lograba derivar casos caia al score de lectura --- 92,
+# 93, 96 en las tres corridas medidas --- y ese numero cruzaba el umbral de 85
+# sin que nadie hubiera ejecutado una linea. Quedaba anotado en la pizarra y no
+# frenaba nada.
+
+def _pizarra(prompt="Escribe una funcion f(x) que devuelva x+1"):
+    from memory.blackboard import Blackboard
+    return Blackboard(task_id="t", session_id="s", user_prompt=prompt)
+
+
+def test_no_verificado_no_declara_consenso():
+    """Score por encima del umbral, pero nadie ejecuto: NO es consenso."""
+    bb = _pizarra()
+    c = bb.add_critique("da igual", score=96, threshold=85,
+                        verificado_por_ejecucion=False)
+    assert c.score == 96
+    assert not c.passed, "96 leido no puede declarar consenso"
+    assert not bb.consensus_reached
+    # y tiene que DECIRLO, no callarlo
+    assert any("LEER" in e["message"] for e in bb.execution_timeline)
+
+
+def test_verificado_por_ejecucion_si_declara_consenso():
+    """Mismo score, pero ejecutado: ahi si cierra."""
+    bb = _pizarra()
+    c = bb.add_critique("da igual", score=96, threshold=85,
+                        verificado_por_ejecucion=True)
+    assert c.passed and bb.consensus_reached
+
+
+def test_sin_codigo_esperado_no_se_exige_ejecucion():
+    """Una auditoria o un analisis no lleva codigo: None no debe bloquear."""
+    bb = _pizarra("Audita este proyecto y dame hallazgos")
+    c = bb.add_critique("hallazgos", score=90, threshold=85,
+                        verificado_por_ejecucion=None)
+    assert c.passed and bb.consensus_reached
+
+
+def test_no_verificado_bajo_el_umbral_sigue_refinando():
+    """Sin verificar y por debajo: refina, y sin el aviso enganoso."""
+    bb = _pizarra()
+    c = bb.add_critique("flojo", score=40, threshold=85,
+                        verificado_por_ejecucion=False)
+    assert not c.passed
+    assert not any("alcanza el umbral" in e["message"] for e in bb.execution_timeline)

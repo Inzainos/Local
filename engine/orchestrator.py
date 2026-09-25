@@ -602,7 +602,16 @@ class ConsensusOrchestrator:
                 final_round_score = int(critique.score)
 
             blackboard.consensus_score = final_round_score
-            passed = final_round_score >= self.threshold
+            # Un score que viene de LEER el codigo no declara consenso aunque
+            # cruce el umbral: el 2026-09-24 la lectura puso 92, 93 y 96 a tres
+            # codigos que fallaban todos los casos validos.
+            sin_verificar = critique.verificado_por_ejecucion is False
+            passed = final_round_score >= self.threshold and not sin_verificar
+            if sin_verificar and final_round_score >= self.threshold:
+                blackboard.log_event(
+                    "CONCILIO", "Orchestrator",
+                    f"score {final_round_score} alcanza el umbral {self.threshold} "
+                    f"pero NADIE ejecuto el codigo. Se refina en vez de cerrar.")
             if passed:
                 consensus_achieved = True
                 blackboard.consensus_reached = True

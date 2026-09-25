@@ -73,7 +73,12 @@ obligatorias (umbral único {threshold}; sin zona intermedia).
         # correcto; ejecutar dice si LO ES.
         score = score_leido
         veredicto = None
+        # None mientras no aplique; False si se esperaba codigo y no se pudo
+        # comprobar. Ese False es lo que impide que un score de LECTURA cruce
+        # el umbral. Ver CritiqueArtifact.verificado_por_ejecucion.
+        verificado = None
         if espera_codigo and blackboard.code_proposal:
+            verificado = False
             veredicto, casos = self._verificar_ejecutando(blackboard)
             if veredicto is not None:
                 if veredicto.error and "no compila" not in veredicto.error:
@@ -83,8 +88,10 @@ obligatorias (umbral único {threshold}; sin zona intermedia).
                     blackboard.log_event(
                         "VERIFY", self.name,
                         f"no verificable ({veredicto.error}): el score {score_leido} "
-                        f"viene de LEER el codigo, no de ejecutarlo")
+                        f"viene de LEER el codigo, no de ejecutarlo. La ronda NO "
+                        f"puede declarar consenso")
                 else:
+                    verificado = True
                     score = veredicto.puntuacion
                     aviso = ("" if veredicto.supera_la_base
                              else "  ATENCION: no supera la linea base trivial")
@@ -95,7 +102,9 @@ obligatorias (umbral único {threshold}; sin zona intermedia).
                     response_text += self._informe_verificacion(
                         veredicto, casos, score_leido)
 
-        artifact = blackboard.add_critique(response_text, score=score, threshold=threshold)
+        artifact = blackboard.add_critique(
+            response_text, score=score, threshold=threshold,
+            verificado_por_ejecucion=verificado)
         return artifact
 
     def _verificar_ejecutando(self, blackboard):
