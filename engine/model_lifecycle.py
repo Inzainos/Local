@@ -118,7 +118,21 @@ class ModelLifecycle:
                             break
             except Exception:
                 pass
-            if num_ctx and concedido and int(concedido) != int(num_ctx):
+            # TRES resultados, no dos. La version anterior tenia un `else`
+            # que se comia el caso "no se pudo verificar" y lo registraba a
+            # nivel INFO como si fuera un exito: el log de las 19:01 del
+            # 2026-09-24 decia cuatro veces "warm-loaded ... concedido=None",
+            # que leido de corrido parece confirmacion y en realidad es que
+            # /api/ps no encontro el modelo. Mismo patron que el resto de los
+            # fallos de esta semana: el silencio tratado como afirmacion, y
+            # aqui dentro de la propia herramienta de medir.
+            if num_ctx and concedido is None:
+                logger.warning(
+                    "warm-load %s: se pidio num_ctx=%s y NO SE PUDO VERIFICAR "
+                    "lo concedido (el modelo no aparecio en /api/ps; puede que "
+                    "aun estuviera cargando). La ventana real es DESCONOCIDA, "
+                    "no la pedida", model, num_ctx)
+            elif num_ctx and int(concedido) != int(num_ctx):
                 logger.warning(
                     "warm-load %s: se pidio num_ctx=%s y Ollama concedio %s "
                     "--- la cache reservada no es la esperada",
