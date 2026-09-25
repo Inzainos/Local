@@ -494,3 +494,46 @@ def test_no_inventa_casos_donde_no_hay():
     for basura in ("", "no hay nada aqui", "lo siento, no puedo", "{}", "[]"):
         d = _extraer_json(basura)
         assert not d, f"{basura!r} produjo {d}"
+
+
+# ─── lo que recibe el CODER cuando la ejecucion contradice a la lectura ──────
+# En la bateria del 2026-09-25 el arbitro leyo 97, 98, 99, 99 sobre un codigo
+# que rechazaba los ocho tokens validos. El informe de ejecucion iba pegado al
+# FINAL de esa lectura, y el coder recibia la orden de «resolver los puntos de
+# la auditoria»: reemitio el mismo codigo hasta que el freno lo corto.
+
+def test_el_veredicto_de_ejecucion_va_antes_que_la_lectura(monkeypatch):
+    from engine.verificador import Veredicto
+    v = Veredicto(8, 16, linea_base=8, detalle=[
+        {"entrada": "validar_token_telegram('0:AHOVcjqx4-GNUbipw3_FMTahov29ELSZgnu')",
+         "obtenido": "False", "esperado": "True", "correcto": False}])
+    a, mem, bb = _arbitro_con_veredicto(monkeypatch, v)
+    c = a.evaluate_solution(mem, threshold=85, espera_codigo=True)
+    texto = c.raw_content
+    i_ejec = texto.find("VERIFICACION POR EJECUCION")
+    i_lect = texto.find("Analisis")          # la lectura fingida del arbitro
+    assert 0 <= i_ejec < i_lect, "el veredicto de ejecucion tiene que ir PRIMERO"
+    assert "ANULADA" in texto
+    assert "esperado True" in texto, "el caso fallido concreto tiene que llegar"
+
+
+def test_la_puntuacion_leida_queda_neutralizada(monkeypatch):
+    """Si sobrevive `[PUNTUACION_CONSENSO: 96]`, alguien aguas abajo la cree."""
+    from engine.verificador import Veredicto
+    a, mem, bb = _arbitro_con_veredicto(monkeypatch, Veredicto(6, 8, linea_base=4))
+    c = a.evaluate_solution(mem, threshold=85, espera_codigo=True)
+    assert "[PUNTUACION_CONSENSO:" not in c.raw_content
+    assert "[PUNTUACION_LEIDA_ANULADA: 96]" in c.raw_content
+
+
+def test_el_coder_recibe_la_orden_confiable_de_obedecer_la_ejecucion():
+    """La orden va FUERA de los bloques no confiables: si va dentro, el
+    preambulo anti-inyeccion le dice al modelo que la ignore."""
+    from memory.blackboard import Blackboard
+    bb = Blackboard(task_id="t", session_id="s", user_prompt="x")
+    bb.update_code("```python\ndef f(): pass\n```")
+    bb.add_critique("=== VERIFICACION POR EJECUCION ===\nfalla", score=0)
+    ctx = bb.get_context_for_refinement()
+    confiable = ctx[ctx.rfind("INSTRUCCIÓN DEL SISTEMA (confiable)"):]
+    assert "VERIFICACION POR EJECUCION" in confiable
+    assert "MANDAN" in confiable

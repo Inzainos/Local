@@ -120,8 +120,17 @@ obligatorias (umbral único {threshold}; sin zona intermedia).
                         "VERIFY", self.name,
                         f"ejecutado [via {veredicto.via}]: {veredicto.resumen()} | "
                         f"el arbitro habia leido {score_leido}{aviso}")
-                    response_text += self._informe_verificacion(
-                        veredicto, casos, score_leido)
+                    # EL VEREDICTO DE EJECUCION VA PRIMERO. Antes se pegaba al
+                    # FINAL de la lectura del arbitro, que el 2026-09-25 decia
+                    # 97, 98, 99 y «consenso APROBADO» sobre un codigo que
+                    # rechazaba los ocho tokens validos. El coder recibia eso y
+                    # la orden de «resolver los puntos de la auditoria»: reemitio
+                    # el mismo codigo hasta que el freno lo corto en la ronda 4.
+                    response_text = (
+                        self._informe_verificacion(veredicto, casos, score_leido)
+                        + "\n\n=== LECTURA DEL ARBITRO (su puntuacion queda ANULADA "
+                          "por la ejecucion; solo sirven sus observaciones) ===\n"
+                        + self._anular_puntuacion_leida(response_text))
 
         artifact = blackboard.add_critique(
             response_text, score=score, threshold=threshold,
@@ -174,8 +183,19 @@ obligatorias (umbral único {threshold}; sin zona intermedia).
             return None, []
 
     @staticmethod
+    def _anular_puntuacion_leida(texto: str) -> str:
+        """Neutraliza el marcador de puntuacion de la lectura.
+
+        Si queda `[PUNTUACION_CONSENSO: 99]` en el texto, cualquier lector
+        aguas abajo --- el coder, el verificador ligero --- puede tomarlo como
+        la nota vigente.
+        """
+        return re.sub(r"\[PUNTUACION_CONSENSO:\s*(\d{1,3})\]",
+                      r"[PUNTUACION_LEIDA_ANULADA: \1]", texto or "")
+
+    @staticmethod
     def _informe_verificacion(veredicto, casos, score_leido: int) -> str:
-        lineas = ["\n\n=== VERIFICACION POR EJECUCION ===",
+        lineas = ["=== VERIFICACION POR EJECUCION (esto es lo que manda) ===",
                   f"Resultado: {veredicto.resumen()}",
                   f"El arbitro habia puntuado {score_leido} LEYENDO el codigo."]
         if not veredicto.supera_la_base:
