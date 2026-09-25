@@ -61,7 +61,13 @@ concilio:
   # recibir el enunciado y trabajaba con el material truncado.
   # concilio-investigador (llama3.2:3b) tiene 131.072 y pesa menos.
   worker_model: concilio-investigador
-  coder_model: concilio-medium    # MEDIUM coder propio (DeepSeek R1); si falta cae al worker
+  # CODER: qwen2.5-coder:7b desde el 2026-09-25, decision del operador tras
+  # medir. deepseek-r1:8b (concilio-medium) es un modelo de RAZONAMIENTO: en
+  # la linea base se gasto 4.000 tokens pensando (15 min) sin escribir la
+  # funcion; qwen la escribio correcta en 21 s. En la bateria A/B qwen tardo
+  # casi la mitad y quedo mas cerca en las dos tareas. Solo dos funciones
+  # sencillas: en tareas de razonamiento largo deepseek no esta medido.
+  coder_model: qwen2.5-coder:7b
   arbiter_model: concilio-arbitro # aliases: concilio-heavy, sentinel-concilio-arbitro
   fast_gente_outside: true
   telegram_preload_sentinel_pack: true
@@ -118,9 +124,9 @@ roles:
     # tokens; 16.384 deja holgura de 3x sin desperdiciar cache.
     num_ctx: 16384
   coder:
-    name: Concilio Coder (MEDIUM · DeepSeek R1)
-    model: concilio-medium
-    fallback_model: deepseek-r1:8b
+    name: Concilio Coder (MEDIUM · qwen2.5-coder)
+    model: qwen2.5-coder:7b
+    fallback_model: concilio-medium
     temperature: 0.2
     system_prompt: |
       Eres el Programador (MEDIUM) del Concilio secuencial.

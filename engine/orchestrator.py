@@ -187,11 +187,16 @@ class ConsensusOrchestrator:
         arbitro = next((m for m in arbiter_candidates if m and exists(m)), "gemma3:4b")
         if "gemma3" in worker.lower() or worker == arbitro:
             worker = next((m for m in worker_candidates if m and "gemma" not in m.lower() and exists(m)), "llama3.2:3b")
-        # MEDIUM coder: modelo propio (DeepSeek) distinto del researcher; cae al worker.
+        # MEDIUM coder: el CONFIGURADO primero. La lista fija ponia
+        # "concilio-medium" delante y pisaba config.yaml: el 2026-09-25 el
+        # operador cambio el coder a qwen2.5-coder:7b y el orquestador seguia
+        # usando concilio-medium. Mismo defecto que ya se corrigio para el
+        # investigador y el arbitro; el coder se habia quedado fuera.
+        cfg_coder = getattr(self.coder, "model", "") or ""
         coder_candidates = [
+            cfg_coder,
             "concilio-medium",
             "deepseek-r1:8b",
-            getattr(self.coder, "model", "") or worker,
             worker,
         ]
         coder = next((m for m in coder_candidates if m and exists(m)), worker)
@@ -210,7 +215,9 @@ class ConsensusOrchestrator:
         # operador, 2026-09-24): no entra como respaldo de ningun otro rol.
         if not self.researcher.fallback_model:
             self.researcher.fallback_model = "llama3.2:3b"
-        self.coder.fallback_model = worker   # si DeepSeek falla, cae al worker ligero
+        # El respaldo CONFIGURADO se respeta; solo si no hay, el worker ligero.
+        if not self.coder.fallback_model or self.coder.fallback_model == self.coder.model:
+            self.coder.fallback_model = worker
         if not self.optimizer.fallback_model:
             self.optimizer.fallback_model = "gemma3:4b" if exists("gemma3:4b") else "llama3.2:3b"
 

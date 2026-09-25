@@ -647,3 +647,24 @@ def test_la_confianza_se_acota_a_0_100():
     from engine.turnos import parsear_respuesta
     _, c, _, _ = parsear_respuesta("VEREDICTO: PASO\nCONFIANZA: 999\nBORRADOR:\nx")
     assert c == 100
+
+
+# ─── el coder CONFIGURADO manda ──────────────────────────────────────────────
+# 2026-09-25: el operador cambio el coder a qwen2.5-coder:7b en config.yaml y el
+# orquestador seguia usando concilio-medium. La lista fija de
+# _maybe_prefer_custom_models ponia "concilio-medium" primero. El mismo defecto
+# ya se habia corregido para investigador y arbitro; el coder quedo fuera.
+
+def test_el_coder_configurado_gana_a_la_lista_fija():
+    from types import SimpleNamespace as NS
+    from engine.orchestrator import ConsensusOrchestrator
+    orq = ConsensusOrchestrator.__new__(ConsensusOrchestrator)
+    orq.researcher = NS(model="concilio-investigador", fallback_model="llama3.2:3b")
+    orq.optimizer = NS(model="concilio-arbitro", fallback_model="gemma3:4b")
+    orq.coder = NS(model="qwen2.5-coder:7b", fallback_model="concilio-medium")
+    orq.inject_sentinel = False
+    orq._model_exists = lambda m: True        # todos instalados: gana el orden
+    ConsensusOrchestrator._maybe_prefer_custom_models(orq)
+    assert orq.coder.model == "qwen2.5-coder:7b", (
+        f"la lista fija volvio a pisar la configuracion: {orq.coder.model}")
+    assert orq.coder.fallback_model == "concilio-medium", "el respaldo configurado se perdio"
