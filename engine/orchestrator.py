@@ -268,6 +268,24 @@ class ConsensusOrchestrator:
         return score > mejor + margen
 
     @staticmethod
+    def _entregable_de_la_ronda(blackboard, critique=None) -> str:
+        """Lo que se compara entre rondas: el MISMO codigo que ejecuta el verificador.
+
+        Antes era `code_proposal.code`, que concatena todos los bloques: si el
+        coder solo cambiaba el bloque de ejemplo y dejaba la funcion identica,
+        la huella cambiaba y el freno por repeticion no disparaba.
+        """
+        entregable = ""
+        if blackboard.code_proposal is not None:
+            from engine.verificador import extraer_codigo, nombre_funcion
+            crudo = getattr(blackboard.code_proposal, "raw_content", "") or ""
+            entregable = (extraer_codigo(crudo, nombre_funcion(blackboard.user_prompt))
+                          or getattr(blackboard.code_proposal, "code", "") or crudo)
+        if not entregable and critique is not None:
+            entregable = getattr(critique, "raw_content", "") or ""
+        return entregable
+
+    @staticmethod
     def _firma_entregable(texto: str) -> str:
         """Huella exacta del entregable, para detectar repeticion literal."""
         return hashlib.sha256((texto or "").strip().encode("utf-8")).hexdigest()
@@ -728,12 +746,12 @@ class ConsensusOrchestrator:
             # tres entradas en la línea de tiempo. Leí esas entradas como rondas
             # y dije «quince rondas, seis idénticas» cuando eran unas cinco y
             # dos. Las rondas reales son los eventos «Ronda completa N».
-            entregable = ""
-            if blackboard.code_proposal is not None:
-                entregable = (getattr(blackboard.code_proposal, "code", "") or
-                              getattr(blackboard.code_proposal, "raw_content", "") or "")
-            if not entregable:
-                entregable = getattr(critique, "raw_content", "") or ""
+            # La huella se calcula sobre el MISMO codigo que ejecuta el
+            # verificador (la funcion extraida), no sobre `code`, que concatena
+            # todos los bloques: si el coder solo cambiaba el bloque de ejemplo
+            # y dejaba la funcion identica, la huella cambiaba y el freno no
+            # disparaba.
+            entregable = self._entregable_de_la_ronda(blackboard, critique)
             firma = self._firma_entregable(entregable)
             repetido = bool(entregable.strip()) and firma == firma_previa
             firma_previa = firma
@@ -859,7 +877,14 @@ class ConsensusOrchestrator:
                 "Sin lectura DB: di que faltan datos; no inventes.\n"
             )
         if self.sequential:
-            self.lifecycle.ensure_exclusive(self.researcher.model, settle_seconds=self.settle_seconds)
+            # CON su ventana. Sin num_ctx la precarga pedia el valor por defecto
+            # del servidor, OLLAMA_CONTEXT_LENGTH=262144 --- y la ventana ya
+            # reservada no se reduce despues en generate(). Esta es la via
+            # LIGERA (/task del bot de Telegram): era la que mas memoria pedia.
+            # Hermano del arreglo de _run_exclusive que se quedo sin aplicar.
+            self.lifecycle.ensure_exclusive(self.researcher.model,
+                                            settle_seconds=self.settle_seconds,
+                                            num_ctx=self.researcher.num_ctx)
         try:
             return self.researcher.generate(
                 prompt=fenced, system_override=sys_prompt, stream_callback=stream_callback

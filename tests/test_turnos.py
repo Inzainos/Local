@@ -668,3 +668,42 @@ def test_el_coder_configurado_gana_a_la_lista_fija():
     assert orq.coder.model == "qwen2.5-coder:7b", (
         f"la lista fija volvio a pisar la configuracion: {orq.coder.model}")
     assert orq.coder.fallback_model == "concilio-medium", "el respaldo configurado se perdio"
+
+
+# ─── barrido de hermanos (2026-09-25): defectos arreglados en un sitio y ─────
+# ─── vivos en otro ────────────────────────────────────────────────────────────
+
+def test_el_freno_compara_la_funcion_no_los_bloques_de_ejemplo():
+    """Misma funcion, distinto ejemplo de uso: es la MISMA entrega."""
+    from engine.orchestrator import ConsensusOrchestrator as O
+    from memory.blackboard import Blackboard
+    P = "Escribe una funcion Python llamada f(x: int) -> int que sume uno."
+    funcion = "```python\ndef f(x):\n    return x + 1\n```\n"
+    a = Blackboard(task_id="a", session_id="s", user_prompt=P)
+    a.update_code(funcion + "Uso:\n```python\nprint(f(1))\n```")
+    b = Blackboard(task_id="b", session_id="s", user_prompt=P)
+    b.update_code(funcion + "Uso:\n```python\nprint(f(41))\n```")
+    ea, eb = O._entregable_de_la_ronda(a), O._entregable_de_la_ronda(b)
+    assert O._firma_entregable(ea) == O._firma_entregable(eb), (
+        "cambiar solo el ejemplo hacia que el freno no detectara la repeticion")
+
+
+def test_fast_ask_precarga_con_la_ventana_del_investigador(monkeypatch):
+    """La via LIGERA (/task del bot) precargaba sin num_ctx: 262144 del servidor."""
+    from types import SimpleNamespace as NS
+    from engine.orchestrator import ConsensusOrchestrator
+    cargas = []
+    orq = ConsensusOrchestrator.__new__(ConsensusOrchestrator)
+    orq.sequential, orq.settle_seconds = True, 0
+    orq.lifecycle = NS(
+        ensure_exclusive=lambda m, settle_seconds=1.0, num_ctx=None: cargas.append((m, num_ctx)),
+        unload_after_role=lambda m: None)
+    orq.researcher = NS(model="concilio-investigador", num_ctx=16384,
+                        generate=lambda **k: "ok")
+    orq.inject_sentinel = False
+    orq.config = {"concilio": {"telegram_preload_sentinel_pack": False}}
+    orq._project_root = "/ruta/que/no/existe"
+    # SIN vias de escape: la primera version de esta prueba hacia pytest.skip
+    # ante un AttributeError, y se salto. Un test saltado pasa sin probar nada.
+    orq.fast_ask("hola", preload_sentinel=False)
+    assert cargas and cargas[0] == ("concilio-investigador", 16384), cargas
