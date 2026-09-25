@@ -1,6 +1,6 @@
 # Telegram Bot — Consensus Expert Agent + Sentinel Omega Bridge
 
-Bot de Telegram que integra el **Concilio** (pipeline secuencial worker → árbitro, umbral **85**) con **Sentinel Omega** (estado read-only + cola de alertas).
+Bot de Telegram que integra el **Concilio** (v1: vía directa con verificación por ejecución y, si no verifica, concilio secuencial) con **Sentinel Omega** (estado read-only + cola de alertas).
 
 ## Politica de alertas (no romper)
 

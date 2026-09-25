@@ -1,6 +1,9 @@
 # Propuesta — Concilio MoE por niveles y por turnos
 
-**Fecha:** 2026-09-24 · **Estado:** niveles definidos en `profiles/niveles.yaml`; motor de turnos pendiente
+**Fecha:** 2026-09-24 · **Estado (2026-09-25, v1):** niveles recalculados con caché `q8_0` y
+`codegemma:7b` de programador en `profiles/niveles.yaml`; motor de turnos (`engine/turnos.py`),
+adaptador y capitán (`engine/turnos_ollama.py`) **escritos y probados, NO cableados**: quedan
+para la v2. La v1 resolvió la carga con la **vía directa** + verificador, que no necesita niveles.
 
 Todos los números vienen de medir la instalación real (`/api/show`, `/api/embed`),
 no del manual.

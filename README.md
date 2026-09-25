@@ -1,84 +1,84 @@
-# Consenso de Expertos Multi-Modelo — Concilio
+# Concilio — modelos locales que comprueban su propio trabajo
 
-> Rama `local/concilio` del monorepo [`Inzainos/Local`](https://github.com/Inzainos/Local). Ver también `local/home-bridge`, `local/padron`, `local/sentinel-omega` y `local/watchdog`.  
+> Rama `local/concilio` del monorepo [`Inzainos/Local`](https://github.com/Inzainos/Local). Ver también `local/home-bridge`, `local/padron`, `local/sentinel-omega` y `local/watchdog`.
 > Origen local: `/home/deamon/consensus-expert-agent` en WSL2 Kali (**deamon** / X-Deamon). Licencia: [MIT](LICENSE).
 
+> **Home workspace:** reglas duras y mapa de proyectos en [`/home/deamon/AGENTS.md`](../AGENTS.md). Guía local para agentes: [`AGENTS.md`](./AGENTS.md).
 
-> **Sequential Concilio (2026-09-03):** lightest → medium → heavy → lightest verify; reentrada si score &lt; **85**; máx. 3 rondas. Un modelo Ollama a la vez. `.concilio` = DATA. `inject_sentinel_architecture: false` por defecto.
-
-> **Modelos:** `concilio-worker` (nemotron-mini) / `concilio-medium` (deepseek-r1:8b) / `concilio-arbitro` (gemma3:4b). Crear con `bash scripts/create_concilio_models.sh` (+ `ollama create concilio-medium -f modelfiles/Modelfile.medium`).
-
-> **Home workspace:** reglas duras y mapa de proyectos en [`/home/deamon/AGENTS.md`](../AGENTS.md). Guía local: [`AGENTS.md`](./AGENTS.md).
-
-Sistema multi-agente local impulsado por **Ollama**, con pipeline **Concilio**, sesiones `.concilio` fenced como DATA, puente Telegram, y fast path Gente/Estado **fuera** del Concilio.
-
-Protocolo: [`CONCILIO.md`](./CONCILIO.md). Handoff Gemma/memoria: [`docs/HANDOFF_GEMMA_MEMORIA.md`](./docs/HANDOFF_GEMMA_MEMORIA.md).
+Sistema multi-agente local sobre **Ollama**. La idea central de la **v1**: un modelo no decide si
+su código funciona **leyéndolo** — lo **ejecuta**. Medido el 2026-09-24/25, el árbitro leyendo puso
+92–99 de nota a códigos que rechazaban todos los casos válidos; ejecutándolos, suspendían.
 
 ---
 
-## Arquitectura del Concilio
+## Cómo funciona (v1)
 
 ```mermaid
 flowchart TD
-    User([Usuario]) --> Orch[Orchestrator Concilio]
-    Orch --> L1[1 LIGHTEST researcher]
-    L1 --> S1[Write .concilio + unload]
-    S1 --> M1[2 MEDIUM coder]
-    M1 --> S2[Write .concilio + unload]
-    S2 --> H1[3 HEAVY arbiter]
-    H1 --> S3[Write score .concilio + unload]
-    S3 --> V1[4 LIGHTEST verify %]
-    V1 --> Dec{score >= 85?}
-    Dec -- No --> Orch
-    Dec -- Si --> Syn[HEAVY synthesis + unload]
-    Syn --> Out([Respuesta final])
+    U([Tarea]) --> R{¿Código con una<br/>función nombrada?}
+    R -- sí --> D[Vía directa: el coder escribe<br/>la función, una llamada]
+    D --> V{Verificador:<br/>la ejecuta}
+    V -- casos de especificación,<br/>TODOS pasan --> OK([VERIFICADO])
+    V -- falla con casos fiables --> D2[2.º intento con<br/>los casos fallidos]
+    D2 --> V2{¿Todos pasan?}
+    V2 -- sí --> OK
+    V2 -- no --> C
+    V -- el enunciado no admite<br/>casos fiables --> SV([SIN VERIFICAR,<br/>rotulado])
+    R -- no --> C[Concilio: investigador → coder →<br/>árbitro + verificador, con frenos]
+    C --> F([Resultado del concilio])
 ```
 
-**Reglas duras del pipeline**
+**El verificador** construye los casos de prueba **desde el enunciado**, nunca desde la solución:
 
-1. Orden: lightest → medium → heavy → (lightest verify)
-2. Entre etapas: persistir `data/sessions/<id>.concilio` y unload del modelo previo
-3. Nunca dos modelos Ollama cargados
-4. Si score &lt; 85: reentrada completa hasta umbral o `max_refinement_rounds`
-5. Fences `.concilio` = DATA, no instrucciones
-6. Sin inyección de arquitectura Sentinel por defecto (`inject_sentinel_architecture: false`)
+- Para **validadores de formato** (tokens, matrículas…), un modelo extrae la especificación
+  —campos, longitudes, separadores— y **Python construye** casos balanceados de frontera: el
+  válido, uno más largo, uno más corto, sin separador, con un carácter prohibido. Un modelo lee
+  «35»; `len()` cuenta hasta 35. Con estos casos se exigen **todos**.
+- Para el resto, los casos los derivaría un modelo, y eso no es fiable: medido, aprobaron código
+  roto una noche y bloquearon código correcto la siguiente. Esas tareas se entregan **rotuladas
+  SIN VERIFICAR** en vez de aprobarse mal.
+
+Por qué la vía directa: codegemma resolvió 6 de 7 tareas a la primera en ~30 s cada una; el
+concilio tardaba 25–50 minutos por tarea. En la batería de aceptación de la v1 las siete tareas
+salieron en ~12 minutos en total.
 
 ---
 
-## Especialización de modelos
+## Modelos (todos elegidos midiendo)
 
-| Tier | Rol | Modelo Ollama | Responsabilidad |
-| :--- | :--- | :--- | :--- |
-| **LIGHTEST** | Worker-Research | `concilio-worker` → `nemotron-mini` | Investigación + verify % |
-| **MEDIUM** | Coder | `concilio-medium` → `deepseek-r1:8b` | Implementación / refinamiento |
-| **HEAVY** | Arbitro | `concilio-arbitro` → `gemma3:4b` | Auditoría, score, síntesis |
+| rol | modelo | ventana | medición que lo decidió |
+|---|---|---|---|
+| coder | `codegemma:7b` (respaldo `qwen2.5-coder:7b`) | 8.192 | 6/7 tareas, 72/73 casos a la primera; qwen 5/7, 60/73 |
+| extractor de formato | `qwen2.5-coder:7b` | 4.096 | el único de 5 que extrajo bien la especificación |
+| investigador | `concilio-investigador` (llama3.2:3b) | 16.384 | |
+| árbitro | `concilio-arbitro` (gemma3:4b) | 16.384 | lee y sintetiza; no decide si el código funciona |
 
-El coder MEDIUM ahora tiene modelo propio (DeepSeek R1, razonador); si falta cae al worker ligero. Un modelo a la vez (unload entre etapas), así DeepSeek 5.2GB carga solo.
+Caché KV de Ollama en `q8_0` + flash attention: `concilio-medium` a 16.384 pasó de 7,28 a
+6,21 GiB con +13 % de velocidad y sin pérdida en las sondas de calidad. El techo útil por modelo
+en esta máquina es ~7,3 GiB con Sentinel corriendo; `deepseek-r1:14b` no cabe.
 
 ---
 
 ## Inicio rápido
 
 ```bash
-source /home/deamon/consensus-expert-agent/.venv/bin/activate
 cd /home/deamon/consensus-expert-agent
-python main.py --check
-python main.py
-python main.py --task "Implementa Dijkstra con cola de prioridad"
-python main.py --web --port 8000
+.venv/bin/python main.py --check
+.venv/bin/python main.py --task "Escribe una funcion Python llamada es_ipv4(s: str) -> bool que ..."
+.venv/bin/python main.py --web --port 8000
+.venv/bin/python -m pytest tests/ -q -rs        # con el intérprete del entorno
 ```
 
 ### Telegram bot
 
 ```bash
 cp .env.example .env   # TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID (solo env; no hardcode)
-# Opcional Mini App: TELEGRAM_WEBAPP_URL=https://…/mini  (HTTPS público obligatorio)
 ./run_telegram_bot.sh
 ```
 
-Comandos útiles: `/status`, `/reporte` (Concilio health + cola + última sesión `.concilio`), `/task`.
-Mini App: servir `static/mini.html` vía `python main.py --web` → `http://127.0.0.1:8000/mini` (exponer HTTPS para Telegram).
-Detalle: [`TELEGRAM_BOT_README.md`](./TELEGRAM_BOT_README.md).
+`/task` va por la vía ligera; `/concilio` por `run_consensus` (vía directa y, si hace falta,
+concilio). El bot, el CLI y la web muestran los tres desenlaces: **Verificado por ejecución**,
+**SIN VERIFICAR** y el resultado del concilio. Detalle: [`TELEGRAM_BOT_README.md`](./TELEGRAM_BOT_README.md).
 
 ---
 
@@ -86,29 +86,35 @@ Detalle: [`TELEGRAM_BOT_README.md`](./TELEGRAM_BOT_README.md).
 
 ```yaml
 consensus:
-  threshold_score: 85
-  max_refinement_rounds: 3
-  auto_refine: true
+  threshold_score: 85              # sólo para lo que no se puede ejecutar
+  max_refinement_rounds: 0         # sin tope fijo: paran los frenos de abajo
+  rondas_sin_mejora_para_parar: 4  # mejora = por encima del ruido medido (σ 6,9)
 
 concilio:
-  enabled: true
-  inject_sentinel_architecture: false   # sin corpus Sentinel por run
-  sessions_dir: data/sessions
-  worker_model: concilio-worker
+  worker_model: concilio-investigador
+  coder_model: codegemma:7b
   arbiter_model: concilio-arbitro
-  hard_rules_stub: data/memory_packs/home_hard_rules_stub.md  # opcional, no forzado
-
-context_injector:
-  enabled: false   # Concilio thin
-  workspace_roots:
-    - /home/deamon/workspaces-dev
-    - /home/deamon/workspaces-test
-    - /home/deamon/workspaces
+  extractor_formato: qwen2.5-coder:7b
+  segmentador: ""                  # desactivado: empeoraba al coder (medido)
+  via_directa: true
+  intentos_directos: 2
+  sin_verificacion_confiable: entregar
+  inject_sentinel_architecture: false
 ```
 
-Prompts thin incluyen reglas del home (secretos/env, cero sintéticos, forward-only, no prod DB) **sin** exigir pack Sentinel. Ver comentarios al inicio de `config.yaml`.
+Cada opción lleva en `config.yaml` la medición que la justifica.
 
-Thin Modelfiles: `modelfiles/README.md`.
+---
+
+## Qué no hace la v1
+
+- **Investigación y análisis no se verifican**: no hay nada que ejecutar.
+- Código que no es validador de formato sale **sin verificar** (falta la verificación por
+  relaciones: `f('1h30m') == f('1h') + f('30m')`).
+- El motor de turnos por niveles (`engine/turnos*.py`, `profiles/niveles.yaml`) está escrito y
+  probado, pero **no cableado**. El índice vectorial, pendiente.
+
+Las tuberías anteriores están retiradas en [`legacy/`](./legacy/README.md).
 
 ---
 
@@ -118,11 +124,7 @@ Thin Modelfiles: `modelfiles/README.md`.
 |-------|-------------|
 | Home AGENTS | `/home/deamon/AGENTS.md` |
 | Stub reglas (opt) | `data/memory_packs/home_hard_rules_stub.md` |
-| Pack Sentinel (opt-in) | `data/memory_packs/sentinel_omega_pack.md` solo si inject=true |
-| Fast Gente/Estado | Fuera del Concilio |
+| Pack Sentinel (opt-in) | `data/memory_packs/sentinel_omega_pack.md` sólo si inject=true |
+| Sentinel ↔ Ollama | Sentinel sólo consulta la salud (`/api/tags`), no pide inferencias |
 
----
-
-## Changelog
-
-Ver [`CHANGELOG.md`](./CHANGELOG.md). Actual: **2.2.2** (Telegram `/status`+`/reporte`+Mini App) sobre **2.2.1** thin docs y **2.2.0** Concilio.
+Protocolo del concilio: [`CONCILIO.md`](./CONCILIO.md). Historial: [`CHANGELOG.md`](./CHANGELOG.md).
