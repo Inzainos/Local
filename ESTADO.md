@@ -5,7 +5,7 @@
 > modelo) no deje a nadie sin saber dónde se quedó. **Se actualiza cada vez que algo avanza.**
 > Si lo que dice aquí contradice al código, manda el código: verifícalo y corrige este archivo.
 
-**Última actualización:** 2026-09-25, durante la segunda pasada de aceptación de la v1.
+**Última actualización:** 2026-09-25, tras la 2.ª pasada de aceptación (cero consensos falsos).
 **Rama:** `local/concilio` (nunca push a `main`). **Operador:** Elán (responder en español).
 
 ---
@@ -36,10 +36,10 @@ Regla: no se toca systemd sin orden del operador. **Desplegar la v1 =**
 
 | qué | estado | cómo retomarlo si se cortó |
 |---|---|---|
-| **Aceptación v1, 2.ª pasada** (`bench/aceptacion.py`) | corriendo. `validar_token` verificada 16/16; `a_segundos`, `es_palindromo` sin verificar pero correctas; **`es_matricula` sin consenso, sin consenso falso** (ver abajo); quedan `es_bisiesto`, `a_romano`, `es_ipv4` | ver las pizarras en `data/shared_memory.db` (`blackboard_snapshots`), más fiables que el log; si murió, relanzar con Ollama libre |
-| **«Mejor intento verificado»** | por construir. En `es_matricula` la vía directa dio 15/16, el concilio lo EMPEORÓ a 8/16 en 3 rondas y se entregó el 8/16. Quedarse con el mejor intento medido y entregarlo, rotulado con lo que falla, si nadie cierra | diseño en el apartado 4 |
-| **CHANGELOG 3.0.0** | borrador fuera del repo; faltan las cifras de la aceptación | reescribir desde `git log --since=2026-09-24` y el apartado 3 |
-| **Etiqueta `v1.0-estable`** | sólo con **cero consensos falsos** en la aceptación | `git tag -a v1.0-estable` en `local/concilio`, sin push |
+| **Aceptación v1, 2.ª pasada** | **HECHA: cero consensos falsos**, 26,0 min. `validar_token` verificada 16/16 (1,1 min); `a_segundos`, `es_palindromo`, `es_bisiesto`, `a_romano`, `es_ipv4` sin verificar y las cinco correctas por la vara independiente; `es_matricula` escaló al concilio y no cerró (14,3 min) | — |
+| **Mejor intento verificado** (`51c0ba4`) | construido y probado; **corriendo su verificación en vivo** con `bench/aceptacion.py es_matricula`: debe entregar el 15/16 de la vía directa, no el 8/16 del concilio | relanzar `.venv/bin/python bench/aceptacion.py es_matricula` con Ollama libre; mirar la vara y que la síntesis diga «mejor intento medido» |
+| **CHANGELOG 3.0.0** | borrador fuera del repo; cifras ya disponibles salvo la del mejor intento | reescribir desde `git log --since=2026-09-24` y el apartado 3 |
+| **Etiqueta `v1.0-estable`** | lista para poner en cuanto el mejor intento se verifique en vivo | `git tag -a v1.0-estable` en `local/concilio`, sin push |
 
 **1.ª pasada de aceptación** (antes de `2565dfc`): 7 tareas en 12,4 min, **1 consenso falso**
 (`es_matricula` aprobada con 15/16 por el umbral de 85). Corregido: con casos de especificación
@@ -65,11 +65,8 @@ Detalle y porqués: `CHANGELOG.md` y los mensajes de commit (cada uno explica su
 ## 4. Qué falta
 
 **Para cerrar la v1** (antes de la etiqueta):
-1. Terminar la 2.ª pasada de aceptación con **cero consensos falsos**.
-1b. **Mejor intento verificado**: el orquestador guarda el candidato con más casos de
-   especificación acertados (vía directa y cada ronda del concilio); si nadie cierra, entrega ése
-   con su cifra y los casos que falla, en vez del último. Motivo medido: `es_matricula` 15/16 →
-   el concilio lo dejó en 8/16 y se entregó el 8/16.
+1. ~~2.ª pasada de aceptación con cero consensos falsos~~ — hecha.
+1b. ~~Mejor intento verificado~~ — construido (`51c0ba4`); falta verlo en vivo con `es_matricula`.
 2. CHANGELOG 3.0.0 con sus cifras, y la cifra del README si cambió.
 3. Commit + etiqueta `v1.0-estable`.
 
