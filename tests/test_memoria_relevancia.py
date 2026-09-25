@@ -202,3 +202,74 @@ def test_sin_nada_relevante_no_hay_bloque_de_memoria():
 def test_el_bloque_declara_la_relevancia():
     """Auditable: por que entro cada antecedente."""
     assert "rel=" in _bloque(TOKEN, _tareas(TOKEN))
+
+
+# ─── memoria envenenada ──────────────────────────────────────────────────────
+# Los siete hechos de knowledge_facts del 2026-09-24 se aprobaron antes del
+# arreglo del verificador, todos de codigo roto (acierto real 78%, 38%, 78%,
+# 50%), y se servian como «lo unico que el Concilio dio por bueno». Uno de
+# validar_token acabo inyectado en la tarea a_segundos.
+
+class _MemoriaConHechos(_MemoriaFalsa):
+    def __init__(self, tareas, hechos):
+        super().__init__(tareas)
+        self._hechos = hechos
+
+    def buscar_hechos(self, consulta, limite=2):
+        return list(self._hechos[:limite])
+
+
+def test_un_hecho_de_otra_tarea_no_entra_en_el_bloque():
+    """EL FALLO DEL 2026-09-25: un hecho de validar_token en a_segundos."""
+    from engine.orchestrator import ConsensusOrchestrator
+    from memory.blackboard import Blackboard
+    bb = Blackboard(task_id="actual", session_id="s", user_prompt=SEGUNDOS)
+    mem = _MemoriaConHechos(
+        _tareas(SEGUNDOS),
+        [{"key": TOKEN, "value": "sintesis rota del token",
+          "source_agent": "Concilio score=88/85"}])
+    orq = ConsensusOrchestrator.__new__(ConsensusOrchestrator)
+    bloque = ConsensusOrchestrator._bloque_memoria_historica(orq, mem, bb)
+    assert "a_segundos" in bloque, "el antecedente propio si debe entrar"
+    assert "sintesis rota del token" not in bloque, (
+        "un hecho de validar_token volvio a colarse en a_segundos")
+
+
+def test_no_se_archiva_lo_que_el_verificador_bloqueo():
+    """Score de LECTURA 96 >= 85, pero sin consenso: no es un hecho aprobado."""
+    from memory.blackboard import Blackboard
+    from memory.shared_context import SharedMemory
+
+    class _Almacen:
+        guardados = []
+
+        def save_fact(self, **k):
+            self.guardados.append(k)
+
+    m = SharedMemory.__new__(SharedMemory)
+    m.store = _Almacen()
+    bb = Blackboard(task_id="t", session_id="s", user_prompt="x")
+    bb.consensus_score, bb.consensus_threshold = 96, 85
+    bb.consensus_reached = False
+    bb.final_synthesis = "codigo que nadie ejecuto"
+    assert m.recordar_consenso(bb) is False
+    assert m.store.guardados == []
+
+
+def test_si_se_archiva_un_consenso_real():
+    from memory.blackboard import Blackboard
+    from memory.shared_context import SharedMemory
+
+    class _Almacen:
+        guardados = []
+
+        def save_fact(self, **k):
+            self.guardados.append(k)
+
+    m = SharedMemory.__new__(SharedMemory)
+    m.store = _Almacen()
+    bb = Blackboard(task_id="t", session_id="s", user_prompt="x")
+    bb.consensus_score, bb.consensus_threshold = 100, 85
+    bb.consensus_reached = True
+    bb.final_synthesis = "codigo verificado"
+    assert m.recordar_consenso(bb) is True

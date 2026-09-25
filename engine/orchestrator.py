@@ -320,8 +320,15 @@ class ConsensusOrchestrator:
         # de los antecedentes de arriba (enunciado + veredicto), aqui si va
         # contenido: son sintesis que pasaron el umbral.
         try:
-            hechos = shared_memory.buscar_hechos(
-                getattr(blackboard, "user_prompt", "") or "", limite=2
+            # Los hechos pasan por el MISMO filtro de relevancia que los
+            # antecedentes. El 2026-09-25 un hecho de validar_token entro en la
+            # tarea a_segundos: el filtro de cec6b61 cubria la lista de tareas
+            # previas y no esta segunda via.
+            crudos = shared_memory.buscar_hechos(enunciado, limite=6)
+            hechos = filtrar_por_relevancia(
+                enunciado,
+                [{**h, "user_prompt": h.get("key") or ""} for h in crudos],
+                limite=2,
             )
         except Exception:
             hechos = []

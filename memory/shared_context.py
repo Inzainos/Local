@@ -220,6 +220,17 @@ class SharedMemory:
         umbral = int(getattr(blackboard, "consensus_threshold", 0) or 0)
         if not umbral or score < umbral:
             return False
+        # EL CONSENSO TIENE QUE HABER OCURRIDO. Comparar solo score y umbral no
+        # basta: una ronda que el verificador BLOQUEO por no poder ejecutar
+        # conserva la puntuacion de LECTURA (96, por ejemplo) con
+        # consensus_reached=False, y se habria archivado como aprobada.
+        #
+        # Asi entraron los siete hechos de knowledge_facts del 2026-09-24,
+        # todos anteriores al arreglo del verificador y todos de codigo roto
+        # (acierto real medido 78%, 38%, 78%, 50%). Se servian despues como
+        # «lo unico que el Concilio dio por bueno».
+        if not getattr(blackboard, "consensus_reached", False):
+            return False
         sintesis = (getattr(blackboard, "final_synthesis", "") or "").strip()
         enunciado = (getattr(blackboard, "user_prompt", "") or "").strip()
         if not sintesis or not enunciado:
