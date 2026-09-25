@@ -199,10 +199,10 @@ def test_el_capitan_cabe_de_sobra(perfil):
 
 
 # ─── freno de estancamiento ───────────────────────────────────────────────────
-# El 2026-09-24 la tarea `horas_a_segundos` giro mas de nueve rondas sin que el
-# freno disparara, mientras la linea de tiempo de la sesion mostraba el MISMO
-# tamano de codigo ronda tras ronda (5763, 5763, 5763, 5753, 5753, 5753) y el
-# arbitro lo puntuaba en 8-10.
+# El 2026-09-24 la tarea `horas_a_segundos` giro unas cinco rondas (124 min) sin
+# que el freno disparara, las dos ultimas con el MISMO codigo, mientras el
+# arbitro la puntuaba en 8-10. (Primero lo conte como «quince rondas»: cada
+# ronda deja unas tres escrituras de codigo en el .concilio.)
 #
 # Causa: el freno comparaba `final_round_score > mejor_score`, estricto y sin
 # margen. La desviacion tipica medida del arbitro sobre cuatro corridas del

@@ -705,10 +705,15 @@ class ConsensusOrchestrator:
             #
             # SEÑAL 1 --- ENTREGABLE IDÉNTICO. Exacta, sin ruido: si el coder
             # reemite el mismo texto, no está refinando. Medido el 2026-09-24
-            # en la tarea `horas_a_segundos`, la línea de tiempo de la sesión
-            # mostraba seis rondas seguidas con el MISMO tamaño de código
-            # (5763, 5763, 5763, 5753, 5753, 5753) mientras el árbitro lo
-            # puntuaba en 8-10. Dos rondas iguales bastan para saberlo.
+            # en la tarea `horas_a_segundos`: unas cinco rondas en 124 min, las
+            # dos últimas con el MISMO código, mientras el árbitro puntuaba 8-10.
+            # Dos rondas iguales bastan para saberlo.
+            #
+            # OJO AL LEER EL .concilio: _sync_concilio_from_blackboard reescribe
+            # la sección de código tras CADA etapa, así que cada ronda deja unas
+            # tres entradas en la línea de tiempo. Leí esas entradas como rondas
+            # y dije «quince rondas, seis idénticas» cuando eran unas cinco y
+            # dos. Las rondas reales son los eventos «Ronda completa N».
             entregable = ""
             if blackboard.code_proposal is not None:
                 entregable = (getattr(blackboard.code_proposal, "code", "") or
