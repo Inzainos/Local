@@ -90,9 +90,26 @@ obligatorias (umbral único {threshold}; sin zona intermedia).
                         f"no verificable ({veredicto.error}): el score {score_leido} "
                         f"viene de LEER el codigo, no de ejecutarlo. La ronda NO "
                         f"puede declarar consenso")
+                elif not veredicto.error and not veredicto.discrimina:
+                    # LOS CASOS NO SIRVEN. Medido el 2026-09-24: 8 casos de los
+                    # que SIETE esperaban el mismo valor. Un codigo que devuelve
+                    # siempre esa constante saca 88% --- sobre el umbral de 85 ---
+                    # sin tener ninguna capacidad, y asi se declaro consenso
+                    # sobre un codigo que rechazaba los cuatro tokens validos.
+                    #
+                    # Ejecutar contra un conjunto asi no es verificar. Se trata
+                    # igual que "no se pudo verificar", porque la conclusion es
+                    # la misma: la ejecucion no demostro nada.
+                    blackboard.log_event(
+                        "VERIFY", self.name,
+                        f"{veredicto.resumen()} | el arbitro habia leido "
+                        f"{score_leido}. La ronda NO puede declarar consenso: "
+                        f"hacen falta casos balanceados")
                 else:
                     verificado = True
-                    score = veredicto.puntuacion
+                    # LA GANANCIA SOBRE LA BASE, no el acierto crudo. 7/8 con
+                    # base 7/8 es un 88% que vale cero.
+                    score = veredicto.puntuacion_util
                     aviso = ("" if veredicto.supera_la_base
                              else "  ATENCION: no supera la linea base trivial")
                     blackboard.log_event(

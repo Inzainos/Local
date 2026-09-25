@@ -348,3 +348,104 @@ def test_no_verificado_bajo_el_umbral_sigue_refinando():
                         verificado_por_ejecucion=False)
     assert not c.passed
     assert not any("alcanza el umbral" in e["message"] for e in bb.execution_timeline)
+
+
+# ─── CONJUNTOS DE CASOS QUE NO MIDEN NADA ─────────────────────────────────────
+# El 2026-09-24 el arbitro derivo 8 casos de los que SIETE esperaban el mismo
+# valor. Un codigo que devuelve siempre esa constante acierta 7 de 8 y saca 88%
+# --- por encima del umbral de 85 --- sin tener ninguna capacidad. Y eso ocurrio:
+# se declaro consenso sobre un codigo que rechazaba los cuatro tokens validos.
+#
+# Es el mismo error que yo cometi montando la primera vara de medir (2 positivos,
+# 7 negativos, `return False` sacaba 78%). Lo corregi en mi conjunto y no en el
+# del verificador.
+
+def test_el_conjunto_de_la_tarea_1_no_discrimina():
+    """EL CASO REAL: 7 aciertos de 8, con base trivial de 7 de 8."""
+    from engine.verificador import Veredicto
+    v = Veredicto(aciertos=7, total=8, linea_base=7)
+    assert v.puntuacion == 88, "el acierto crudo sigue siendo 88%"
+    assert not v.discrimina, "un conjunto con base 7/8 no puede medir nada"
+    assert v.puntuacion_util == 0, "igualar la base es cero merito"
+    assert "NO DISCRIMINA" in v.resumen()
+
+
+def test_un_conjunto_balanceado_si_discrimina():
+    from engine.verificador import Veredicto
+    v = Veredicto(aciertos=8, total=8, linea_base=4)
+    assert v.discrimina and v.puntuacion_util == 100
+
+
+def test_pocos_casos_no_permiten_concluir():
+    from engine.verificador import Veredicto
+    v = Veredicto(aciertos=3, total=3, linea_base=2)
+    assert not v.discrimina, "tres casos no bastan"
+    assert v.puntuacion_util == 0
+
+
+def test_la_puntuacion_util_mide_ganancia_sobre_la_base():
+    """(aciertos - base) / (total - base). Igualar la base da 0, todo da 100."""
+    from engine.verificador import Veredicto
+    assert Veredicto(aciertos=4, total=8, linea_base=4).puntuacion_util == 0
+    assert Veredicto(aciertos=6, total=8, linea_base=4).puntuacion_util == 50
+    assert Veredicto(aciertos=8, total=8, linea_base=4).puntuacion_util == 100
+
+
+def test_un_veredicto_con_error_no_discrimina():
+    from engine.verificador import Veredicto
+    v = Veredicto(0, 8, error="la solucion no compila: SyntaxError")
+    assert not v.discrimina and v.puntuacion_util == 0
+
+
+# ─── el arbitro no debe cerrar con casos que no miden ────────────────────────
+
+def _arbitro_con_veredicto(monkeypatch, veredicto):
+    """Arbitro cuyo verificador devuelve `veredicto`, sin tocar Ollama."""
+    from agents.optimizer import OptimizerAgent
+    from memory.blackboard import Blackboard
+
+    a = OptimizerAgent.__new__(OptimizerAgent)
+    a.name = "arbitro"
+    monkeypatch.setattr(a, "generate",
+                        lambda **k: "Analisis. [PUNTUACION_CONSENSO: 96]",
+                        raising=False)
+    monkeypatch.setattr(a, "_verificar_ejecutando",
+                        lambda bb: (veredicto, []), raising=False)
+    bb = Blackboard(task_id="t", session_id="s",
+                    user_prompt="Escribe validar_token_telegram(token)")
+    bb.update_code("```python\ndef validar_token_telegram(t): return False\n```")
+
+    class _Mem:                       # evaluate_solution recibe la memoria
+        blackboard = bb
+    return a, _Mem(), bb
+
+
+def test_con_casos_que_no_discriminan_no_hay_consenso(monkeypatch):
+    """EL FALLO DEL 2026-09-24, de punta a punta."""
+    from engine.verificador import Veredicto
+    a, mem, bb = _arbitro_con_veredicto(monkeypatch, Veredicto(7, 8, linea_base=7))
+    c = a.evaluate_solution(mem, threshold=85, espera_codigo=True)
+    assert not c.passed, ("88% crudo sobre un conjunto con base 7/8 volvio a "
+                          "declarar consenso")
+    assert c.verificado_por_ejecucion is False
+    assert any("NO DISCRIMINA" in e["message"] or "balanceados" in e["message"]
+               for e in bb.execution_timeline)
+
+
+def test_con_casos_buenos_el_score_es_la_ganancia(monkeypatch):
+    """No el acierto crudo: 6/8 con base 4 son 50, no 75."""
+    from engine.verificador import Veredicto
+    a, mem, bb = _arbitro_con_veredicto(monkeypatch, Veredicto(6, 8, linea_base=4))
+    c = a.evaluate_solution(mem, threshold=85, espera_codigo=True)
+    assert c.score == 50, f"uso {c.score}; el crudo (75) engana"
+    assert c.verificado_por_ejecucion is True
+    assert not c.passed
+
+
+def test_un_codigo_correcto_si_pasa(monkeypatch):
+    """El cierre no puede ser solo un freno: tiene que dejar pasar lo bueno."""
+    from engine.verificador import Veredicto
+    a, mem, bb = _arbitro_con_veredicto(monkeypatch, Veredicto(8, 8, linea_base=4))
+    c = a.evaluate_solution(mem, threshold=85, espera_codigo=True)
+    assert c.score == 100 and c.passed
+    assert c.verificado_por_ejecucion is True

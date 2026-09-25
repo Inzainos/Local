@@ -67,6 +67,19 @@ logger.addHandler(logging.NullHandler())
 LIMITE_SEGUNDOS = 20
 LIMITE_MEMORIA_MB = 512
 
+# ─── CUÁNDO UN CONJUNTO DE CASOS NO SIRVE ────────────────────────────────────
+# Medido el 2026-09-24: el árbitro derivó 8 casos de los que SIETE esperaban el
+# mismo valor. Un código que devuelve siempre esa constante acierta 7 de 8 y
+# saca 88% --- por encima del umbral de 85 --- sin tener ninguna capacidad. Y eso
+# es exactamente lo que pasó: se declaró consenso sobre un código que rechazaba
+# los cuatro tokens válidos.
+#
+# Es el mismo error que yo mismo cometí montando la primera vara de medir (2
+# positivos, 7 negativos, `return False` sacaba 78%). Ahí lo corregí en mi
+# conjunto y no en el del verificador.
+MINIMO_CASOS = 4              # menos de 4 no permite concluir nada
+MAXIMA_PROPORCION_BASE = 0.70  # si una constante acierta más, el conjunto no mide
+
 
 # ─── ESTRUCTURAS ─────────────────────────────────────────────────────────────
 
@@ -99,6 +112,39 @@ class Veredicto:
         return round(100 * self.aciertos / self.total)
 
     @property
+    def discrimina(self) -> bool:
+        """¿El conjunto de casos permite distinguir competencia de constancia?
+
+        Un conjunto desbalanceado premia a quien responde siempre lo mismo. Si
+        la línea base trivial ya supera `MAXIMA_PROPORCION_BASE`, ejecutar
+        contra él no informa: no es una verificación, es una lotería con el
+        resultado cargado.
+        """
+        if self.error or self.total < MINIMO_CASOS:
+            return False
+        return (self.linea_base / self.total) <= MAXIMA_PROPORCION_BASE
+
+    @property
+    def puntuacion_util(self) -> int:
+        """0-100 por acierto POR ENCIMA de la línea base trivial.
+
+        `puntuacion` es el acierto crudo y sirve para informar. Pero el acierto
+        crudo de un conjunto con base alta engaña: 7/8 con base 7/8 es un 88%
+        que vale cero. Esto mide la ganancia sobre la constante, que es la
+        misma normalización que usamos en Sentinel para la ganancia de Molchan:
+
+            (aciertos - base) / (total - base)
+
+        Así, igualar la base da 0 y acertar todo da 100.
+        """
+        if self.error or not self.discrimina:
+            return 0
+        margen = self.total - self.linea_base
+        if margen <= 0:
+            return 0
+        return max(0, min(100, round(100 * (self.aciertos - self.linea_base) / margen)))
+
+    @property
     def supera_la_base(self) -> bool:
         """¿Vale más que devolver siempre la misma respuesta?
 
@@ -111,9 +157,15 @@ class Veredicto:
     def resumen(self) -> str:
         if self.error:
             return f"no verificable: {self.error}"
+        if not self.discrimina:
+            razon = (f"solo {self.total} casos" if self.total < MINIMO_CASOS
+                     else f"la base trivial es {self.linea_base}/{self.total}")
+            return (f"{self.aciertos}/{self.total} = {self.puntuacion}% pero el "
+                    f"CONJUNTO NO DISCRIMINA ({razon}): no se puede concluir nada")
         estado = "supera la base" if self.supera_la_base else "NO supera la base trivial"
-        return (f"{self.aciertos}/{self.total} = {self.puntuacion}% "
-                f"(base {self.linea_base}/{self.total}) --- {estado}")
+        return (f"{self.aciertos}/{self.total} = {self.puntuacion}% crudo, "
+                f"{self.puntuacion_util}% sobre la base "
+                f"({self.linea_base}/{self.total}) --- {estado}")
 
 
 # ─── DERIVACIÓN DE CASOS (del enunciado) ─────────────────────────────────────
