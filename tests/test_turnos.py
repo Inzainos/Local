@@ -453,8 +453,8 @@ def test_la_sintesis_prohibe_repetir_las_instrucciones():
 def test_el_respaldo_no_tumba_la_corrida():
     import inspect
 
-    from agents.base_agent import BaseAgent
-    fuente = inspect.getsource(BaseAgent.generate)
+    from agents.base_agent import BaseExpertAgent
+    fuente = inspect.getsource(BaseExpertAgent.generate)
     tras_fallback = fuente.split('payload["model"] = self.fallback_model', 1)[1]
     assert "try:" in tras_fallback.split("raise e", 1)[0], \
         "la llamada al modelo de respaldo debe ir protegida"
@@ -465,8 +465,8 @@ def test_el_error_que_se_propaga_es_el_original():
     está en el primero."""
     import inspect
 
-    from agents.base_agent import BaseAgent
-    assert "raise e from e_fb" in inspect.getsource(BaseAgent.generate)
+    from agents.base_agent import BaseExpertAgent
+    assert "raise e from e_fb" in inspect.getsource(BaseExpertAgent.generate)
 
 
 def test_el_tiempo_limite_cubre_las_etapas_medidas():
