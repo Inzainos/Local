@@ -212,12 +212,12 @@ class MotorTurnos:
         self,
         perfil: Dict,
         invocar: Callable[[str, str, int], Tuple[str, int, str, List[str]]],
-        cargar_exclusivo: Optional[Callable[[str], None]] = None,
+        cargar_exclusivo: Optional[Callable[[str, Optional[int]], None]] = None,
         memoria: Optional[MemoriaTurnos] = None,
     ) -> None:
         self.perfil = perfil
         self._invocar = invocar
-        self._cargar = cargar_exclusivo or (lambda _m: None)
+        self._cargar = cargar_exclusivo or (lambda _m, _ventana=None: None)
         cfg_mem = perfil.get("memoria", {}) or {}
         self.memoria = memoria or MemoriaTurnos(
             cfg_mem.get("store", "data/moe_turnos.jsonl"),
@@ -250,9 +250,19 @@ class MotorTurnos:
             tokens = presupuesto_material(self.escalado, ventana, i)
             ctx = componer_contexto(enunciado, turnos, material, tokens * 4)
 
-            logger.info("turno %d · %s (%s) · material ~%d tokens",
-                        i, rol, modelo, tokens)
-            self._cargar(modelo)
+            logger.info("turno %d · %s (%s) · ventana %d · material ~%d tokens",
+                        i, rol, modelo, ventana, tokens)
+            # LA VENTANA VA EN LA PRECARGA, no solo en la invocación. Medido el
+            # 2026-09-24: sin num_ctx en la carga, Ollama reserva caché para la
+            # ventana COMPLETA del modelo y el generate posterior ya no puede
+            # reducirla sin recargar. deepseek-r1:8b quedaba en 23,93 GiB
+            # medidos, de los que sólo 2,2 entraban en la GPU.
+            #
+            # La firma anterior era Callable[[str], None] y se llamaba con el
+            # modelo a secas, así que el motor de turnos habría reproducido ese
+            # desastre entero en cuanto se cableara. Ningún test inyectaba
+            # cargar_exclusivo, así que nada lo delataba.
+            self._cargar(modelo, ventana)
 
             t0 = time.time()
             try:

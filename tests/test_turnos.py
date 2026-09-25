@@ -502,3 +502,60 @@ def test_el_tiempo_limite_cubre_las_etapas_medidas():
         (Path(__file__).resolve().parents[1] / "config.yaml").read_text(encoding="utf-8"))
     t = cfg["ollama"]["timeout_seconds"]
     assert t >= 600, f"timeout_seconds={t} no cubre una etapa de 8,7 min"
+
+
+# ─── la ventana tiene que llegar a la PRECARGA ────────────────────────────────
+# Medido el 2026-09-24: num_ctx en la invocación NO basta. Quien fija la caché
+# reservada es la carga del modelo; si se omite ahí, Ollama aparta la ventana
+# completa (deepseek-r1:8b a 131.072 = 23,93 GiB medidos, host de 11,71) y el
+# generate posterior no puede reducirla sin recargar.
+#
+# La firma de cargar_exclusivo era Callable[[str], None] y se llamaba con el
+# modelo a secas: el motor habría reproducido ese desastre al cablearse. Ningún
+# test lo inyectaba, así que nada lo delataba.
+
+def test_la_precarga_recibe_la_ventana_del_turno():
+    from engine.turnos import MotorTurnos
+
+    cargas = []
+    perfil = {
+        "consenso": {"umbral_nivel": 85},
+        "memoria": {"store": "/dev/null", "turnos_visibles": 3},
+        "escalado_contexto": {"por_ventana": {4096: 1200, 16384: 4000},
+                              "por_turno": {1: 1.0, 2: 0.6},
+                              "reserva_para_generacion": 0.25},
+        "codigo": {"ligero": {"techo_ram_gb": 6.4, "turnos": [
+            {"model": "llama3.2:3b", "rol": "esbozo", "ctx": 16384},
+            {"model": "nemotron-mini", "rol": "portero", "ctx": 4096},
+        ]}},
+    }
+    motor = MotorTurnos(
+        perfil,
+        invocar=lambda modelo, ctx, ventana: ("PASO", 90, "borrador", []),
+        cargar_exclusivo=lambda modelo, ventana=None: cargas.append((modelo, ventana)),
+    )
+    motor.correr_nivel("t1", "haz algo", "codigo", "ligero")
+
+    assert cargas == [("llama3.2:3b", 16384), ("nemotron-mini", 4096)], (
+        f"la precarga recibio {cargas}: la ventana de cada turno tiene que "
+        f"llegar a quien carga el modelo, no solo a quien lo invoca")
+
+
+def test_sin_cargador_inyectado_no_revienta():
+    """El cargador por defecto tiene que aceptar la ventana igual."""
+    from engine.turnos import MotorTurnos
+
+    perfil = {
+        "consenso": {"umbral_nivel": 85},
+        "memoria": {"store": "/dev/null", "turnos_visibles": 3},
+        "escalado_contexto": {"por_ventana": {4096: 1200},
+                              "por_turno": {1: 1.0},
+                              "reserva_para_generacion": 0.25},
+        "codigo": {"ligero": {"techo_ram_gb": 3.2, "turnos": [
+            {"model": "nemotron-mini", "rol": "esbozo", "ctx": 4096},
+        ]}},
+    }
+    r = MotorTurnos(perfil,
+                    invocar=lambda m, c, v: ("PASO", 90, "listo", [])
+                    ).correr_nivel("t2", "haz algo", "codigo", "ligero")
+    assert r.borrador_final == "listo"
