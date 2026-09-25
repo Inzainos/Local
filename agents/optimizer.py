@@ -119,7 +119,15 @@ obligatorias (umbral único {threshold}; sin zona intermedia).
                         f"habia leido {score_leido}. La ronda NO puede declarar consenso: "
                         f"hacen falta casos balanceados")
                 else:
-                    verificado = True
+                    # Solo los casos construidos desde la ESPECIFICACION
+                    # verifican. Los que deriva un modelo no son fiables en
+                    # ninguna direccion --- medido: aprobaron codigo roto el
+                    # 2026-09-24 y bloquearon codigo correcto el 25 ('2h' -> 120)
+                    # --- asi que informan al coder, rotulados, pero NO
+                    # declaran consenso. Politica de la v1: una tarea que no se
+                    # puede verificar se bloquea con honestidad en vez de
+                    # aprobarse mal.
+                    verificado = veredicto.via == "especificacion"
                     # LA GANANCIA SOBRE LA BASE, no el acierto crudo. 7/8 con
                     # base 7/8 es un 88% que vale cero.
                     score = veredicto.puntuacion_util
@@ -182,6 +190,13 @@ obligatorias (umbral único {threshold}; sin zona intermedia).
             # para a_segundos, como llama3.2, gemma3 y mistral. Ademas asi la
             # verificacion la hace un modelo DISTINTO del que puntua leyendo.
             from engine.tool_agent import run_with_tools
+            # OJO: en el orquestador el arbitro NO tiene lifecycle (None), asi
+            # que esta rama no se ejecuta y NO es la que garantiza la
+            # exclusividad. Medido el 2026-09-25: con gemma3 cargado a 16.384 y
+            # esta llamada a qwen, /api/ps mostro SOLO qwen --- el planificador
+            # de Ollama desalojo a gemma3 al no caber ambos. Es el servidor el
+            # que lo impide, y solo cuando no hay memoria: en una maquina mayor
+            # podrian convivir, que es lo correcto.
             if self.lifecycle is not None:
                 self.lifecycle.ensure_exclusive(self.extractor_formato,
                                                 num_ctx=4096)

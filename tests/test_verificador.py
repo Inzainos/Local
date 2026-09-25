@@ -435,7 +435,9 @@ def test_con_casos_que_no_discriminan_no_hay_consenso(monkeypatch):
 def test_con_casos_buenos_el_score_es_la_ganancia(monkeypatch):
     """No el acierto crudo: 6/8 con base 4 son 50, no 75."""
     from engine.verificador import Veredicto
-    a, mem, bb = _arbitro_con_veredicto(monkeypatch, Veredicto(6, 8, linea_base=4))
+    v = Veredicto(6, 8, linea_base=4)
+    v.via = "especificacion"
+    a, mem, bb = _arbitro_con_veredicto(monkeypatch, v)
     c = a.evaluate_solution(mem, threshold=85, espera_codigo=True)
     assert c.score == 50, f"uso {c.score}; el crudo (75) engana"
     assert c.verificado_por_ejecucion is True
@@ -445,7 +447,9 @@ def test_con_casos_buenos_el_score_es_la_ganancia(monkeypatch):
 def test_un_codigo_correcto_si_pasa(monkeypatch):
     """El cierre no puede ser solo un freno: tiene que dejar pasar lo bueno."""
     from engine.verificador import Veredicto
-    a, mem, bb = _arbitro_con_veredicto(monkeypatch, Veredicto(8, 8, linea_base=4))
+    v = Veredicto(8, 8, linea_base=4)
+    v.via = "especificacion"
+    a, mem, bb = _arbitro_con_veredicto(monkeypatch, v)
     c = a.evaluate_solution(mem, threshold=85, espera_codigo=True)
     assert c.score == 100 and c.passed
     assert c.verificado_por_ejecucion is True
@@ -693,3 +697,20 @@ def test_la_orden_confiable_distingue_las_dos_vias():
     confiable = bb.get_context_for_refinement()
     confiable = confiable[confiable.rfind("INSTRUCCIÓN DEL SISTEMA (confiable)"):]
     assert "PROPUSO un modelo" in confiable and "no rompas" in confiable
+
+
+
+def test_casos_derivados_no_declaran_consenso_ni_con_100(monkeypatch):
+    """Politica de la v1: solo verifica lo construido desde la especificacion.
+
+    Los casos que deriva un modelo fallan en las dos direcciones --- aprobaron
+    codigo roto el 2026-09-24 y bloquearon codigo correcto el 25 --- asi que ni
+    un 100% sobre ellos es una verificacion.
+    """
+    from engine.verificador import Veredicto
+    v = Veredicto(8, 8, linea_base=4)
+    v.via = "derivados"
+    a, mem, bb = _arbitro_con_veredicto(monkeypatch, v)
+    c = a.evaluate_solution(mem, threshold=85, espera_codigo=True)
+    assert c.score == 100
+    assert not c.passed and c.verificado_por_ejecucion is False
