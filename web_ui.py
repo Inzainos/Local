@@ -247,10 +247,21 @@ HTML_TEMPLATE = """
                 }
                 
                 // Actualizar badges
-                scoreBadge.textContent = `Score: ${data.consensus_score ?? 0}/100`;
-                scoreBadge.className = data.consensus_reached 
-                    ? 'text-xs font-bold px-2.5 py-1 rounded bg-emerald-950 text-emerald-400 border border-emerald-800'
-                    : 'text-xs font-bold px-2.5 py-1 rounded bg-amber-950 text-amber-400 border border-amber-800';
+                // La via directa no pasa por el concilio: mismos desenlaces que
+                // el bot y el CLI, para que ninguna pantalla diga algo falso.
+                const via = (data.shared_notes || {}).via || '';
+                const verde = 'text-xs font-bold px-2.5 py-1 rounded bg-emerald-950 text-emerald-400 border border-emerald-800';
+                const ambar = 'text-xs font-bold px-2.5 py-1 rounded bg-amber-950 text-amber-400 border border-amber-800';
+                if (via === 'directa_verificada') {
+                    scoreBadge.textContent = `Verificado por ejecución · vía directa (${data.consensus_score ?? 0}%)`;
+                    scoreBadge.className = verde;
+                } else if (via === 'directa_sin_verificar') {
+                    scoreBadge.textContent = 'SIN VERIFICAR · vía directa — revisar antes de usar';
+                    scoreBadge.className = ambar;
+                } else {
+                    scoreBadge.textContent = `Score: ${data.consensus_score ?? 0}/100`;
+                    scoreBadge.className = data.consensus_reached ? verde : ambar;
+                }
 
                 // Render Markdown
                 const synthesis = data.final_synthesis || 'El agente no produjo una síntesis final.';
