@@ -86,16 +86,32 @@ memoria:
   turnos_visibles: 6
 
 capitan:
-  model: nemotron-mini
+  model: llama3.2:3b
   temperature: 0.0
-  # nemotron-mini NO es un razonador y aquí no hace falta que lo sea. Su
-  # trabajo es DECIDIR rápido: leer el enunciado y devolver una etiqueta
-  # (investigación | código) y un nivel de entrada. Nada de cadenas de
-  # pensamiento, nada de explorar.
+  # ERA nemotron-mini. Cambiado el 2026-09-24 por decisión del operador:
+  # nemotron-mini se reserva SOLO para el portero, que es donde su velocidad
+  # rinde, y no participa en ninguna otra tarea mientras no lo probemos.
   #
-  # Su ventana de 4.096 --- la más estrecha de la instalación --- deja de ser
-  # un defecto aquí: clasificar no necesita contexto profundo, solo el
-  # enunciado y una nota de alcance. Y es de los más rápidos.
+  # Y las cifras medidas hoy respaldan el cambio en los tres ejes:
+  #
+  #                   peso   huella@4096   ventana nativa
+  #   nemotron-mini   2,51      3,2 GiB          4.096
+  #   llama3.2:3b     1,88      2,4 GiB        131.072
+  #
+  # llama3.2:3b es MÁS PEQUEÑO, ocupa 0,8 GiB menos y tiene 32 veces más
+  # ventana. Sus 2,4 GiB lo dejan al borde de caber entero en la VRAM de 4 GiB,
+  # que es la diferencia entre segundos y minutos.
+  #
+  # Y un ahorro que no es cosmético: llama3.2:3b es también el explorador del
+  # primer turno de investigación, así que capitán y primer turno son el MISMO
+  # modelo y se ahorra un intercambio. Medido en la corrida de las 19:01,
+  # cambiar de modelo fue 6m30 de 20m07 --- el 32% del tiempo total.
+  #
+  # Lo que NO está medido es si razona mejor que nemotron-mini para clasificar.
+  # Hay que probarlo antes de afirmarlo.
+  #
+  # Su trabajo sigue siendo DECIDIR, no razonar: leer el enunciado y devolver
+  # un área y un nivel de entrada. Nada de cadenas de pensamiento.
   #
   # Se usa decodificación restringida (Ollama `format`) para que devuelva la
   # etiqueta y ya, en vez de confiar en que obedezca "responde SOLO con...".
@@ -221,7 +237,8 @@ escalado_contexto:
   # entrada, del que el MATERIAL nuevo se lleva un tercio y el ACUMULADO el
   # resto. El acumulado manda porque sin él no hay refinamiento.
   por_ventana:
-    4096:   1200      # nemotron-mini (capitán, portero): ya filtrado
+    4096:   1200      # nemotron-mini (portero): ya filtrado
+    2048:    600      # el capitán clasifica; no necesita más
     12288:  3000      # deepseek-r1:8b --- el experto es quien MENOS sitio tiene
     16384:  4000      # llama3.2, gemma3, mistral
     24576:  6000      # deepseek-r1:8b en el perfil `maximo` (Sentinel parado)

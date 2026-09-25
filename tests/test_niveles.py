@@ -157,3 +157,42 @@ def test_el_modelo_de_huella_predice_lo_medido():
         err = abs(calc - medido) / medido
         assert err < 0.05, (f"{modelo}@{ctx}: calculado {calc:.2f} contra "
                             f"{medido} medido, error {100*err:.1f}%")
+
+
+# ─── nemotron-mini queda reservado al portero ─────────────────────────────────
+# Decision del operador el 2026-09-24: nemotron-mini SOLO como portero, donde su
+# velocidad rinde, y fuera de cualquier otra tarea mientras no lo probemos.
+#
+# Las cifras medidas lo respaldan en los tres ejes frente a llama3.2:3b:
+#
+#                   peso   huella@4096   ventana nativa
+#   nemotron-mini   2,51      3,2 GiB          4.096
+#   llama3.2:3b     1,88      2,4 GiB        131.072
+#
+# Lo que NO esta medido es si razona mejor para clasificar. Eso hay que probarlo.
+
+def test_nemotron_solo_es_portero(perfil):
+    assert perfil["portero"]["model"] == "nemotron-mini"
+    assert perfil["capitan"]["model"] != "nemotron-mini", (
+        "el capitan era nemotron-mini; llama3.2:3b es mas pequeno, ocupa 0,8 GiB "
+        "menos y tiene 32 veces mas ventana")
+    for fam, niv, modelo, _ in _turnos(perfil):
+        assert "nemotron" not in modelo, f"{fam}/{niv} monta {modelo}"
+    for k in perfil["juez"]:
+        assert "nemotron" not in perfil["juez"][k]["model"]
+
+
+def test_nemotron_no_es_respaldo_de_nadie():
+    """Un respaldo silencioso a nemotron-mini es participar «en las demas tareas»."""
+    fuente = (RAIZ / "engine" / "orchestrator.py").read_text(encoding="utf-8")
+    asignaciones = [l.strip() for l in fuente.splitlines()
+                    if "nemotron-mini" in l and "=" in l and not l.strip().startswith("#")]
+    assert not asignaciones, "nemotron-mini asignado como modelo:\n  " + "\n  ".join(asignaciones)
+
+
+def test_el_capitan_cabe_de_sobra(perfil):
+    """El capitan corre en TODA tarea: su huella es un coste fijo."""
+    m = perfil["capitan"]["model"]
+    assert huella(m, 4096) < 3.0, (
+        f"{m} a 4096 mide {huella(m, 4096):.1f} GiB; el capitan se paga en cada "
+        f"encargo y por encima de ~2,5 no cabe entero en la VRAM de 4 GiB")

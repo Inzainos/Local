@@ -67,7 +67,7 @@ class ConsensusOrchestrator:
         arbiter_model = self._resolve_model(preferred_arbiter, base_arbiter)
         # The heavy arbiter base (gemma3) is ONLY final arbiter — never a worker.
         if "gemma3" in worker_model.lower() or worker_model == arbiter_model:
-            worker_model = base_worker if "gemma3" not in base_worker.lower() else "nemotron-mini"
+            worker_model = base_worker if "gemma3" not in base_worker.lower() else "llama3.2:3b"
 
         # MEDIUM coder can have its OWN model (e.g. DeepSeek) distinct from the
         # LIGHTEST researcher. Falls back to the worker if not configured/present.
@@ -177,10 +177,10 @@ class ConsensusOrchestrator:
                 cfg_arbitro,
                 "gemma3:4b",
             ]
-        worker = next((m for m in worker_candidates if m and exists(m)), "nemotron-mini")
+        worker = next((m for m in worker_candidates if m and exists(m)), "llama3.2:3b")
         arbitro = next((m for m in arbiter_candidates if m and exists(m)), "gemma3:4b")
         if "gemma3" in worker.lower() or worker == arbitro:
-            worker = next((m for m in worker_candidates if m and "gemma" not in m.lower() and exists(m)), "nemotron-mini")
+            worker = next((m for m in worker_candidates if m and "gemma" not in m.lower() and exists(m)), "llama3.2:3b")
         # MEDIUM coder: modelo propio (DeepSeek) distinto del researcher; cae al worker.
         coder_candidates = [
             "concilio-medium",
@@ -194,9 +194,19 @@ class ConsensusOrchestrator:
         self.researcher.model = worker
         self.coder.model = coder
         self.optimizer.model = arbitro
-        self.researcher.fallback_model = "nemotron-mini"
+        # Los respaldos CONFIGURADOS se respetan. Esta funcion los pisaba con
+        # "nemotron-mini" aunque config.yaml declara `fallback_model:
+        # llama3.2:3b` para el investigador --- el mismo patron que ya se
+        # corrigio para el modelo principal: una lista fija ganandole a la
+        # configuracion sin que nadie lo pidiera.
+        #
+        # Y nemotron-mini queda reservado SOLO para el portero (decision del
+        # operador, 2026-09-24): no entra como respaldo de ningun otro rol.
+        if not self.researcher.fallback_model:
+            self.researcher.fallback_model = "llama3.2:3b"
         self.coder.fallback_model = worker   # si DeepSeek falla, cae al worker ligero
-        self.optimizer.fallback_model = "gemma3:4b" if exists("gemma3:4b") else "nemotron-mini"
+        if not self.optimizer.fallback_model:
+            self.optimizer.fallback_model = "gemma3:4b" if exists("gemma3:4b") else "llama3.2:3b"
 
     def _load_config(self, path: str) -> Dict[str, Any]:
         if not os.path.exists(path):

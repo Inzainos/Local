@@ -21,10 +21,10 @@ def render_banner():
     banner_text = """
     ╔══════════════════════════════════════════════════════════════════╗
     ║       CONCILIO — cadena secuencial (standalone)                  ║
-    ║   • Worker-Research (nemotron-mini / concilio-worker)           ║
-    ║   • Worker-Coder    (nemotron-mini / concilio-worker)           ║
+    ║   • Investigador    (llama3.2:3b / concilio-investigador)        ║
+    ║   • Coder           (deepseek-r1:8b / concilio-medium)           ║
     ║   • Árbitro         (gemma3:4b / concilio-arbitro)               ║
-    ║   Umbral 85 · unload entre roles · sessions/*.concilio           ║
+    ║   Umbral 85 · num_ctx 16.384 · unload entre roles                ║
     ╚══════════════════════════════════════════════════════════════════╝
     """
     console.print(Panel(banner_text, style="bold cyan", expand=False))

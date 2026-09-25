@@ -168,7 +168,7 @@ class DecisionCapitan(NamedTuple):
 
 def elegir_area_y_nivel(
     enunciado: str,
-    modelo: str = "nemotron-mini",
+    modelo: str = "llama3.2:3b",
     ollama_host: str = "http://127.0.0.1:11434",
     nota_de_alcance: str = "",
     ventana: int = 2048,
@@ -176,8 +176,9 @@ def elegir_area_y_nivel(
     """Clasifica el encargo. El Capitán decide; no razona ni explora.
 
     No recibe el pack de memoria a propósito: clasificar no necesita contexto
-    profundo, y nemotron-mini tiene una ventana nativa de 4.096 tokens --- un
-    pack de ~4.000 la saturaría casi entera.
+    profundo. El modelo por defecto es llama3.2:3b --- nemotron-mini se reserva
+    solo para el portero --- y aunque su ventana nativa es de 131.072 aquí se
+    le dan 2.048: el enunciado y una nota de alcance, nada más.
     """
     esquema = {
         "type": "object",
