@@ -1,3 +1,24 @@
+## [3.0.1] - 2026-09-25 — el verificador rechazaba código correcto por otra redacción
+
+Primera tarea real tras desplegar la v1, por Telegram: «validar_token_telegram … que acepte
+identificador numerico, DOS PUNTOS y un secreto de EXACTAMENTE 35…». El código del concilio era
+correcto (`^[0-9]+:[A-Za-z0-9_-]{35}$`) y se entregó «SIN CONSENSO 15/16» porque un caso
+construido estaba mal: `'18:<35 válidos>'` → `False`.
+
+- **Causa**: el extractor dio al identificador longitud máxima 1 y la defensa «el número tiene
+  que aparecer en el texto» lo aceptó porque «**un** secreto» contaba como 1. La excepción del 1
+  era para el mínimo implícito y cubría también el máximo.
+- **Arreglo** (`engine/especificacion.py`): «un/una» ya no cuentan como 1 (artículos); el «dos»
+  de «dos puntos» ya no cuenta como 2 (se quitan los separadores nombrados antes de contar,
+  también le llega a `segmentacion.py`); el 1 sólo está exento como mínimo; un número dicho una
+  vez sólo puede medir un campo; y el extractor tiene **un reintento** con el motivo del rechazo,
+  que pasa por las mismas defensas.
+- **Bucle del extractor**: con es_palindromo y a_romano, qwen decía `aplica: false` y se quedaba
+  en bucle dentro de `funcion` hasta los 180 s. Topes `maxLength`/`maxItems` en el esquema (5-6 s)
+  y tiempo de espera del extractor 90 s.
+- Medido con `bench/extractor_redacciones.py`: 10/10, cero rechazos falsos, cero aprobaciones
+  falsas. 10 tests nuevos; las 5 defensas nuevas sobreviven a mutación (cada una la detecta un test).
+
 ## [3.0.0] - 2026-09-25 — v1.0-estable: los modelos comprueban su trabajo ejecutándolo
 
 Primera versión estable de la arquitectura de verificación. 50 commits en dos días, casi todos

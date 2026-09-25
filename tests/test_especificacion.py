@@ -324,3 +324,109 @@ def test_sin_extractor_el_comportamiento_es_el_de_antes():
                      lambda p: '[{"entrada": "validar_token_telegram(\\"x\\")", '
                                '"esperado": "False"}]')
     assert v.via == "derivados"
+
+
+# ─── Defensa de cantidades: el fallo en vivo del 2026-09-25 ─────────────────
+# Por Telegram, con otra redacción («que acepte…»), el extractor dio al
+# identificador longitud máxima 1; «un secreto» contaba como el 1 y el caso
+# '18:<35 válidos>' → False rechazó 4 rondas seguidas un código correcto.
+
+ENUNCIADO_VIVO = (
+    "Escribe una funcion Python llamada validar_token_telegram(token: str) -> bool "
+    "que acepte identificador numerico, DOS PUNTOS y un secreto de EXACTAMENTE 35 "
+    "caracteres del alfabeto [A-Za-z0-9_-]"
+)
+
+
+def _spec_token(id_min, id_max):
+    return {"aplica": True, "funcion": "validar_token_telegram", "partes": [
+        {"tipo": "campo", "alfabeto": "0-9", "longitud_min": id_min, "longitud_max": id_max},
+        {"tipo": "separador", "texto": ":"},
+        {"tipo": "campo", "alfabeto": "A-Za-z0-9_-", "longitud_min": 35, "longitud_max": 35},
+    ]}
+
+
+def test_el_articulo_un_no_justifica_un_tope_de_1():
+    fmt, motivo = parsear_formato(_spec_token(1, 1), ENUNCIADO_VIVO)
+    assert fmt is None and "cantidad 1" in motivo
+
+
+def test_dos_puntos_no_justifica_la_cantidad_2():
+    fmt, motivo = parsear_formato(_spec_token(2, 2), ENUNCIADO_VIVO)
+    assert fmt is None and "cantidad 2" in motivo
+
+
+def test_un_numero_dicho_una_vez_no_mide_dos_campos():
+    fmt, motivo = parsear_formato(_spec_token(35, 35), ENUNCIADO_VIVO)
+    assert fmt is None and "35" in motivo and "2 campos" in motivo
+
+
+def test_la_especificacion_correcta_del_enunciado_vivo_pasa():
+    fmt, motivo = parsear_formato(_spec_token(1, 0), ENUNCIADO_VIVO)
+    assert fmt is not None, motivo
+    casos = casos_desde_formato(fmt)
+    v = ejecutar_verificacion(CORRECTO, casos)
+    assert v.aciertos == v.total == len(casos)
+
+
+def test_un_solo_y_la_cifra_si_justifican_el_1():
+    from engine.especificacion import aparece_cantidad
+    assert aparece_cantidad(1, "un solo digito")
+    assert aparece_cantidad(1, "longitud 1")
+    assert not aparece_cantidad(1, "un secreto y una clave")
+    assert not aparece_cantidad(2, "separados por dos puntos")
+    assert aparece_cantidad(2, "dos letras y dos puntos")
+
+
+def test_la_misma_cantidad_dicha_dos_veces_mide_dos_campos():
+    enunciado = ("Escribe una funcion Python llamada es_codigo(s: str) -> bool que "
+                 "acepte 4 digitos, un guion y 4 letras")
+    fmt, motivo = parsear_formato({"aplica": True, "funcion": "es_codigo", "partes": [
+        {"tipo": "campo", "alfabeto": "0-9", "longitud_min": 4, "longitud_max": 4},
+        {"tipo": "separador", "texto": "-"},
+        {"tipo": "campo", "alfabeto": "A-Za-z", "longitud_min": 4, "longitud_max": 4},
+    ]}, enunciado)
+    assert fmt is not None, motivo
+
+
+def test_el_extractor_reintenta_una_vez_con_el_motivo():
+    prompts = []
+    respuestas = [json.dumps(_spec_token(1, 1)), json.dumps(_spec_token(1, 0))]
+
+    def invocar(prompt, esquema):
+        prompts.append(prompt)
+        return respuestas[len(prompts) - 1]
+    fmt, motivo = extraer_formato(ENUNCIADO_VIVO, invocar)
+    assert fmt is not None, motivo
+    assert len(prompts) == 2 and "cantidad 1" in prompts[1]
+
+
+def test_el_reintento_pasa_por_las_mismas_defensas():
+    llamadas = []
+
+    def invocar(prompt, esquema):
+        llamadas.append(prompt)
+        return json.dumps(_spec_token(1, 1))
+    fmt, motivo = extraer_formato(ENUNCIADO_VIVO, invocar)
+    assert fmt is None and len(llamadas) == 2
+
+
+def test_sin_formato_no_hay_reintento():
+    llamadas = []
+
+    def invocar(prompt, esquema):
+        llamadas.append(prompt)
+        return json.dumps({"aplica": False, "funcion": "", "partes": []})
+    fmt, _ = extraer_formato("Escribe una funcion que ordene una lista", invocar)
+    assert fmt is None and len(llamadas) == 1
+
+
+def test_el_esquema_acota_las_cadenas_para_que_no_haya_bucles():
+    # Sin topes, qwen se quedaba en bucle dentro de "funcion" hasta los 180 s.
+    from engine.especificacion import ESQUEMA_FORMATO
+    props = ESQUEMA_FORMATO["properties"]
+    partes = props["partes"]
+    assert props["funcion"].get("maxLength")
+    assert partes.get("maxItems")
+    for campo in ("texto", "alfabeto"):
+        assert partes["items"]["properties"][campo].get("maxLength")

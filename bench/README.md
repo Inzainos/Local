@@ -18,6 +18,7 @@ ejecuta nada. Los demás scripts **sí se ejecutan al importarse**: no los impor
 | `comparar_coders.py` | codegemma vs qwen, una llamada, temperatura 0 | codegemma 6/7 tareas, 72/73 casos; qwen 5/7, 60/73 | coder = `codegemma:7b` |
 | `comparar_derivadores.py` | 5 modelos derivando casos de prueba | ninguno construyó un secreto de 35 caracteres; todos volcados a negativos | no usar casos derivados para aprobar |
 | `comparar_extractores.py` | 5 modelos extrayendo la especificación de formato | sólo qwen2.5-coder la extrajo bien; las otras 3 erróneas las rechazaron las defensas | extractor = `qwen2.5-coder:7b` |
+| `extractor_redacciones.py` | el extractor ante 5 redacciones de las dos tareas de formato + las 5 que no lo son | 10/10 bien; la redacción «que acepte…» se recupera con el reintento; antes del arreglo, tope 1 al identificador y 2 tareas en bucle 180 s | defensas de cantidades, 1 reintento, topes en el esquema |
 | `comparar_segmentadores.py` | 5 modelos segmentando tarea / reglas / límites (27 hechos a mano) | qwen 27/27, gemma3 25, codegemma 25, mistral 23, llama3.2 22 | segmentador = qwen… |
 | `efecto_reglas.py` | el coder con y sin las reglas segmentadas | codegemma 72 → 68/73 **con** reglas | …y segmentador **desactivado** |
 | `banco_kv_hilos.py` | caché KV f16 vs q8_0 y `num_thread` | 7,28 → 6,21 GiB, +13 % generación; 12 hilos no gana con q8_0 | caché `q8_0`, hilos por defecto |

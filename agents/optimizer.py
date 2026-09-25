@@ -226,7 +226,10 @@ obligatorias (umbral único {threshold}; sin zona intermedia).
                 system_prompt="Describes formatos. Devuelves solo JSON. No resuelves nada.",
                 user_prompt=prompt_formato, ollama_host=self.ollama_host,
                 tools_schema=None, tool_impls=None, max_iterations=1,
-                num_ctx=4096, format_schema=esquema, temperature=0.0)
+                num_ctx=4096, format_schema=esquema, temperature=0.0,
+                # Una extracción sana tarda 15-30 s. 90 s acota un bucle que
+                # escape a los topes del esquema (antes: 180 s por tarea).
+                timeout_seconds=90.0)
 
         try:
             return verificar(blackboard.user_prompt, codigo, invocar,
