@@ -120,3 +120,72 @@ def test_el_motor_y_el_adaptador_encajan(monkeypatch, tmp_path):
     assert lc.cargas == [("llama3.2:3b", 16384), ("qwen2.5-coder:7b", 32768)]
     assert r.media == 90.0 and r.alcanzo_umbral
     assert r.borrador_final == "listo"
+
+
+# ─── el Capitan ──────────────────────────────────────────────────────────────
+# La version anterior (moe_captain.classify_task) devolvia `task_types[0]`
+# cuando el modelo salia del esquema, con un aviso en el log. Quien llamaba no
+# tenia forma de distinguir una clasificacion de un valor de relleno.
+
+def _fingir_capitan(monkeypatch, respuesta=None, excepcion=None):
+    import engine.turnos_ollama as mod
+
+    def falso(**k):
+        if excepcion:
+            raise excepcion
+        return respuesta
+    monkeypatch.setattr(mod, "run_with_tools", falso)
+
+
+def test_el_capitan_clasifica(monkeypatch):
+    from engine.turnos_ollama import elegir_area_y_nivel
+    _fingir_capitan(monkeypatch, '{"area": "codigo", "nivel": "intermedio"}')
+    d = elegir_area_y_nivel("escribe una funcion")
+    assert (d.area, d.nivel, d.seguro) == ("codigo", "intermedio", True)
+
+
+def test_si_el_capitan_no_responde_la_decision_no_es_fiable(monkeypatch):
+    """EL PUNTO: los valores de arranque van MARCADOS, no disfrazados."""
+    from engine.turnos_ollama import elegir_area_y_nivel
+    _fingir_capitan(monkeypatch, excepcion=TimeoutError("se agoto"))
+    d = elegir_area_y_nivel("da igual")
+    assert d.seguro is False, ("un fallo del capitan no puede devolverse como "
+                              "una clasificacion: el area equivocada es una "
+                              "tuberia equivocada y eso no se arregla escalando")
+
+
+def test_fuera_del_esquema_tampoco_es_fiable(monkeypatch):
+    from engine.turnos_ollama import elegir_area_y_nivel
+    for basura in ('{"area": "otra", "nivel": "ligero"}', "no es json", "{}"):
+        _fingir_capitan(monkeypatch, basura)
+        assert elegir_area_y_nivel("x").seguro is False, basura
+
+
+def test_el_capitan_restringe_la_salida_con_esquema(monkeypatch):
+    """Decodificacion restringida, no confianza en la obediencia.
+
+    Confirmado en vivo el 2026-09-16: nemotron-mini ignoraba «responde SOLO con
+    la etiqueta» y contestaba la pregunta del usuario, alucinando nombres de
+    agentes inexistentes.
+    """
+    import engine.turnos_ollama as mod
+    visto = {}
+    monkeypatch.setattr(mod, "run_with_tools",
+                        lambda **k: (visto.update(k),
+                                     '{"area":"codigo","nivel":"ligero"}')[1])
+    mod.elegir_area_y_nivel("escribe f(x)")
+    esquema = visto.get("format_schema")
+    assert esquema, "el capitan invoco sin format_schema"
+    assert esquema["properties"]["area"]["enum"] == list(mod.AREAS)
+    assert esquema["properties"]["nivel"]["enum"] == list(mod.NIVELES)
+
+
+def test_el_capitan_no_recibe_ventana_grande(monkeypatch):
+    """Clasificar no pide contexto profundo, y nemotron-mini tiene 4.096."""
+    import engine.turnos_ollama as mod
+    visto = {}
+    monkeypatch.setattr(mod, "run_with_tools",
+                        lambda **k: (visto.update(k),
+                                     '{"area":"codigo","nivel":"ligero"}')[1])
+    mod.elegir_area_y_nivel("x")
+    assert visto["num_ctx"] <= 4096, visto["num_ctx"]

@@ -28,10 +28,12 @@ modelo con dos ventanas distintas es, en memoria, dos cosas distintas.
 """
 from __future__ import annotations
 
+import json
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, NamedTuple, Optional, Tuple
 
 from agents.base_agent import BaseExpertAgent
+from engine.tool_agent import run_with_tools
 from engine.turnos import parsear_respuesta
 
 logger = logging.getLogger("Concilio.TurnosOllama")
@@ -123,3 +125,91 @@ class AdaptadorTurnos:
                 keep_alive="5m",
             )
         return self._agentes[clave]
+
+
+# ─── CAPITÁN: elige área y nivel de entrada ──────────────────────────────────
+# Decodificación restringida, no confianza en la obediencia. Confirmado en vivo
+# el 2026-09-16: nemotron-mini ignoraba "responde SOLO con la etiqueta" y
+# contestaba la pregunta del usuario, alucinando nombres de agentes que no
+# existían. Con `format` la salida es siempre una etiqueta válida.
+
+AREAS = ("investigacion", "codigo")
+NIVELES = ("ligero", "intermedio", "avanzado")
+
+SISTEMA_CAPITAN = """Eres el Capitán del Concilio. NO resuelves la tarea.
+
+Tu único trabajo es clasificarla en dos ejes:
+
+  area  --- investigacion si pide analizar, auditar, investigar o explicar;
+            codigo si pide escribir, corregir u optimizar código.
+  nivel --- ligero si es directa y acotada; intermedio si pide contrastar
+            varias fuentes o piezas; avanzado si es ambigua, larga o de
+            consecuencias delicadas.
+
+Si dudas del nivel, elige el MÁS BAJO: el concilio escala solo cuando no
+alcanza el umbral. Escalar cuesta una vuelta; empezar demasiado arriba cuesta
+todas.
+"""
+
+
+class DecisionCapitan(NamedTuple):
+    """Área y nivel, MÁS si la decisión es fiable.
+
+    `seguro=False` significa que el Capitán no respondió (red, tiempo agotado)
+    y los valores son el arranque por defecto, no una clasificación. Quien la
+    reciba tiene que poder distinguir las dos cosas: la versión anterior de
+    este Capitán devolvía `task_types[0]` con un aviso en el log y quien
+    llamaba no tenía forma de saber que le estaban dando un valor de relleno.
+    """
+    area: str
+    nivel: str
+    seguro: bool
+
+
+def elegir_area_y_nivel(
+    enunciado: str,
+    modelo: str = "nemotron-mini",
+    ollama_host: str = "http://127.0.0.1:11434",
+    nota_de_alcance: str = "",
+    ventana: int = 2048,
+) -> DecisionCapitan:
+    """Clasifica el encargo. El Capitán decide; no razona ni explora.
+
+    No recibe el pack de memoria a propósito: clasificar no necesita contexto
+    profundo, y nemotron-mini tiene una ventana nativa de 4.096 tokens --- un
+    pack de ~4.000 la saturaría casi entera.
+    """
+    esquema = {
+        "type": "object",
+        "properties": {
+            "area": {"type": "string", "enum": list(AREAS)},
+            "nivel": {"type": "string", "enum": list(NIVELES)},
+        },
+        "required": ["area", "nivel"],
+    }
+    sistema = SISTEMA_CAPITAN + (f"\n{nota_de_alcance}" if nota_de_alcance else "")
+    try:
+        respuesta = run_with_tools(
+            model=modelo,
+            system_prompt=sistema,
+            user_prompt=enunciado,
+            ollama_host=ollama_host,
+            tools_schema=None,
+            tool_impls=None,
+            max_iterations=1,
+            num_ctx=ventana,
+            format_schema=esquema,
+        )
+        d = json.loads(respuesta)
+        area, nivel = d.get("area"), d.get("nivel")
+        if area in AREAS and nivel in NIVELES:
+            logger.info("capitán: %s/%s", area, nivel)
+            return DecisionCapitan(area, nivel, seguro=True)
+        logger.warning("capitán respondió fuera del esquema: %r", respuesta)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("el capitán no respondió: %s: %s", type(e).__name__, e)
+
+    # NO se elige por él. Se devuelven los valores de arranque marcados como NO
+    # fiables para que quien llama decida: el área equivocada es una tubería
+    # equivocada y eso no se arregla escalando.
+    return DecisionCapitan("investigacion", "ligero", seguro=False)
