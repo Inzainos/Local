@@ -189,3 +189,42 @@ def test_el_capitan_no_recibe_ventana_grande(monkeypatch):
                                      '{"area":"codigo","nivel":"ligero"}')[1])
     mod.elegir_area_y_nivel("x")
     assert visto["num_ctx"] <= 4096, visto["num_ctx"]
+
+
+# ─── la temperatura tiene que LLEGAR a Ollama ─────────────────────────────────
+# run_with_tools no enviaba temperatura: Ollama usaba la del modelo (~0,7). La
+# extraccion de formato funciono en 2 de 4 llamadas identicas, y el Capitan
+# declaraba `temperature: 0.0` en niveles.yaml sin que llegara nunca.
+
+def test_run_with_tools_envia_la_temperatura(monkeypatch):
+    import engine.tool_agent as ta
+    enviado = {}
+
+    class _Resp:
+        def raise_for_status(self): pass
+        def json(self): return {"message": {"content": "{}"}}
+
+    class _Cliente:
+        def __init__(self, *a, **k): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def post(self, url, json=None):
+            enviado.update(json or {})
+            return _Resp()
+    monkeypatch.setattr(ta.httpx, "Client", _Cliente)
+    ta.run_with_tools(model="m", system_prompt="s", user_prompt="u",
+                      ollama_host="http://x", tools_schema=None, tool_impls=None,
+                      max_iterations=1, num_ctx=2048, format_schema={"type": "object"},
+                      temperature=0.0)
+    assert enviado.get("options", {}).get("temperature") == 0.0
+    assert enviado["options"]["num_ctx"] == 2048
+
+
+def test_el_capitan_pide_temperatura_cero(monkeypatch):
+    import engine.turnos_ollama as mod
+    visto = {}
+    monkeypatch.setattr(mod, "run_with_tools",
+                        lambda **k: (visto.update(k),
+                                     '{"area":"codigo","nivel":"ligero"}')[1])
+    mod.elegir_area_y_nivel("escribe f(x)")
+    assert visto.get("temperature") == 0.0

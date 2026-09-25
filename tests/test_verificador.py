@@ -449,3 +449,48 @@ def test_un_codigo_correcto_si_pasa(monkeypatch):
     c = a.evaluate_solution(mem, threshold=85, espera_codigo=True)
     assert c.score == 100 and c.passed
     assert c.verificado_por_ejecucion is True
+
+
+# ─── EXTRACCION TOLERANTE ─────────────────────────────────────────────────────
+# El 2026-09-24, midiendo que modelo deriva mejores casos, TRES de cinco se
+# contabilizaron como «la respuesta no contenia un array JSON». Al mirar la
+# salida cruda, dos de esos tres fallos eran del parser, no del modelo:
+#
+#   nemotron-mini     array con estructura PERFECTA y True/False de Python
+#   llama3.2:3b       1.817 chars, cortado sin cerrar el corchete
+#   qwen2.5-coder:7b  3.992 chars, cortado sin cerrar el corchete
+#
+# Iba a concluir «ningun modelo puede» y en parte era el instrumento. Sin
+# guardar la salida cruda no habria forma de distinguir una cosa de la otra ---
+# que es el fallo del dia aplicado a mi propio experimento.
+
+def test_acepta_literales_de_python():
+    """nemotron-mini devolvio True/False en vez de true/false."""
+    from engine.verificador import _extraer_json
+    d = _extraer_json('[{"entrada": "f(1)", "esperado": True, "porque": "x"}]')
+    assert d and len(d) == 1 and d[0]["esperado"] is True
+
+
+def test_no_toca_literales_dentro_de_una_cadena():
+    """«True» como texto de un campo no debe convertirse."""
+    from engine.verificador import _normalizar_literales
+    assert '"esperado": "True"' in _normalizar_literales('"esperado": "True"')
+
+
+def test_rescata_los_casos_de_un_array_truncado():
+    """Once casos buenos no se pierden por culpa del doceavo cortado."""
+    from engine.verificador import _extraer_json
+    truncado = ('```json\n[\n'
+                '  {"entrada": "f(1)", "esperado": "True", "porque": "a"},\n'
+                '  {"entrada": "f(2)", "esperado": "False", "porque": "b"},\n'
+                '  {"entrada": "f(3)", "esper')
+    d = _extraer_json(truncado)
+    assert d and len(d) == 2, f"rescato {len(d or [])} de los 2 completos"
+
+
+def test_no_inventa_casos_donde_no_hay():
+    """Tolerante no es adivino: sin datos, None."""
+    from engine.verificador import _extraer_json
+    for basura in ("", "no hay nada aqui", "lo siento, no puedo", "{}", "[]"):
+        d = _extraer_json(basura)
+        assert not d, f"{basura!r} produjo {d}"

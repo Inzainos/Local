@@ -68,6 +68,10 @@ concilio:
   verify_with_light: true
   settle_seconds: 1.0
   prefer_custom_models: true
+  # Quien extrae la especificacion de formato para el verificador. Medido el
+  # 2026-09-24: de cinco modelos, solo qwen2.5-coder:7b extrajo bien el formato
+  # del token de Telegram. Vacio = sin via de especificacion.
+  extractor_formato: qwen2.5-coder:7b
   # Optional stub path (documentation / future opt-in; not forced when inject=false)
   hard_rules_stub: data/memory_packs/home_hard_rules_stub.md
 

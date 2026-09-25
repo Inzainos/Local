@@ -27,6 +27,7 @@ def run_with_tools(
     timeout_seconds: float = 180.0,
     num_ctx: Optional[int] = None,
     format_schema: Optional[Dict[str, Any]] = None,
+    temperature: Optional[float] = None,
 ) -> str:
     """Corre una conversación con tool-calling hasta que el modelo responda
     sin pedir más herramientas, o se agoten las iteraciones.
@@ -63,8 +64,19 @@ def run_with_tools(
                 payload["tools"] = tools_schema
             if format_schema is not None:
                 payload["format"] = format_schema
+            opciones: Dict[str, Any] = {}
             if num_ctx is not None:
-                payload["options"] = {"num_ctx": num_ctx}
+                opciones["num_ctx"] = num_ctx
+            # SIN esto Ollama usa la temperatura por defecto del modelo (~0,7).
+            # Medido el 2026-09-24: la extraccion de formato con qwen2.5-coder
+            # funciono en 2 de 4 llamadas identicas --- azar en una tarea que
+            # debe ser determinista. Y el Capitan declaraba `temperature: 0.0`
+            # en profiles/niveles.yaml, pero este cliente no la enviaba: el 0,0
+            # nunca llego a Ollama.
+            if temperature is not None:
+                opciones["temperature"] = float(temperature)
+            if opciones:
+                payload["options"] = opciones
 
             resp = client.post(f"{ollama_host.rstrip('/')}/api/chat", json=payload)
             resp.raise_for_status()

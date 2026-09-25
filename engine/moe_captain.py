@@ -116,6 +116,8 @@ def classify_task(
         max_iterations=1,
         num_ctx=2048,
         format_schema=schema,
+        # Clasificar es decidir, no crear: determinista.
+        temperature=0.0,
     )
     try:
         parsed = json.loads(resp)

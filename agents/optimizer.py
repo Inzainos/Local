@@ -35,6 +35,10 @@ class OptimizerAgent(BaseExpertAgent):
 4. HONESTIDAD --- dice explicitamente que NO pudo verificar, en vez de
    rellenarlo con suposiciones."""
 
+    # Quién extrae la especificación de formato. Configurable desde
+    # config.yaml (concilio.extractor_formato); vacío desactiva la vía.
+    extractor_formato: str = "qwen2.5-coder:7b"
+
     def evaluate_solution(
         self,
         shared_memory: SharedMemory,
@@ -144,8 +148,27 @@ obligatorias (umbral único {threshold}; sin zona intermedia).
                                  "Devuelves solo JSON. No resuelves nada."),
             )
 
+        def invocar_json(prompt_formato: str, esquema: dict) -> str:
+            # El EXTRACTOR de formato es otro modelo. Medido el 2026-09-24 con
+            # cinco candidatos: qwen2.5-coder:7b fue el UNICO que extrajo bien
+            # la especificacion del token (las otras tres extracciones
+            # erroneas las rechazaron las defensas), y dijo bien «no aplica»
+            # para a_segundos, como llama3.2, gemma3 y mistral. Ademas asi la
+            # verificacion la hace un modelo DISTINTO del que puntua leyendo.
+            from engine.tool_agent import run_with_tools
+            if self.lifecycle is not None:
+                self.lifecycle.ensure_exclusive(self.extractor_formato,
+                                                num_ctx=4096)
+            return run_with_tools(
+                model=self.extractor_formato,
+                system_prompt="Describes formatos. Devuelves solo JSON. No resuelves nada.",
+                user_prompt=prompt_formato, ollama_host=self.ollama_host,
+                tools_schema=None, tool_impls=None, max_iterations=1,
+                num_ctx=4096, format_schema=esquema, temperature=0.0)
+
         try:
-            return verificar(blackboard.user_prompt, codigo, invocar)
+            return verificar(blackboard.user_prompt, codigo, invocar,
+                             invocar_json=invocar_json if self.extractor_formato else None)
         except Exception as e:  # noqa: BLE001
             logger.warning("la verificacion fallo: %s: %s", type(e).__name__, e)
             return None, []

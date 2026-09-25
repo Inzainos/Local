@@ -200,6 +200,8 @@ def elegir_area_y_nivel(
             max_iterations=1,
             num_ctx=ventana,
             format_schema=esquema,
+            # Decide, no crea: determinista. niveles.yaml declara 0.0.
+            temperature=0.0,
         )
         d = json.loads(respuesta)
         area, nivel = d.get("area"), d.get("nivel")

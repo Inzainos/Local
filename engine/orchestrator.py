@@ -54,6 +54,9 @@ class ConsensusOrchestrator:
             self.sessions_dir = os.path.normpath(os.path.join(self._project_root, sessions_rel))
         self.concilio_store = ConcilioStore(self.sessions_dir)
         self.inject_sentinel = bool(conc.get('inject_sentinel_architecture', False))
+        # Extractor de formato para el verificador. Vacio desactiva la via de
+        # especificacion y el verificador vuelve a derivar casos con un modelo.
+        self._extractor_formato = str(conc.get("extractor_formato", "qwen2.5-coder:7b") or "")
         self.lifecycle = ModelLifecycle(ollama_host=self.ollama_host)
 
         r_cfg = self.config["roles"]["researcher"]
@@ -118,6 +121,7 @@ class ConsensusOrchestrator:
             num_ctx=o_cfg.get("num_ctx"),
             timeout_retries=self.timeout_retries,
         )
+        self.optimizer.extractor_formato = self._extractor_formato
 
         # Optional: swap to thin custom Modelfiles if present and prefer_custom_models
         if bool(conc.get("prefer_custom_models", True)):

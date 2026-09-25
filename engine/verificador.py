@@ -103,6 +103,11 @@ class Veredicto:
     detalle: List[Dict] = field(default_factory=list)
     error: Optional[str] = None
     linea_base: int = 0           # mejor resultado devolviendo siempre lo mismo
+    # De dónde salieron los casos: «especificacion» (Python los construyó desde
+    # un formato extraído) o «derivados» (un modelo los escribió). No valen lo
+    # mismo: medido el 2026-09-24, ningún modelo local derivó un solo caso
+    # válido para «EXACTAMENTE 35 caracteres».
+    via: str = "derivados"
 
     @property
     def puntuacion(self) -> int:
@@ -225,19 +230,61 @@ def derivar_casos(
     return casos, None
 
 
+def _normalizar_literales(txt: str) -> str:
+    """Convierte literales de Python a JSON.
+
+    Medido el 2026-09-24: nemotron-mini devolvió un array con la estructura
+    PERFECTA y `True`/`False` de Python en vez de `true`/`false`. `json.loads`
+    lo rechaza entero, así que se contabilizó como «el modelo no supo» cuando
+    el modelo sí supo y era el parser el que no. Se reemplaza solo cuando el
+    literal está suelto, para no tocar el interior de una cadena.
+    """
+    for py, js in (("True", "true"), ("False", "false"), ("None", "null")):
+        txt = re.sub(rf"(?<![\w\"']){py}(?![\w\"'])", js, txt)
+    return txt
+
+
+def _rescatar_truncado(txt: str):
+    """Saca los objetos COMPLETOS de un array que se quedó sin cerrar.
+
+    Con num_predict acotado, un modelo que emite doce casos se corta a mitad
+    del último y el array nunca cierra. Antes eso devolvía CERO casos: se
+    perdían los once buenos por culpa del doceavo. Medido el 2026-09-24 con
+    llama3.2:3b (1.817 chars) y qwen2.5-coder:7b (3.992), los dos truncados.
+    """
+    objetos = []
+    for m in re.finditer(r"\{[^{}]*\}", txt, re.S):
+        try:
+            d = json.loads(_normalizar_literales(m.group(0)))
+            # Se exigen los campos de un CASO. Rescatar objetos sueltos de un
+            # texto libre colaria cualquier `{}` o cualquier diccionario que el
+            # modelo mencionara de paso.
+            if isinstance(d, dict) and d.get("entrada") and "esperado" in d:
+                objetos.append(d)
+        except json.JSONDecodeError:
+            continue
+    return objetos or None
+
+
 def _extraer_json(texto: str):
-    """Saca el primer array JSON, con o sin cercas de código."""
+    """Saca el primer array JSON, con o sin cercas de código.
+
+    Tolera literales de Python y arrays truncados: ver las dos funciones de
+    arriba. Lo que NO hace es inventar casos que el modelo no dio.
+    """
     for patron in (r"```(?:json)?\s*(\[.*?\])\s*```", r"(\[[\s\S]*\])"):
         m = re.search(patron, texto, re.S)
         if not m:
             continue
-        try:
-            d = json.loads(m.group(1))
-            if isinstance(d, list):
-                return d
-        except json.JSONDecodeError:
-            continue
-    return None
+        for candidato in (m.group(1), _normalizar_literales(m.group(1))):
+            try:
+                d = json.loads(candidato)
+                if isinstance(d, list):
+                    return d
+            except json.JSONDecodeError:
+                continue
+    # Último recurso: el array no cierra. Se rescatan los objetos completos.
+    return _rescatar_truncado(texto)
 
 
 # ─── EJECUCIÓN AISLADA ───────────────────────────────────────────────────────
@@ -357,13 +404,36 @@ def verificar(
     codigo: str,
     invocar_modelo: Callable[[str], str],
     maximo_casos: int = 12,
+    invocar_json: Optional[Callable[[str, Dict], str]] = None,
 ) -> Tuple[Veredicto, List[Caso]]:
     """Ciclo completo: enunciado → casos → ejecución → veredicto.
 
-    `invocar_modelo` solo se usa para DERIVAR los casos, y recibe únicamente el
-    enunciado. Nunca ve el código: así no puede acomodar las pruebas a la
-    solución.
+    DOS VÍAS, en este orden:
+
+      1. ESPECIFICACIÓN. Si hay `invocar_json`, un modelo extrae el formato con
+         decodificación restringida y Python construye casos balanceados de
+         frontera. Solo aplica a validadores de formato de cadena.
+      2. DERIVACIÓN. Si la primera no aplica, un modelo escribe los casos. Es
+         la vía débil --- ningún modelo local contó bien hasta 35 --- y por eso
+         su resultado pasa por la puerta de balance (`discrimina`), que
+         bloquea el consenso cuando los casos no miden.
+
+    En ninguna de las dos el modelo ve el código: así no puede acomodar las
+    pruebas a la solución.
     """
+    if invocar_json is not None:
+        from engine.especificacion import casos_desde_formato, extraer_formato
+        fmt, motivo = extraer_formato(enunciado, invocar_json)
+        if fmt is not None:
+            casos = casos_desde_formato(fmt, maximo=max(maximo_casos, 16))
+            if casos:
+                logger.info("casos construidos de la especificación: %d", len(casos))
+                v = ejecutar_verificacion(codigo, casos)
+                v.via = "especificacion"
+                logger.info("verificación: %s", v.resumen())
+                return v, casos
+        logger.info("vía de especificación no aplica (%s); se derivan casos", motivo)
+
     casos, err = derivar_casos(enunciado, invocar_modelo, maximo=maximo_casos)
     if err:
         logger.warning("no se pudieron derivar casos: %s", err)
