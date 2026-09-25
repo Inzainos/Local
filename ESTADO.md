@@ -5,7 +5,7 @@
 > modelo) no deje a nadie sin saber dónde se quedó. **Se actualiza cada vez que algo avanza.**
 > Si lo que dice aquí contradice al código, manda el código: verifícalo y corrige este archivo.
 
-**Última actualización:** 2026-09-25 14:15. v1 + 3.0.1 + 3.0.2 **desplegados** (servicios reiniciados 14:12). Pendiente: una tarea del concilio que TERMINE (las dos últimas no cerraron).
+**Última actualización:** 2026-09-25 14:40. **v1 CERRADA**: desplegada y con una tarea real terminada de principio a fin, verificada por ejecución (16/16). Lo que sigue es v2.
 **Rama:** `local/concilio` (nunca push a `main`). **Operador:** Elán (responder en español).
 
 ---
@@ -45,6 +45,7 @@ contra `git log -1 --format=%ci`.
 | **Desplegar** | **HECHO** 25-sep 09:46 | `journalctl -u consensus-telegram -n 50` |
 | **1.ª tarea real (12:18)** | token con la redacción «que acepte…»: vía directa falló BIEN (codegemma escribió `len(token)==39 and isalnum()` dos veces); el concilio acertó en la ronda 1 pero se entregó «SIN CONSENSO 15/16» por un caso MAL construido (el extractor puso tope 1 al identificador; «un secreto» lo justificaba). **Arreglado en 3.0.1** (`88951e8`, ver CHANGELOG) y medido con `bench/extractor_redacciones.py` 10/10 | hecho: reinicio 13:04 |
 | **2.ª tarea real (13:05)** | misma redacción, con el arreglo. La defensa **funcionó**: rechazó el tope 1 y el reintento construyó los 16 casos buenos. La vía directa falló bien (codegemma, 8/16 = la base). Concilio ronda 1: código que **no compila** (`from typing import str`) y el árbitro le había leído 92 → el verificador lo paró. Ronda 2: código CORRECTO (16/16, re-verificado a mano el 25-sep 13:35) pero **un reinicio de Windows a las 13:16 cortó la tarea mientras el árbitro lo revisaba**: no se entregó nada y el operador no recibió aviso | `data/sessions/91bce515.concilio` (última escritura 13:16) y `journalctl -b -1 -u consensus-telegram --since 13:05` |
+| **3.ª tarea real (14:24)** | **✅ CERRÓ BIEN.** Token con la redacción del operador: vía directa falló (codegemma, 8/16 = la base) y escaló; el concilio acertó en la **ronda 1** y el verificador dio **16/16 = consenso 100**. 9 minutos. Re-verificado a mano el 25-sep 14:38: 16/16. La sesión quedó `cerrado: terminada` y el aviso de interrumpidas no reporta nada | `journalctl -u consensus-telegram --since 14:24` |
 | **Aprendizaje de errores** | idea del operador (25-sep, ver apartado 4, v2): que el sistema aprenda de sus aciertos y fallos como los modelos ONNX de Sentinel | sin empezar |
 
 **1.ª pasada de aceptación** (antes de `2565dfc`): 7 tareas en 12,4 min, **1 consenso falso**
@@ -69,6 +70,11 @@ Detalle y porqués: `CHANGELOG.md` y los mensajes de commit (cada uno explica su
 ---
 
 ## 4. Qué falta
+
+**La v1 está cerrada.** Queda medido, de punta a punta y en producción: la vía directa rechaza lo
+que no funciona, el concilio lo arregla, el verificador lo confirma ejecutándolo y la sesión se
+cierra. Lo primero de la v2 sigue siendo el **segundo intento con otro modelo**: codegemma falla
+con esta redacción las dos veces, y eso son 8 minutos de concilio que qwen podría ahorrar.
 
 **Para cerrar la v1** — HECHO:
 1. ~~2.ª pasada de aceptación con cero consensos falsos~~ — hecha.
