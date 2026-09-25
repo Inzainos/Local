@@ -287,6 +287,60 @@ def _extraer_json(texto: str):
     return _rescatar_truncado(texto)
 
 
+# ─── EXTRACCIÓN DEL CÓDIGO A EJECUTAR ───────────────────────────────────────
+# Medido el 2026-09-25 en `a_segundos`: de cuatro «no compila», NINGUNO medía el
+# código del coder.
+#
+#   v1  4 bloques de código      -> se CONCATENABAN todos -> SyntaxError línea 50
+#   v2  empezaba con <<<UNTRUSTED_DATA historial_tareas>>> (el coder repitió su
+#   v3  empezaba con <<<UNTRUSTED_DATA code>>>              entrada al refinar)
+#   v4  SOLO el bloque de memoria -> se ejecutó la memoria como Python; el
+#       «invalid character '·'» era el punto de «HECHO APROBADO · Concilio»
+#
+# Ejecutar prosa da «no compila», que suena a fallo del código y no lo es: es
+# que no hubo código. Se distingue.
+
+_CERCA_DATOS = re.compile(r"<<<UNTRUSTED_DATA[^>]*>>>.*?<<<END_UNTRUSTED_DATA>>>", re.S)
+
+
+def nombre_funcion(enunciado: str) -> Optional[str]:
+    """La función que pide el enunciado: «llamada f(...)» o «def f(».
+
+    Se exige el paréntesis detrás: «llamada validar_token_telegram(token: str)».
+    """
+    m = re.search(r"(?:llamada|def)\s+([A-Za-z_]\w*)\s*\(", enunciado or "")
+    return m.group(1) if m else None
+
+
+def extraer_codigo(texto: str, funcion: Optional[str] = None) -> str:
+    """El bloque de código a ejecutar, o cadena vacía si no lo hay.
+
+    - Quita los bloques de datos que el modelo haya repetido de su entrada.
+    - Quita el razonamiento <think>…</think>.
+    - Elige UN bloque: el primero que define `funcion`; si no se sabe cuál, el
+      primero que define algo. Nunca concatena bloques: un ejemplo de uso o una
+      salida de muestra pegados detrás del código lo rompen.
+    - Sin bloque con `def`, devuelve "": no se ejecuta prosa.
+    """
+    t = _CERCA_DATOS.sub("", texto or "")
+    t = re.sub(r"<think>.*?</think>", "", t, flags=re.S)
+    bloques = re.findall(r"```[ \t]*([\w+-]*)[^\n]*\n(.*?)```", t, re.S)
+    candidatos = [cuerpo for etiqueta, cuerpo in bloques
+                  if etiqueta.lower() in ("", "python", "py", "python3")]
+    if funcion:
+        propios = [c for c in candidatos
+                   if re.search(rf"^\s*def\s+{re.escape(funcion)}\s*\(", c, re.M)]
+        if propios:
+            return propios[0].strip()
+    con_def = [c for c in candidatos if re.search(r"^\s*def\s+\w+\s*\(", c, re.M)]
+    if con_def:
+        return con_def[0].strip()
+    # Sin cercas: acepta el texto solo si EMPIEZA como código Python.
+    if not bloques and re.match(r"\s*(import |from |def )", t) and "def " in t:
+        return t.strip()
+    return ""
+
+
 # ─── EJECUCIÓN AISLADA ───────────────────────────────────────────────────────
 
 _ARNES = '''

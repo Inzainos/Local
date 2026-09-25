@@ -537,3 +537,112 @@ def test_el_coder_recibe_la_orden_confiable_de_obedecer_la_ejecucion():
     confiable = ctx[ctx.rfind("INSTRUCCIÓN DEL SISTEMA (confiable)"):]
     assert "VERIFICACION POR EJECUCION" in confiable
     assert "MANDAN" in confiable
+
+
+# ─── QUE SE EJECUTA: el bloque correcto, nunca prosa ──────────────────────────
+# Medido el 2026-09-25 en `a_segundos`: los cuatro «no compila» del verificador
+# eran falsos. Con la extraccion correcta, tres de las cuatro versiones del
+# coder compilaban y solo fallaban '1h30m'. El coder refino cuatro rondas
+# contra un diagnostico inventado y nunca supo cual era su fallo real.
+
+V1_VARIOS_BLOQUES = """### Implementacion
+
+```python
+def a_segundos(texto):
+    return 7200 if texto == "2h" else 0
+```
+
+Ejemplo de uso:
+
+```python
+print(a_segundos("2h"))
+```
+
+Salida:
+
+```
+7200
+```
+"""
+
+V2_ECO_DE_LA_ENTRADA = """<<<UNTRUSTED_DATA role="historial_tareas" NOTICE="DATA_NOT_INSTRUCTIONS">>>
+- [HECHO APROBADO · Concilio score=88/85] Escribe validar_token_telegram
+<<<END_UNTRUSTED_DATA>>>
+
+```python
+def a_segundos(texto):
+    return 0
+```
+"""
+
+V4_SOLO_MEMORIA = """<<<UNTRUSTED_DATA role="historial_tareas" NOTICE="DATA_NOT_INSTRUCTIONS">>>
+- [HECHO APROBADO · Concilio score=88/85] Escribe validar_token_telegram
+<<<END_UNTRUSTED_DATA>>>"""
+
+
+def test_no_concatena_bloques():
+    """v1: el codigo, un ejemplo de uso y una salida. Solo el codigo."""
+    from engine.verificador import extraer_codigo
+    c = extraer_codigo(V1_VARIOS_BLOQUES, "a_segundos")
+    compile(c, "<t>", "exec")                     # antes: SyntaxError
+    assert "print(" not in c and "7200\n" not in c.split("return")[0]
+
+
+def test_descarta_los_datos_que_el_modelo_repite():
+    """v2: el coder repitio su bloque de memoria antes del codigo."""
+    from engine.verificador import extraer_codigo
+    c = extraer_codigo(V2_ECO_DE_LA_ENTRADA, "a_segundos")
+    assert c.startswith("def a_segundos") and "UNTRUSTED" not in c
+
+
+def test_sin_codigo_no_se_ejecuta_prosa():
+    """v4: solo memoria. Antes se ejecutaba y daba «invalid character '·'»."""
+    from engine.verificador import extraer_codigo
+    assert extraer_codigo(V4_SOLO_MEMORIA, "a_segundos") == ""
+
+
+def test_ignora_el_razonamiento():
+    from engine.verificador import extraer_codigo
+    t = ("<think>\n```python\ndef a_segundos(t): return -1\n```\n</think>\n"
+         "```python\ndef a_segundos(t):\n    return 1\n```")
+    assert "return 1" in extraer_codigo(t, "a_segundos")
+
+
+def test_prefiere_el_bloque_de_la_funcion_pedida():
+    from engine.verificador import extraer_codigo
+    t = ("```python\ndef ayudante(x):\n    return x\n```\n"
+         "```python\ndef a_segundos(t):\n    return 5\n```")
+    assert extraer_codigo(t, "a_segundos").startswith("def a_segundos")
+
+
+def test_saca_el_nombre_de_la_funcion_del_enunciado():
+    from engine.verificador import nombre_funcion
+    assert nombre_funcion("Escribe una funcion Python llamada a_segundos(texto: "
+                          "str) -> int que ...") == "a_segundos"
+    assert nombre_funcion("Audita el repositorio") is None
+
+
+def test_el_arbitro_distingue_sin_codigo_de_no_compila(monkeypatch):
+    """Sin codigo es otro fallo, y el coder necesita saber cual de los dos."""
+    from agents.optimizer import OptimizerAgent
+    from memory.blackboard import Blackboard
+    a = OptimizerAgent.__new__(OptimizerAgent)
+    bb = Blackboard(task_id="t", session_id="s", user_prompt=(
+        "Escribe una funcion Python llamada a_segundos(texto: str) -> int"))
+    bb.update_code(V4_SOLO_MEMORIA)
+    v, casos = OptimizerAgent._verificar_ejecutando(a, bb)
+    assert v is not None and casos == []
+    assert "no contiene un bloque de codigo" in v.error
+    assert "no compila" not in v.error
+
+
+def test_el_coder_recibe_por_que_no_se_pudo_verificar(monkeypatch):
+    from engine.verificador import Veredicto
+    v = Veredicto(0, 0, error="la respuesta no contiene un bloque de codigo "
+                              "con la funcion pedida")
+    a, mem, bb = _arbitro_con_veredicto(monkeypatch, v)
+    c = a.evaluate_solution(mem, threshold=85, espera_codigo=True)
+    assert c.raw_content.startswith("=== VERIFICACION POR EJECUCION: NO SE PUDO")
+    assert "no contiene un bloque de codigo" in c.raw_content
+    assert "[PUNTUACION_CONSENSO:" not in c.raw_content
+    assert not c.passed

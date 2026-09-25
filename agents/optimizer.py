@@ -94,6 +94,15 @@ obligatorias (umbral único {threshold}; sin zona intermedia).
                         f"no verificable ({veredicto.error}): el score {score_leido} "
                         f"viene de LEER el codigo, no de ejecutarlo. La ronda NO "
                         f"puede declarar consenso")
+                    # El coder tiene que saber POR QUE no se pudo verificar: si
+                    # no entrego un bloque con la funcion, eso es lo que debe
+                    # corregir, y la lectura del arbitro no se lo va a decir.
+                    response_text = (
+                        "=== VERIFICACION POR EJECUCION: NO SE PUDO VERIFICAR ===\n"
+                        f"Motivo: {veredicto.error}\n"
+                        "La puntuacion de la lectura de abajo no cuenta.\n\n"
+                        "=== LECTURA DEL ARBITRO ===\n"
+                        + self._anular_puntuacion_leida(response_text))
                 elif not veredicto.error and not veredicto.discrimina:
                     # LOS CASOS NO SIRVEN. Medido el 2026-09-24: 8 casos de los
                     # que SIETE esperaban el mismo valor. Un codigo que devuelve
@@ -144,10 +153,18 @@ obligatorias (umbral único {threshold}; sin zona intermedia).
         codigo. Si viera la solucion, anclaria las pruebas a lo que hace y
         aprobaria el mismo error que venia a cazar.
         """
-        codigo = getattr(blackboard.code_proposal, "code", "") or \
-            getattr(blackboard.code_proposal, "raw_content", "") or ""
+        # Se extrae de la respuesta CRUDA con extraer_codigo: el `code` de la
+        # pizarra concatenaba todos los bloques y, sin bloques, era la respuesta
+        # entera --- el 2026-09-25 se ejecuto el bloque de memoria como Python.
+        from engine.verificador import Veredicto, extraer_codigo, nombre_funcion
+        crudo = getattr(blackboard.code_proposal, "raw_content", "") or \
+            getattr(blackboard.code_proposal, "code", "") or ""
+        codigo = extraer_codigo(crudo, nombre_funcion(blackboard.user_prompt))
         if not codigo.strip():
-            return None, []
+            # No es «no compila»: es que no hubo codigo. Se dice asi, y cuenta
+            # como no verificado, que bloquea el consenso.
+            return Veredicto(0, 0, error="la respuesta no contiene un bloque de "
+                                         "codigo con la funcion pedida"), []
 
         def invocar(prompt_casos: str) -> str:
             # system_override: aqui no actua de auditor, solo deriva casos.
