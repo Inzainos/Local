@@ -5,7 +5,7 @@
 > modelo) no deje a nadie sin saber dónde se quedó. **Se actualiza cada vez que algo avanza.**
 > Si lo que dice aquí contradice al código, manda el código: verifícalo y corrige este archivo.
 
-**Última actualización:** 2026-09-25, **v1.0-estable etiquetada**. Falta desplegarla (servicios).
+**Última actualización:** 2026-09-25 09:52, **v1.0-estable etiquetada y DESPLEGADA** (servicios reiniciados 09:46).
 **Rama:** `local/concilio` (nunca push a `main`). **Operador:** Elán (responder en español).
 
 ---
@@ -26,18 +26,20 @@ Historial: [`CHANGELOG.md`](./CHANGELOG.md).
 
 ## 2. EN CURSO ahora mismo
 
-### ⚠ Lo más importante: los servicios corren código VIEJO
-`consensus-telegram` (bot) y `consensus-web` son **servicios del sistema** y cargan el código al
-arrancar. El 25-sep el bot corría el código del **24 por la mañana** (antes del verificador) y la
-web el del **20**. Nada de la v1 llega al teléfono hasta reiniciarlos, y el bot viejo **puede
-archivar como «hecho aprobado» cualquier lectura ≥ 85** (la memoria envenenada que se limpió).
-Regla: no se toca systemd sin orden del operador. **Desplegar la v1 =**
-`sudo systemctl restart consensus-telegram consensus-web` (lo decide y lo corre el operador).
+### Servicios: corren la v1 desde el 25-sep 09:46
+`consensus-telegram` (bot) y `consensus-web` son **servicios del sistema** y cargan el código **al
+arrancar**: cualquier cambio posterior no llega al teléfono ni a la web hasta reiniciarlos. El
+operador los reinició a las 09:46 (10 min después de la etiqueta, `1687f4c` 09:36). Verificado:
+ambos activos, arranque limpio en el journal, la web en `:8002` sirve las insignias de la vía
+directa y ningún `.py` cambió después del arranque. Regla: no se toca systemd sin orden del
+operador; reiniciar = `sudo systemctl restart consensus-telegram consensus-web` (lo corre él).
+Comprobar qué código corren: `systemctl show consensus-telegram consensus-web -p ActiveEnterTimestamp`
+contra `git log -1 --format=%ci`.
 
 | qué | estado | cómo retomarlo si se cortó |
 |---|---|---|
 | **v1.0-estable** | **ETIQUETADA** en `local/concilio`. Aceptación: cero consensos falsos en la 2.ª pasada y en la comprobación del mejor intento (`es_matricula`: el concilio llegó a 0/16 y se entregó el 15/16 de la vía directa) | `git show v1.0-estable` |
-| **Desplegar** | **pendiente del operador**: `sudo systemctl restart consensus-telegram consensus-web` | tras reiniciar, `/status` en Telegram y probar una tarea |
+| **Desplegar** | **HECHO** 25-sep 09:46. Falta la primera tarea real desde el teléfono (`/concilio` con un validador de formato → «✅ Verificado por ejecución · vía directa») | `journalctl -u consensus-telegram -n 50` |
 | **Aprendizaje de errores** | idea del operador (25-sep, ver apartado 4, v2): que el sistema aprenda de sus aciertos y fallos como los modelos ONNX de Sentinel | sin empezar |
 
 **1.ª pasada de aceptación** (antes de `2565dfc`): 7 tareas en 12,4 min, **1 consenso falso**
@@ -63,11 +65,11 @@ Detalle y porqués: `CHANGELOG.md` y los mensajes de commit (cada uno explica su
 
 ## 4. Qué falta
 
-**Para cerrar la v1** — HECHO salvo el despliegue:
+**Para cerrar la v1** — HECHO:
 1. ~~2.ª pasada de aceptación con cero consensos falsos~~ — hecha.
 1b. ~~Mejor intento verificado~~ — construido (`51c0ba4`); falta verlo en vivo con `es_matricula`.
 2. ~~CHANGELOG 3.0.0~~ — hecho. 3. ~~Etiqueta `v1.0-estable`~~ — hecha.
-4. **Desplegar** (el operador): `sudo systemctl restart consensus-telegram consensus-web`.
+4. ~~Desplegar~~ — hecho el 25-sep 09:46.
 
 **v2** (acordado con el operador que queda fuera de la v1). Orden recomendado tras medir: primero
 «segundo intento con otro modelo» (codegemma repitió el mismo código en sus dos intentos de
