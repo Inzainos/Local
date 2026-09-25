@@ -331,6 +331,46 @@ class ConsensusOrchestrator:
         return self.__coder_directo
 
     @staticmethod
+    def _registrar_intento(blackboard, aciertos, total, codigo, fallos, origen) -> None:
+        """Guarda el candidato con MAS casos de especificacion acertados.
+
+        Medido en la aceptacion de la v1: es_matricula dio 15/16 por la via
+        directa, el concilio lo EMPEORO a 8/16 en tres rondas, y se entrego el
+        8/16. El verificador ya mide cada intento: quedarse con el mejor es
+        gratis.
+        """
+        if not codigo or not total:
+            return
+        mejor = blackboard.shared_notes.get("mejor_intento")
+        if mejor is None or aciertos > mejor["aciertos"]:
+            blackboard.shared_notes["mejor_intento"] = {
+                "aciertos": aciertos, "total": total, "codigo": codigo,
+                "fallos": list(fallos or [])[:8], "origen": origen}
+
+    @staticmethod
+    def _entregar_mejor_intento(blackboard) -> bool:
+        """Si nadie cerro, entrega el mejor intento medido en vez del ultimo.
+
+        NO es una aprobacion: consensus_reached sigue en False y el texto lo
+        dice. Solo cambia QUE codigo se entrega.
+        """
+        mejor = blackboard.shared_notes.get("mejor_intento")
+        if blackboard.consensus_reached or not mejor:
+            return False
+        fallos = "\n".join(f"  - {f}" for f in mejor["fallos"]) or "  (sin detalle)"
+        blackboard.final_synthesis = (
+            f"**SIN CONSENSO · mejor intento medido: {mejor['aciertos']}/{mejor['total']} "
+            f"casos construidos desde el enunciado** ({mejor['origen']}). NO esta "
+            f"verificado: falla estos casos, revisalo antes de usarlo:\n{fallos}\n\n"
+            f"```python\n{mejor['codigo']}\n```\n\n"
+            f"_Se entrega el intento con mas casos acertados de todos los que se "
+            f"midieron, no el ultimo._")
+        blackboard.log_event("CONCILIO", "Orchestrator",
+                             f"sin consenso: se entrega el mejor intento medido "
+                             f"({mejor['aciertos']}/{mejor['total']}, {mejor['origen']})")
+        return True
+
+    @staticmethod
     def _realimentacion_directa(veredicto) -> str:
         """Lo que se le dice al coder en el segundo intento. Solo casos FIABLES."""
         if veredicto.error:
@@ -378,6 +418,12 @@ class ConsensusOrchestrator:
             blackboard.log_event("DIRECTO", "Orchestrator",
                                  f"intento {intento} [via {veredicto.via}]: {veredicto.resumen()}")
             fiable = veredicto.via == "especificacion"
+            if fiable and not veredicto.error:
+                self._registrar_intento(
+                    blackboard, veredicto.aciertos, veredicto.total,
+                    extraer_codigo(respuesta or "", funcion),
+                    [f["entrada"] for f in (veredicto.detalle or []) if not f.get("correcto")],
+                    f"via directa, intento {intento}")
             # TODOS los casos, no el umbral: cada caso de especificacion es un
             # requisito. Con >= 85 se aprobo un es_matricula que fallaba 1 de 16
             # (acepto '!OV-3074') en la aceptacion de la v1.
@@ -824,6 +870,11 @@ class ConsensusOrchestrator:
                 self.optimizer.name,
                 f"HEAVY: auditoría ronda {round_count} [umbral={self.threshold}]...",
             )
+            uv = blackboard.shared_notes.pop("ultimo_veredicto", None)
+            if uv:
+                self._registrar_intento(blackboard, uv["aciertos"], uv["total"],
+                                        uv["codigo"], uv["fallos"],
+                                        f"concilio, ronda {round_count}")
             last_critique = critique
             self.concilio_store.add_score(
                 doc,
@@ -994,6 +1045,7 @@ class ConsensusOrchestrator:
             "HEAVY: síntesis final consensuada...",
         )
         blackboard.final_synthesis = final_answer
+        self._entregar_mejor_intento(blackboard)
         self.concilio_store.append_timeline(doc, "synthesis", "final", f"{len(final_answer or '')} chars")
         self.concilio_store.save(doc)
 

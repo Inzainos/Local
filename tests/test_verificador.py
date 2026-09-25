@@ -725,3 +725,18 @@ def test_el_arbitro_no_aprueba_con_un_caso_de_especificacion_fallado(monkeypatch
     c = a.evaluate_solution(mem, threshold=85, espera_codigo=True)
     assert not c.passed, "un requisito incumplido no puede declarar consenso"
     assert c.score == 84, f"la cifra queda justo por debajo del umbral: {c.score}"
+
+
+def test_el_arbitro_deja_constancia_de_cada_verificacion_de_especificacion(monkeypatch):
+    """El orquestador necesita cada medicion para quedarse con la mejor."""
+    from engine.verificador import Veredicto
+    v = Veredicto(15, 16, linea_base=8, detalle=[
+        {"entrada": "validar_token_telegram('!x')", "obtenido": "True",
+         "esperado": "False", "correcto": False}])
+    v.via = "especificacion"
+    a, mem, bb = _arbitro_con_veredicto(monkeypatch, v)
+    a.evaluate_solution(mem, threshold=85, espera_codigo=True)
+    uv = bb.shared_notes.get("ultimo_veredicto")
+    assert uv and uv["aciertos"] == 15 and uv["total"] == 16
+    assert uv["fallos"] == ["validar_token_telegram('!x')"]
+    assert "def validar_token_telegram" in uv["codigo"]

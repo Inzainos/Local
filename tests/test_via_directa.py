@@ -129,3 +129,57 @@ def test_quince_de_dieciseis_no_es_verificado():
     assert orq._intentar_via_directa(bb) == "concilio"
     assert not bb.consensus_reached
     assert "es_matricula('!OV-3074')" in prompts[1], "el segundo intento debe saber cual fallo"
+
+
+# ─── MEJOR INTENTO MEDIDO ─────────────────────────────────────────────────────
+# Aceptacion v1, 2.a pasada: es_matricula dio 15/16 por la via directa, el
+# concilio lo EMPEORO a 8/16 en tres rondas, y se entrego el 8/16.
+
+def test_se_guarda_el_mejor_no_el_ultimo():
+    bb = _pizarra()
+    O = ConsensusOrchestrator
+    O._registrar_intento(bb, 15, 16, "def a(): pass", ["x"], "via directa, intento 1")
+    O._registrar_intento(bb, 8, 16, "def b(): pass", ["y"] * 8, "concilio, ronda 1")
+    assert bb.shared_notes["mejor_intento"]["aciertos"] == 15
+    assert bb.shared_notes["mejor_intento"]["origen"] == "via directa, intento 1"
+
+
+def test_sin_consenso_se_entrega_el_mejor_rotulado():
+    bb = _pizarra()
+    ConsensusOrchestrator._registrar_intento(
+        bb, 15, 16, "def es_matricula(s): return True", ["es_matricula('!OV-3074')"],
+        "via directa, intento 1")
+    bb.final_synthesis = "sintesis del concilio con el codigo de 8/16"
+    assert ConsensusOrchestrator._entregar_mejor_intento(bb) is True
+    assert "15/16" in bb.final_synthesis
+    assert "es_matricula('!OV-3074')" in bb.final_synthesis, "tiene que decir que falla"
+    assert "def es_matricula" in bb.final_synthesis
+    assert not bb.consensus_reached, "entregar el mejor NO es aprobarlo"
+
+
+def test_con_consenso_no_se_toca_la_entrega():
+    bb = _pizarra()
+    ConsensusOrchestrator._registrar_intento(bb, 15, 16, "def x(): pass", [], "o")
+    bb.consensus_reached = True
+    bb.final_synthesis = "la verificada"
+    assert ConsensusOrchestrator._entregar_mejor_intento(bb) is False
+    assert bb.final_synthesis == "la verificada"
+
+
+def test_la_via_directa_registra_sus_intentos():
+    f = _veredicto(15, 16, 8, fallos=["es_matricula('!OV-3074')"])
+    orq, _ = _orquestador([f, f])
+    bb = _pizarra()
+    orq._intentar_via_directa(bb)
+    mejor = bb.shared_notes.get("mejor_intento")
+    assert mejor and mejor["aciertos"] == 15 and "via directa" in mejor["origen"]
+
+
+def test_el_mejor_intento_no_entra_en_el_contexto_del_coder():
+    """Lleva codigo; mas contexto le mueve la salida al coder (medido)."""
+    bb = _pizarra()
+    ConsensusOrchestrator._registrar_intento(bb, 15, 16, "def SECRETO_DEL_MEJOR(): pass",
+                                             [], "o")
+    bb.shared_notes["ultimo_veredicto"] = {"codigo": "def SECRETO_DEL_ULTIMO(): pass"}
+    ctx = bb.get_context_for_coder()
+    assert "SECRETO_DEL_MEJOR" not in ctx and "SECRETO_DEL_ULTIMO" not in ctx

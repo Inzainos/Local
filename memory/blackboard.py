@@ -205,8 +205,12 @@ class Blackboard(BaseModel):
             )
         if self.shared_notes:
             # Never dump repository_context secrets; notes are still untrusted.
+            # Claves INTERNAS del orquestador fuera del volcado: el mejor intento
+            # lleva codigo, y mas contexto le mueve la salida al coder (medido:
+            # reglas correctas y redundantes bajaron a codegemma de 72 a 68/73).
             notes = {k: v for k, v in self.shared_notes.items()
-                     if k not in ("repository_context", "reglas_enunciado")}
+                     if k not in ("repository_context", "reglas_enunciado", "via",
+                                  "mejor_intento", "ultimo_veredicto")}
             # repository_context is trusted curated pack — include separately uncapped lightly
             if "repository_context" in self.shared_notes:
                 ctx.append(

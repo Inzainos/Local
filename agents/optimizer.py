@@ -140,6 +140,18 @@ obligatorias (umbral único {threshold}; sin zona intermedia).
                     # umbral, para que el informe diga cuanto le falto.
                     if verificado and veredicto.aciertos < veredicto.total:
                         score = min(score, threshold - 1)
+                    # Constancia para el orquestador, que guarda el MEJOR intento
+                    # medido: si nadie cierra, se entrega ese y no el ultimo.
+                    if verificado:
+                        from engine.verificador import extraer_codigo, nombre_funcion
+                        crudo = (blackboard.code_proposal.raw_content
+                                 if blackboard.code_proposal else "")
+                        blackboard.shared_notes["ultimo_veredicto"] = {
+                            "aciertos": veredicto.aciertos, "total": veredicto.total,
+                            "fallos": [f["entrada"] for f in (veredicto.detalle or [])
+                                       if not f.get("correcto")][:8],
+                            "codigo": extraer_codigo(crudo, nombre_funcion(blackboard.user_prompt)),
+                        }
                     aviso = ("" if veredicto.supera_la_base
                              else "  ATENCION: no supera la linea base trivial")
                     blackboard.log_event(
