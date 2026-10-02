@@ -13,13 +13,22 @@ Architecture:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 from dataclasses import dataclass, asdict, field, fields
 from enum import Enum
 import threading
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - fcntl es POSIX; aqui siempre esta
+    fcntl = None
+
+logger = logging.getLogger(__name__)
 
 
 # Tope de reintentos por aviso. Un aviso que Telegram rechaza siempre (HTML
@@ -27,6 +36,11 @@ import threading
 # al frente de la cola cada 5 s para siempre, y la cola es FIFO: tapaba todo lo
 # que venia detras hasta que alguien reiniciaba el proceso.
 MAX_INTENTOS = 5
+
+# Cuanto se espera el candado de archivo antes de seguir sin el. Las operaciones
+# duran ~1 ms y el nucleo suelta el candado si el proceso muere, asi que agotar
+# esto significa que algo esta parado de verdad.
+ESPERA_CANDADO_S = 5.0
 
 
 class AlertPriority(Enum):
@@ -81,11 +95,18 @@ def _a_dict(alert: Alert) -> Dict[str, Any]:
 
 
 class AlertQueue:
-    """Thread-safe alert queue using JSON file as backing store.
+    """Cola de avisos en un archivo JSON, compartida por el bot y el Sentinel.
 
-    Cross-process safety is best-effort: writes use temp+replace.
-    Concurrent writers from another process can still race; prefer a
-    single producer or external locking if that becomes hot.
+    Los dos son procesos distintos: el Sentinel importa este modulo por ruta
+    absoluta y encola; el bot saca y envia. Cada operacion es leer el archivo,
+    cambiarlo y escribirlo, asi que el `RLock` de hilos no basta --- entre
+    procesos no significa nada. Por eso toda operacion pasa por `_exclusivo()`,
+    que ademas toma un `flock` del archivo `.lock`: sin el, un `push()` cruzado
+    con un `pop_batch()` podia duplicar o perder un aviso (medido: ~0,05 % por
+    encolado al ritmo de uno cada 15 min, o sea uno cada ~3 semanas).
+
+    Las escrituras siguen siendo temp+replace, asi que ningun lector ve un
+    archivo a medias aunque el candado no se pueda tomar.
     """
 
     def __init__(self, queue_path: Optional[str] = None):
@@ -100,9 +121,76 @@ class AlertQueue:
         self.inflight_path = self.queue_path.with_name("alert_queue_inflight.json")
         # Lo que agoto MAX_INTENTOS: se guarda en vez de borrarse.
         self.dead_path = self.queue_path.with_name("alert_queue_dead.json")
+        self.lock_path = self.queue_path.with_name(self.queue_path.name + ".lock")
         self._lock = threading.RLock()
+        # Un unico descriptor por instancia: con `flock`, dos descriptores del
+        # mismo proceso se bloquean entre si, y eso convertiria una llamada
+        # anidada en un cuelgue.
+        self._candado_fd = self._abrir_candado()
+        self._profundidad = 0
         self._ensure_queue_exists()
         self._stats = self._load_stats()
+
+    def _abrir_candado(self) -> Optional[int]:
+        if fcntl is None:
+            logger.warning(
+                "Cola: sin fcntl en esta plataforma; no hay exclusión entre procesos"
+            )
+            return None
+        try:
+            return os.open(str(self.lock_path), os.O_CREAT | os.O_RDWR, 0o600)
+        except OSError as exc:
+            logger.warning(
+                "Cola: no se pudo abrir %s (%s); no hay exclusión entre procesos",
+                self.lock_path.name,
+                type(exc).__name__,
+            )
+            return None
+
+    def _tomar_candado(self) -> bool:
+        """Toma el flock esperando como mucho ESPERA_CANDADO_S. False si no pudo."""
+        limite = time.monotonic() + ESPERA_CANDADO_S
+        while True:
+            try:
+                fcntl.flock(self._candado_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return True
+            except OSError:
+                if time.monotonic() >= limite:
+                    # Seguir sin candado es volver al comportamiento de antes,
+                    # que funcionaba; callarlo seria el problema. El nucleo
+                    # suelta el candado solo si el proceso muere, asi que llegar
+                    # aqui significa que otro proceso esta parado de verdad.
+                    logger.error(
+                        "Cola: el candado %s sigue tomado tras %.0f s; sigo SIN "
+                        "exclusión (un aviso podría duplicarse o perderse)",
+                        self.lock_path.name,
+                        ESPERA_CANDADO_S,
+                    )
+                    return False
+                time.sleep(0.01)
+
+    @contextmanager
+    def _exclusivo(self) -> Iterator[None]:
+        """Exclusión entre hilos (RLock) y entre procesos (flock), reentrante.
+
+        Reentrante a proposito: `requeue()` llama a `_quitar_de_vuelo()` y a
+        `_sumar_stat()`, que tambien lo usan. Solo el nivel exterior toma y
+        suelta el flock.
+        """
+        with self._lock:
+            tomado = False
+            if self._profundidad == 0 and self._candado_fd is not None:
+                tomado = self._tomar_candado()
+            self._profundidad += 1
+            try:
+                yield
+            finally:
+                self._profundidad -= 1
+                if tomado:
+                    try:
+                        fcntl.flock(self._candado_fd, fcntl.LOCK_UN)
+                    except OSError:  # pragma: no cover - el fd sigue siendo valido
+                        pass
 
     def _ensure_queue_exists(self):
         if not self.queue_path.exists():
@@ -138,9 +226,18 @@ class AlertQueue:
 
     @staticmethod
     def _atomic_write(path: Path, content: str):
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(content, encoding="utf-8")
-        os.replace(tmp, path)
+        # El temporal lleva el PID: con un nombre fijo, dos procesos escribiendo
+        # el mismo archivo usan el MISMO temporal, el segundo se lo lleva con su
+        # os.replace y el primero muere con FileNotFoundError. El candado lo
+        # evita; esto deja que, si el candado no se pudo tomar, lo peor sea un
+        # incremento perdido y no una excepcion en la ruta del Sentinel.
+        tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+        try:
+            tmp.write_text(content, encoding="utf-8")
+            os.replace(tmp, path)
+        except OSError:
+            tmp.unlink(missing_ok=True)
+            raise
 
     def _read_json(self, path: Path) -> List[Dict]:
         with self._lock:
@@ -174,7 +271,7 @@ class AlertQueue:
         return Alert(**limpio)
 
     def _quitar_de_vuelo(self, alert_id: str) -> None:
-        with self._lock:
+        with self._exclusivo():
             en_vuelo = self._read_json(self.inflight_path)
             quedan = [a for a in en_vuelo if a.get("id") != alert_id]
             if len(quedan) != len(en_vuelo):
@@ -203,7 +300,7 @@ class AlertQueue:
         incrementos simultaneos siguen pudiendo quedar en uno --- pero quita el
         retroceso sistematico, que es lo que hacia los numeros inservibles.
         """
-        with self._lock:
+        with self._exclusivo():
             self._stats = self._load_stats()
             self._stats[clave] = int(self._stats.get(clave, 0)) + 1
             if last_alert is not None:
@@ -212,7 +309,7 @@ class AlertQueue:
 
     def push(self, alert: Alert) -> str:
         """Add alert to queue. Returns alert ID."""
-        with self._lock:
+        with self._exclusivo():
             alerts = self._read_all()
             alerts.append(_a_dict(alert))
             self._write_all(alerts)
@@ -232,7 +329,7 @@ class AlertQueue:
         devolverlo con requeue(). Lo que quede en vuelo lo recupera
         recover_inflight() en el siguiente arranque.
         """
-        with self._lock:
+        with self._exclusivo():
             alerts = self._read_all()
             if not alerts:
                 return []
@@ -251,7 +348,7 @@ class AlertQueue:
         Asume un solo proceso consumidor (lo que garantiza systemd con estas
         units); con dos a la vez, uno le quitaria al otro lo que esta enviando.
         """
-        with self._lock:
+        with self._exclusivo():
             en_vuelo = self._read_json(self.inflight_path)
             if not en_vuelo:
                 return []
@@ -269,7 +366,7 @@ class AlertQueue:
         TELEGRAM_CHAT_ID configurado): si contaran, una configuracion a medias
         descartaria la cola entera en cinco vueltas.
         """
-        with self._lock:
+        with self._exclusivo():
             self._quitar_de_vuelo(alert.id)
             if contar_intento:
                 alert.attempts = int(alert.attempts or 0) + 1
@@ -285,7 +382,7 @@ class AlertQueue:
             return True
 
     def mark_sent(self, alert: Optional[Alert] = None) -> None:
-        with self._lock:
+        with self._exclusivo():
             if alert is not None:
                 self._quitar_de_vuelo(alert.id)
             self._sumar_stat(
@@ -301,7 +398,7 @@ class AlertQueue:
 
     def clear(self):
         """Vacia la cola y lo que hubiera en vuelo (si no, volveria al arrancar)."""
-        with self._lock:
+        with self._exclusivo():
             self._write_all([])
             self._write_json(self.inflight_path, [])
 
@@ -310,7 +407,7 @@ class AlertQueue:
 
     def get_stats(self) -> Dict[str, Any]:
         """Stats expected by telegram_bot /queue command."""
-        with self._lock:
+        with self._exclusivo():
             self._stats = self._load_stats()
             return {
                 "size": len(self._read_all()),

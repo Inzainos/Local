@@ -204,6 +204,76 @@ def test_un_aviso_del_esquema_viejo_se_lee_igual(tmp_path):
     assert a.metadata == {}
 
 
+# --- exclusion entre procesos --------------------------------------------
+
+HIJO_QUE_ENCOLA = """
+import sys
+sys.path.insert(0, {raiz!r})
+from alert_queue import Alert, AlertQueue
+
+q = AlertQueue(queue_path=sys.argv[1])
+for i in range(int(sys.argv[2])):
+    q.push(Alert(id=f"hijo-{{i}}", timestamp=1.0, priority="medium",
+                 title="del hijo", message="cuerpo"))
+"""
+
+
+def test_dos_procesos_encolando_a_la_vez_no_pierden_avisos(tmp_path):
+    """La carrera real: leer -> añadir -> escribir, desde dos procesos.
+
+    Sin candado de archivo, el que escribe segundo lo hace sobre lo que leyo
+    ANTES de que el otro escribiera, y los avisos del otro desaparecen.
+    """
+    import subprocess
+
+    q = cola(tmp_path)
+    cuantos = 120
+    raiz = str(Path(__file__).resolve().parents[1])
+    hijo = subprocess.Popen(
+        [sys.executable, "-c", HIJO_QUE_ENCOLA.format(raiz=raiz),
+         str(q.queue_path), str(cuantos)],
+        cwd=raiz,
+        stderr=subprocess.PIPE,
+    )
+    try:
+        for i in range(cuantos):
+            q.push(aviso(f"padre-{i}"))
+    finally:
+        _, err = hijo.communicate(timeout=120)
+    assert hijo.returncode == 0, err.decode()[-500:]
+
+    ids = [a.id for a in q.peek(max_count=cuantos * 2)]
+    assert len(ids) == cuantos * 2, f"faltan avisos: {len(ids)} de {cuantos * 2}"
+    assert len(set(ids)) == len(ids), "hay avisos duplicados"
+    assert q.get_stats()["total_enqueued"] == cuantos * 2
+
+
+def test_el_candado_es_reentrante(tmp_path):
+    """requeue() -> _quitar_de_vuelo() -> _sumar_stat() usan el mismo candado.
+
+    Con `flock`, un segundo descriptor del mismo proceso se bloquearia a si
+    mismo: si esto cuelga, el anidamiento esta roto.
+    """
+    q = cola(tmp_path)
+    with q._exclusivo():
+        with q._exclusivo():
+            q.push(aviso())
+            a = q.pop_batch()[0]
+            assert q.requeue(a) is True
+    assert q.size() == 1
+    assert q._profundidad == 0
+
+
+def test_sin_candado_disponible_la_cola_sigue_funcionando(tmp_path, monkeypatch):
+    """Una plataforma sin fcntl no debe dejar la cola inservible."""
+    monkeypatch.setattr("alert_queue.fcntl", None)
+    q = cola(tmp_path)
+
+    assert q._candado_fd is None
+    q.push(aviso())
+    assert [a.id for a in q.pop_batch()] == ["a1"]
+
+
 # --- contadores entre procesos -------------------------------------------
 
 

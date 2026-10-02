@@ -1,3 +1,27 @@
+## [3.0.5] - 2026-10-02 — la cola, con exclusión de verdad entre el bot y el Sentinel
+
+El `RLock` de la cola es de hilos y entre procesos no significa nada, y la cola la comparten dos
+procesos: el Sentinel importa `alert_queue.py` por ruta absoluta y encola, el bot saca y envía. Cada
+operación es leer el archivo, cambiarlo y escribirlo, así que un `push()` cruzado con un
+`pop_batch()` perdía avisos. **Medido con la prueba nueva** (dos procesos de verdad, 120 avisos cada
+uno, 240 en total): sin candado se perdieron **13**; con candado, 240 de 240 y cero duplicados.
+
+- `_exclusivo()`: `RLock` para hilos + `fcntl.flock` para procesos, **reentrante** con un solo
+  descriptor por instancia (con `flock`, dos descriptores del mismo proceso se bloquean entre sí, y
+  `requeue()` llama a `_quitar_de_vuelo()` y `_sumar_stat()`, que también lo toman). Lo usan todas
+  las operaciones que leen-cambian-escriben; `peek()` y `size()` no lo necesitan, son una lectura
+  suelta y la escritura es temp+replace.
+- Espera máxima de 5 s. Agotarla significa que otro proceso está parado de verdad —el núcleo suelta
+  el `flock` solo si el proceso muere— y entonces sigue **sin** candado dejando un ERROR que lo dice.
+  Sin `fcntl` (otra plataforma), avisa al arrancar y la cola sigue funcionando.
+- **El temporal de `_atomic_write` lleva el PID.** Con nombre fijo, dos procesos escribiendo el
+  mismo archivo usaban el mismo temporal: el segundo se lo llevaba con su `os.replace` y el primero
+  moría con `FileNotFoundError` —reproducido en la prueba antes de este cambio—. En el journal del
+  bot no hay rastro de que haya pasado en producción (nada desde el 20-sep, ni restos de `.tmp`),
+  pero era alcanzable, y en la ruta del Sentinel una excepción se lleva su aviso.
+- 3 tests nuevos (262 → 265, cero saltados). Mutado a no abrir el candado, la prueba de los dos
+  procesos cae con 227 de 240.
+
 ## [3.0.4] - 2026-10-02 — el túnel ya no mata al bot para cambiarle la URL
 
 `scripts/run_cloudflared_mini.sh` hacía esto en cada arranque del túnel: esperar la URL nueva,

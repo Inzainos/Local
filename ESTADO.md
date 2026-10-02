@@ -5,9 +5,10 @@
 > modelo) no deje a nadie sin saber dónde se quedó. **Se actualiza cada vez que algo avanza.**
 > Si lo que dice aquí contradice al código, manda el código: verifícalo y corrige este archivo.
 
-**Última actualización:** 2026-10-02 00:10. **v1 CERRADA** y en pie (verificado: 262 tests,
-servicios activos, `:8002/mini` 200, Ollama 200). **Hay DOS arreglos commiteados SIN desplegar**:
-3.0.3 (cola de alertas) y 3.0.4 (el túnel ya no mata al bot). El reinicio lo hace el operador.
+**Última actualización:** 2026-10-02 00:25. **v1 CERRADA** y en pie (verificado: 265 tests,
+servicios activos, `:8002/mini` 200, Ollama 200). **Hay TRES arreglos commiteados SIN desplegar**:
+3.0.3 (la cola no pierde avisos), 3.0.4 (el túnel ya no mata al bot) y 3.0.5 (candado entre
+procesos). El reinicio lo hace el operador.
 Lo que sigue es v2.
 **Rama:** `local/concilio` (nunca push a `main`). **Operador:** Elán (responder en español).
 
@@ -30,7 +31,7 @@ Historial: [`CHANGELOG.md`](./CHANGELOG.md).
 ## 2. EN CURSO ahora mismo
 
 ### Servicios: corren la v1 + 3.0.1 + 3.0.2 + el botón de la Mini App (reiniciados 01-oct 22:07)
-**PENDIENTE DE DESPLEGAR: 3.0.3 (cola de alertas) y 3.0.4 (el túnel ya no mata al bot).** Están
+**PENDIENTE DE DESPLEGAR: 3.0.3, 3.0.4 y 3.0.5 (cola, túnel y candado entre procesos).** Están
 commiteados y probados, pero los servicios siguen con el código de antes. Reiniciar = `sudo
 systemctl restart consensus-telegram consensus-web` (lo corre el operador; no se toca systemd sin su
 orden). Mientras no se reinicie, el `pkill` ya está fuera del script del túnel pero el bot vivo
@@ -194,18 +195,19 @@ Verificado contra el túnel real: la URL leída del log coincide con la del `.en
 **Contadores** arreglados en el mismo paso (`_sumar_stat` relee dentro del lock).
 **Copias viejas** (11 MB) movidas a `~/backups/concilio_2026-10-02/`.
 
+**La cola ya tiene exclusión entre procesos** (`3.0.5`): `_exclusivo()` suma al `RLock` de hilos un
+`fcntl.flock` reentrante, con un solo descriptor por instancia. Medido con dos procesos de verdad
+(120 avisos cada uno): sin candado se perdían 13 de 240; con candado, 240 de 240. Por el camino salió
+que el temporal de `_atomic_write` tenía nombre fijo, así que dos procesos escribiendo a la vez
+podían matarse con `FileNotFoundError` (ahora lleva el PID); en el journal no hay rastro de que haya
+pasado. Mientras el bot vivo no se reinicie no hay exclusión real, porque él tiene el módulo viejo:
+no es peor que antes, pero es una razón más para reiniciar.
+
 **Lo que queda abierto**
 
-1. **La cola no tiene exclusión entre procesos.** El Sentinel encola y el bot saca sin candado de
-   archivo: si `push()` (leer → añadir → escribir) se cruza con `pop_batch()`, un aviso puede
-   duplicarse o perderse. Medido: el bot sondea cada 2 s y la operación dura ~1 ms, así que la
-   ventana es ~0,05 % por encolado — con un aviso cada 15 min, uno cada ~3 semanas. Arreglo: un
-   `fcntl.flock` por instancia (reentrante, un solo descriptor) alrededor de las lecturas y
-   escrituras de la cola. Son ~20 líneas, pero toca el camino de datos que acaba de estabilizarse:
-   **pendiente de tu GO.**
-2. **`source="sentinel"` está fijo** en `queue_alert()`. Hoy no miente —el Sentinel es el único que
-   encola, verificado— pero lo será en cuanto el Concilio encole algo propio. Lo que sí pierde
-   información ya es la prioridad: todo lo del Sentinel llega como MEDIUM
+1. **`source="sentinel"` está fijo** en `queue_alert()`. Hoy no miente —el Sentinel es el único que
+   encola, verificado en todo el repo— pero lo será en cuanto el Concilio encole algo propio. Lo que
+   sí pierde información ya es la prioridad: todo lo del Sentinel llega como MEDIUM
    (`infrastructure/api/telegram.py:191`), y eso está en el repo del Sentinel, no en este.
-3. **La rama local va por delante de `origin/local/concilio`**: la única copia de la v1 y de todo
+2. **La rama local va por delante de `origin/local/concilio`**: la única copia de la v1 y de todo
    esto es este disco. Sin hacer: `git push` es hacia fuera y necesita tu OK.
