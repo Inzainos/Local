@@ -53,6 +53,12 @@ SENTINEL_ROOT = os.environ.get(
     "SENTINEL_OMEGA_ROOT", "/home/deamon/workspaces/sentinel_omega"
 )
 TELEGRAM_WEBAPP_URL = os.environ.get("TELEGRAM_WEBAPP_URL", "").strip()
+# El tunel rapido de Cloudflare publica una URL distinta cada vez que arranca y
+# la escribe en este log (scripts/run_cloudflared_mini.sh, que lo trunca).
+MINI_APP_TUNEL_LOG = Path(__file__).resolve().parent / "logs" / "cloudflared-mini.log"
+# Valor VIVO de la URL. Arranca con lo que diga el .env y lo actualiza
+# vigilar_url_mini_app() cuando el tunel cambia, sin reiniciar el bot.
+_webapp_url_actual: Optional[str] = TELEGRAM_WEBAPP_URL
 CONSENSUS_DASHBOARD_URL = os.environ.get(
     "CONSENSUS_DASHBOARD_URL", "http://127.0.0.1:8002"
 ).strip()
@@ -150,10 +156,41 @@ def sessions_dir() -> Path:
 
 def webapp_url_ok() -> Optional[str]:
     """Telegram Mini Apps require a public HTTPS URL."""
-    url = TELEGRAM_WEBAPP_URL
+    url = _webapp_url_actual or ""
     if url.lower().startswith("https://"):
         return url
     return None
+
+
+def url_tunel_en_log(log_path: Optional[Path] = None) -> Optional[str]:
+    """Ultima URL que cloudflared publico en su log, con la ruta /mini.
+
+    El script del tunel trunca el log en cada arranque, asi que la ultima que
+    aparece es la del tunel que corre ahora.
+    """
+    ruta = log_path or MINI_APP_TUNEL_LOG
+    try:
+        texto = ruta.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    urls = re.findall(r"https://[a-z0-9-]+\.trycloudflare\.com", texto)
+    return f"{urls[-1]}/mini" if urls else None
+
+
+async def url_responde(url: str, timeout: float = 6.0) -> bool:
+    """Que la URL contesta de verdad, ANTES de ponerla en el boton.
+
+    El log puede traer la URL de un tunel que ya murio; registrarla deja el
+    boton tan roto como estaba.
+    """
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            res = await client.get(url)
+        return res.status_code == 200
+    except Exception:
+        return False
 
 
 def format_blackboard(bb: Blackboard) -> str:
@@ -1261,6 +1298,45 @@ async def registrar_boton_mini_app(application: Application) -> None:
             logger.warning("Mini App: no se pudo registrar el botón (%s)", type(exc).__name__)
 
 
+async def vigilar_url_mini_app(application: Application, intervalo: float = 120.0) -> None:
+    """Sigue la URL del túnel y re-registra el botón cuando cambia.
+
+    El tunel rapido estrena URL en cada arranque. Hasta ahora el ajuste lo hacia
+    `scripts/run_cloudflared_mini.sh`: reescribia TELEGRAM_WEBAPP_URL en el .env
+    y MATABA al bot (`pkill -TERM -f /telegram_bot.py`) para que systemd lo
+    levantara con el valor nuevo. Eso se llevaba por delante cualquier tarea del
+    concilio en curso --- la tarea real del 25-sep duro 9 minutos --- igual que
+    el reinicio de Windows del 25-sep 13:16, y por la misma razon: nadie avisaba.
+    Ahora el bot se entera solo y no hace falta reiniciarlo.
+    """
+    global _webapp_url_actual
+    from urllib.parse import urlparse
+
+    while True:
+        try:
+            nueva = url_tunel_en_log()
+            if nueva and nueva != _webapp_url_actual:
+                if await url_responde(nueva):
+                    anterior = urlparse(_webapp_url_actual or "").netloc or "-"
+                    _webapp_url_actual = nueva
+                    logger.info(
+                        "Mini App: el túnel cambió de URL (%s → %s), re-registrando",
+                        anterior,
+                        urlparse(nueva).netloc,
+                    )
+                    await registrar_boton_mini_app(application)
+                else:
+                    logger.warning(
+                        "Mini App: el log anuncia %s pero no responde; se queda la anterior",
+                        urlparse(nueva).netloc,
+                    )
+        except Exception as exc:
+            logger.warning(
+                "Mini App: la vigilancia de la URL falló (%s)", type(exc).__name__
+            )
+        await asyncio.sleep(intervalo)
+
+
 def main():
     global orchestrator, shared_memory
 
@@ -1297,6 +1373,7 @@ def main():
     async def post_init(application: Application):
         application.create_task(poll_alert_queue(application))
         application.create_task(registrar_boton_mini_app(application))
+        application.create_task(vigilar_url_mini_app(application))
         logger.info("🔄 Alert queue poller scheduled")
         await avisar_sesiones_interrumpidas(application)
 

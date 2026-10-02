@@ -46,8 +46,12 @@ if not seen:
 p.write_text("\n".join(out) + "\n", encoding="utf-8")
 print("TELEGRAM_WEBAPP_URL=", url)
 PY
-# Soft-restart telegram bot so systemd picks new EnvironmentFile
-pkill -TERM -f '/telegram_bot.py' 2>/dev/null || true
+# El bot NO se reinicia aqui. Antes se le mandaba un TERM para que systemd lo
+# levantara con el .env nuevo, y eso se llevaba por delante la tarea del
+# concilio que estuviera corriendo (las reales duran minutos). Desde la 3.0.4 el
+# bot vigila este log y re-registra el boton de la Mini App por su cuenta
+# (vigilar_url_mini_app en telegram_bot.py). El .env se sigue actualizando
+# arriba: es el valor con el que arranca en frio.
 echo "cloudflared pid=$CFPID url=$WEBAPP"
 # Keep tunnel in foreground for systemd
 wait "$CFPID"
