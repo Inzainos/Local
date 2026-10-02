@@ -180,21 +180,43 @@ class AlertQueue:
             if len(quedan) != len(en_vuelo):
                 self._write_json(self.inflight_path, quedan)
 
+    def _resumen(self, alert: Alert) -> Dict[str, Any]:
+        return {
+            "type": alert.source,
+            "priority": alert.priority,
+            "timestamp": alert.timestamp,
+            "title": alert.title,
+            "id": alert.id,
+        }
+
+    def _sumar_stat(self, clave: str, last_alert: Optional[Dict] = None) -> None:
+        """Suma 1 a un contador RELEYENDO el archivo dentro del lock.
+
+        El bot y el Sentinel son procesos distintos, cada uno con su copia de
+        `_stats` en memoria, y `_save_stats()` escribe el dict completo: cada
+        escritura de uno revertia los contadores que habia sumado el otro. Por
+        eso el archivo marcaba 2163 enviados contra 92 encolados (y no era que
+        `total_enqueued` se hubiera añadido despues: las dos claves nacieron en
+        el mismo commit, f4abb65).
+
+        Releer antes de sumar no es exclusion entre procesos --- dos
+        incrementos simultaneos siguen pudiendo quedar en uno --- pero quita el
+        retroceso sistematico, que es lo que hacia los numeros inservibles.
+        """
+        with self._lock:
+            self._stats = self._load_stats()
+            self._stats[clave] = int(self._stats.get(clave, 0)) + 1
+            if last_alert is not None:
+                self._stats["last_alert"] = last_alert
+            self._save_stats()
+
     def push(self, alert: Alert) -> str:
         """Add alert to queue. Returns alert ID."""
         with self._lock:
             alerts = self._read_all()
             alerts.append(_a_dict(alert))
             self._write_all(alerts)
-            self._stats["total_enqueued"] = int(self._stats.get("total_enqueued", 0)) + 1
-            self._stats["last_alert"] = {
-                "type": alert.source,
-                "priority": alert.priority,
-                "timestamp": alert.timestamp,
-                "title": alert.title,
-                "id": alert.id,
-            }
-            self._save_stats()
+            self._sumar_stat("total_enqueued", self._resumen(alert))
         return alert.id
 
     def pop_batch(self, max_count: int = 10) -> List[Alert]:
@@ -255,8 +277,7 @@ class AlertQueue:
                     muertos = self._read_json(self.dead_path)
                     muertos.append(_a_dict(alert))
                     self._write_json(self.dead_path, muertos)
-                    self._stats["total_dead"] = int(self._stats.get("total_dead", 0)) + 1
-                    self._save_stats()
+                    self._sumar_stat("total_dead")
                     return False
             alerts = self._read_all()
             alerts.insert(0, _a_dict(alert))
@@ -265,22 +286,14 @@ class AlertQueue:
 
     def mark_sent(self, alert: Optional[Alert] = None) -> None:
         with self._lock:
-            self._stats["total_sent"] = int(self._stats.get("total_sent", 0)) + 1
             if alert is not None:
                 self._quitar_de_vuelo(alert.id)
-                self._stats["last_alert"] = {
-                    "type": alert.source,
-                    "priority": alert.priority,
-                    "timestamp": alert.timestamp,
-                    "title": alert.title,
-                    "id": alert.id,
-                }
-            self._save_stats()
+            self._sumar_stat(
+                "total_sent", self._resumen(alert) if alert is not None else None
+            )
 
     def mark_failed(self, alert: Optional[Alert] = None) -> None:
-        with self._lock:
-            self._stats["total_failed"] = int(self._stats.get("total_failed", 0)) + 1
-            self._save_stats()
+        self._sumar_stat("total_failed")
 
     def peek(self, max_count: int = 10) -> List[Alert]:
         """View alerts without removing."""

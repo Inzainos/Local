@@ -204,6 +204,31 @@ def test_un_aviso_del_esquema_viejo_se_lee_igual(tmp_path):
     assert a.metadata == {}
 
 
+# --- contadores entre procesos -------------------------------------------
+
+
+def test_dos_procesos_no_se_pisan_los_contadores(tmp_path):
+    """El bot y el Sentinel tienen cada uno su copia de stats en memoria.
+
+    Antes `_save_stats()` escribia el dict completo, asi que cada escritura de
+    uno revertia lo que habia sumado el otro: el archivo de produccion marcaba
+    2163 enviados contra 92 encolados.
+    """
+    sentinel = cola(tmp_path)
+    bot = AlertQueue(queue_path=str(sentinel.queue_path))
+
+    sentinel.push(aviso("a1"))
+    bot.mark_sent(aviso("a1"))
+    sentinel.push(aviso("a2"))
+    bot.mark_sent(aviso("a2"))
+    bot.mark_failed(aviso("a2"))
+
+    stats = AlertQueue(queue_path=str(sentinel.queue_path)).get_stats()
+    assert stats["total_enqueued"] == 2
+    assert stats["total_sent"] == 2
+    assert stats["total_failed"] == 1
+
+
 # --- la entrega a medias, en el poller del bot ---------------------------
 
 
