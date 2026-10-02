@@ -1193,6 +1193,37 @@ async def poll_alert_queue(application: Application):
         await asyncio.sleep(2)
 
 
+
+
+async def registrar_boton_mini_app(application: Application) -> None:
+    """Pone el botón de menú Mini App en cada chat de TELEGRAM_CHAT_ID al arrancar.
+
+    El túnel rápido de Cloudflare cambia de URL al reiniciarse; re-registrar
+    en cada arranque evita que el botón quede apuntando a una URL muerta.
+    Sin URL HTTPS, regresa el botón al predeterminado para no dejar uno roto.
+    Se pone por chat porque el botón por defecto no se estaba quedando.
+    Un fallo solo deja un aviso en el log: el bot sigue funcionando.
+    """
+    from urllib.parse import urlparse
+    from telegram import MenuButtonDefault, MenuButtonWebApp
+
+    url = webapp_url_ok()
+    chats = [c.strip() for c in os.environ.get("TELEGRAM_CHAT_ID", "").split(",") if c.strip()]
+    if not chats:
+        logger.info("Mini App: sin TELEGRAM_CHAT_ID, botón no registrado")
+        return
+    host = urlparse(url).netloc if url else "-"
+    boton = (MenuButtonWebApp(text="Mini App", web_app=WebAppInfo(url=url))
+             if url else MenuButtonDefault())
+    for chat in chats:
+        try:
+            await application.bot.set_chat_menu_button(chat_id=int(chat), menu_button=boton)
+            logger.info("Mini App: botón %s en un chat (host %s)",
+                        "registrado" if url else "regresado al predeterminado", host)
+        except Exception as exc:
+            logger.warning("Mini App: no se pudo registrar el botón (%s)", type(exc).__name__)
+
+
 def main():
     global orchestrator, shared_memory
 
@@ -1228,6 +1259,7 @@ def main():
 
     async def post_init(application: Application):
         application.create_task(poll_alert_queue(application))
+        application.create_task(registrar_boton_mini_app(application))
         logger.info("🔄 Alert queue poller scheduled")
         await avisar_sesiones_interrumpidas(application)
 

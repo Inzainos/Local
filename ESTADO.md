@@ -147,3 +147,11 @@ bitácora del día, por qué alfa1 reconoce el 100 % de los eventos (5 de 9 bots
   en `data/shared_memory.db`.
 - **`grep -E "-> ..."`**: un patrón que empieza por `-` se lee como opción; usar `-e`.
 - Revertir la caché de Ollama: `C:\Users\elanz\AppData\Local\Temp\ollama_revertir.ps1`.
+
+## 2026-09-27 (noche) — Telegram del Sentinel (T)
+
+El Sentinel usaba el token viejo de SismoBio_Bot (401). Se rotó `deploy/.env` a las
+19:42 con el token válido (`600`, respaldos en `~/t_scripts/respaldos/`). Los avisos
+directos del día venían del Sentinel de root, que ya está enmascarado. No hay
+resúmenes mientras dure el rebuild. Detalle en
+`/home/deamon/workspaces/estado/TELEGRAM_2026-09-27.md`.
