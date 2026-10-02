@@ -1,3 +1,31 @@
+## [3.0.4] - 2026-10-02 — el túnel ya no mata al bot para cambiarle la URL
+
+`scripts/run_cloudflared_mini.sh` hacía esto en cada arranque del túnel: esperar la URL nueva,
+reescribir `TELEGRAM_WEBAPP_URL` en el `.env` y **matar al bot** (`pkill -TERM -f
+/telegram_bot.py`) para que systemd lo levantara con el valor nuevo. Funcionaba para el botón, pero
+el precio es el mismo hueco de la 3.0.2 y la 3.0.3: **una tarea del concilio en curso moría con el
+bot** —las reales duran minutos, la del 25-sep duró 9— y el túnel se reinicia solo
+(`Restart=always`). Medido esta noche: el túnel pasó de `motion-warrior-lighting-tab` (22:07:01) a
+`metals-june-kiss-mate` (22:07:05) y el bot fue reiniciado a las 22:10:37.
+
+- **El bot se entera solo** (`vigilar_url_mini_app`): cada 120 s lee la última URL del log del
+  túnel (el script lo trunca en cada arranque, así que la última es la viva), **comprueba que
+  responde 200** antes de adoptarla —el log puede anunciar un túnel que ya murió— y re-registra el
+  botón de la Mini App. Sin reinicio, sin tocar el `.env`.
+- `webapp_url_ok()` devuelve el **valor vivo**, no la constante leída al importar: con eso también
+  se corrigen solos el botón en línea de los mensajes y el `webapp_url` del estado, que antes
+  quedaban apuntando a la URL muerta hasta el siguiente arranque.
+- Fuera el `pkill` del script. El `.env` se sigue actualizando: es el valor del arranque en frío.
+- **Contadores de la cola**: `_save_stats()` escribía el dict completo de la copia en memoria de
+  cada proceso, así que cada escritura del bot revertía los `total_enqueued` que sumaba el Sentinel
+  y al revés; de ahí los 2163 enviados contra 92 encolados del archivo de producción. No era que la
+  clave se hubiera añadido después: las dos nacieron en `f4abb65`. Ahora cada incremento relee
+  dentro del lock (`_sumar_stat`).
+- 9 tests nuevos (253 → 262, cero saltados); 5 mutaciones, 5 pruebas caídas. Verificado contra el
+  túnel real: la URL leída del log coincide con la del `.env` y responde 200.
+- Limpieza: las copias viejas (11 MB: dos `shared_memory.db.pre_cuarentena_*` y cuatro
+  `telegram_bot.py.bak.*`) salen del árbol que lee el bot a `~/backups/concilio_2026-10-02/`.
+
 ## [3.0.3] - 2026-10-01 — un aviso de la cola ya no se pierde en silencio
 
 El mismo hueco que cerró la 3.0.2 para las tareas del concilio seguía abierto, idéntico, en la

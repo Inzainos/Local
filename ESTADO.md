@@ -5,9 +5,10 @@
 > modelo) no deje a nadie sin saber dónde se quedó. **Se actualiza cada vez que algo avanza.**
 > Si lo que dice aquí contradice al código, manda el código: verifícalo y corrige este archivo.
 
-**Última actualización:** 2026-10-01 23:55. **v1 CERRADA** y en pie (verificado hoy: 253 tests,
-servicios activos, `:8002/mini` 200, Ollama 200). **Hay un arreglo commiteado SIN desplegar**
-(`89c96e2`, cola de alertas): el reinicio lo hace el operador. Lo que sigue es v2.
+**Última actualización:** 2026-10-02 00:10. **v1 CERRADA** y en pie (verificado: 262 tests,
+servicios activos, `:8002/mini` 200, Ollama 200). **Hay DOS arreglos commiteados SIN desplegar**:
+3.0.3 (cola de alertas) y 3.0.4 (el túnel ya no mata al bot). El reinicio lo hace el operador.
+Lo que sigue es v2.
 **Rama:** `local/concilio` (nunca push a `main`). **Operador:** Elán (responder en español).
 
 ---
@@ -29,9 +30,11 @@ Historial: [`CHANGELOG.md`](./CHANGELOG.md).
 ## 2. EN CURSO ahora mismo
 
 ### Servicios: corren la v1 + 3.0.1 + 3.0.2 + el botón de la Mini App (reiniciados 01-oct 22:07)
-**PENDIENTE DE DESPLEGAR: el arreglo de la cola de alertas (`89c96e2`).** Está commiteado y probado,
-pero los servicios siguen con el código de antes. Reiniciar = `sudo systemctl restart
-consensus-telegram consensus-web` (lo corre el operador; no se toca systemd sin su orden).
+**PENDIENTE DE DESPLEGAR: 3.0.3 (cola de alertas) y 3.0.4 (el túnel ya no mata al bot).** Están
+commiteados y probados, pero los servicios siguen con el código de antes. Reiniciar = `sudo
+systemctl restart consensus-telegram consensus-web` (lo corre el operador; no se toca systemd sin su
+orden). Mientras no se reinicie, el `pkill` ya está fuera del script del túnel pero el bot vivo
+aún no vigila la URL: si el túnel rota en esa ventana, el botón espera al reinicio.
 `consensus-telegram` (bot) y `consensus-web` son **servicios del sistema** y cargan el código **al
 arrancar**: cualquier cambio posterior no llega al teléfono ni a la web hasta reiniciarlos.
 Comprobar qué código corren: `systemctl show consensus-telegram consensus-web -p ActiveEnterTimestamp`
@@ -178,24 +181,31 @@ dicen nada), porque el bot vivo tiene el módulo viejo en memoria y el Sentinel 
 `alert_queue.py` **por ruta absoluta** desde sus propios procesos
 (`workspaces/sentinel_omega/infrastructure/api/telegram.py:34`).
 
-**Lo que queda abierto (medido, sin arreglar)**
+## 2026-10-02 (madrugada) — cerrados los huecos 1, 2 y 5
 
-1. **El botón Mini App depende de un túnel efímero y de edición a mano.** Esta noche el túnel rotó de
-   `motion-warrior-lighting-tab` (22:07:01) a `metals-june-kiss-mate` (22:07:05) y hubo que editar
-   `.env` (22:07:10) y reiniciar el bot (22:10:37) para que el botón apuntara bien: dos URLs en
-   3,5 min. `TELEGRAM_WEBAPP_URL` se lee **al importar** y el botón sólo se re-registra **al
-   arrancar**, así que la próxima rotación lo deja muerto sin aviso. Arreglo de fondo: túnel con
-   nombre (hostname estable) o leer la URL del túnel al registrar.
-2. **Los contadores de la cola se pisan entre procesos.** `total_sent` 2163 vs `total_enqueued` 92 no
-   es antigüedad (ambas claves nacieron en `f4abb65`): `_save_stats()` escribe el dict completo de su
-   propia copia en memoria, así que cada escritura del bot revierte los `total_enqueued` que sumó el
-   Sentinel y al revés. Lo que sí es fiable es el tamaño de los archivos (`size`, `en_vuelo`,
-   `descartados`), que se cuenta leyendo. Arreglo: releer stats dentro del lock antes de sumar.
-3. **`source="sentinel"` está fijo** en `queue_alert()` para toda la API pública: la cola no puede
-   decir quién produjo un aviso, y todo lo del Sentinel llega además con prioridad MEDIUM fija
-   (`infrastructure/api/telegram.py:191`), perdiendo su severidad real.
-4. **La rama local va 73 commits por delante de `origin/local/concilio`**: la única copia de la v1 y
-   de todo esto es este disco.
-5. **11 MB de copias viejas en el árbol del servicio**: `data/shared_memory.db.pre_cuarentena_*` (×2)
-   y `telegram_bot.py.bak.*` (×4). No están en git; conviene moverlas fuera del directorio que lee
-   el bot.
+**El túnel ya no mata al bot** (`3.0.4`, ver CHANGELOG). La corrección importante al diagnóstico del
+01-oct: la edición del `.env` **no era a mano** — la hace `scripts/run_cloudflared_mini.sh`, que
+además **mataba al bot** con `pkill -TERM -f '/telegram_bot.py'` para que systemd lo levantara con
+el valor nuevo. Eso explica el reinicio de las 22:10:37, y el precio es que **una tarea del concilio
+en curso moría con él**, igual que con el reinicio de Windows del 25-sep 13:16; el túnel se reinicia
+solo (`Restart=always`). Ahora el bot lee la URL del log del túnel, comprueba que responde 200 y
+re-registra el botón por su cuenta (`vigilar_url_mini_app`, cada 120 s); fuera el `pkill`.
+Verificado contra el túnel real: la URL leída del log coincide con la del `.env` y responde 200.
+**Contadores** arreglados en el mismo paso (`_sumar_stat` relee dentro del lock).
+**Copias viejas** (11 MB) movidas a `~/backups/concilio_2026-10-02/`.
+
+**Lo que queda abierto**
+
+1. **La cola no tiene exclusión entre procesos.** El Sentinel encola y el bot saca sin candado de
+   archivo: si `push()` (leer → añadir → escribir) se cruza con `pop_batch()`, un aviso puede
+   duplicarse o perderse. Medido: el bot sondea cada 2 s y la operación dura ~1 ms, así que la
+   ventana es ~0,05 % por encolado — con un aviso cada 15 min, uno cada ~3 semanas. Arreglo: un
+   `fcntl.flock` por instancia (reentrante, un solo descriptor) alrededor de las lecturas y
+   escrituras de la cola. Son ~20 líneas, pero toca el camino de datos que acaba de estabilizarse:
+   **pendiente de tu GO.**
+2. **`source="sentinel"` está fijo** en `queue_alert()`. Hoy no miente —el Sentinel es el único que
+   encola, verificado— pero lo será en cuanto el Concilio encole algo propio. Lo que sí pierde
+   información ya es la prioridad: todo lo del Sentinel llega como MEDIUM
+   (`infrastructure/api/telegram.py:191`), y eso está en el repo del Sentinel, no en este.
+3. **La rama local va por delante de `origin/local/concilio`**: la única copia de la v1 y de todo
+   esto es este disco. Sin hacer: `git push` es hacia fuera y necesita tu OK.
