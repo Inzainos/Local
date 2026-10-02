@@ -335,6 +335,16 @@ def alert_queue_block() -> str:
         f"Enviados: <code>{stats.get('total_sent', 0)}</code> | "
         f"Fallidos: <code>{stats.get('total_failed', 0)}</code>",
     ]
+    # Un aviso descartado o colgado en vuelo no debe quedarse callado: es lo
+    # unico que dice que algo no llego.
+    en_vuelo = stats.get("en_vuelo", 0)
+    descartados = stats.get("descartados", 0)
+    if en_vuelo or descartados:
+        lines.append(
+            f"⚠️ En vuelo: <code>{en_vuelo}</code> | "
+            f"Descartados: <code>{descartados}</code> "
+            f"(<code>data/alert_queue_dead.json</code>)"
+        )
     la = stats.get("last_alert")
     if la:
         lines.append(
@@ -1150,6 +1160,16 @@ async def avisar_sesiones_interrumpidas(application: Application):
 
 
 async def poll_alert_queue(application: Application):
+    # Lo que el proceso anterior saco de la cola y no llego a confirmar vuelve
+    # a la cabeza. Es el mismo hueco que el de las sesiones cortadas: si el
+    # proceso muere entre sacar y enviar, el aviso no esta en ningun archivo.
+    recuperados = alert_queue.recover_inflight()
+    if recuperados:
+        logger.warning(
+            "Cola: %d aviso(s) quedaron en vuelo en el arranque anterior, "
+            "devueltos a la cola",
+            len(recuperados),
+        )
     logger.info("🔄 Alert queue poller started")
     while True:
         try:
@@ -1160,33 +1180,50 @@ async def poll_alert_queue(application: Application):
                     if TELEGRAM_CHAT_ID
                     else []
                 )
-                if not chat_ids:
-                    logger.warning("TELEGRAM_CHAT_ID empty — requeueing alert")
-                    alert_queue.requeue(alert)
+                # Un reintento solo va a los chats que faltan: repetirselo a
+                # quien ya lo recibio seria duplicarle el aviso.
+                destinos = alert.pending_chats or chat_ids
+                if not destinos:
+                    logger.warning("TELEGRAM_CHAT_ID vacío — el aviso vuelve a la cola")
+                    # Sin chats configurados el fallo no es del aviso: no
+                    # gasta intentos (si no, la cola entera se descartaria).
+                    alert_queue.requeue(alert, contar_intento=False)
                     alert_queue.mark_failed(alert)
+                    await asyncio.sleep(5)
                     continue
 
-                delivered = False
-                for chat_id in chat_ids:
+                fallidos = []
+                for chat_id in destinos:
                     try:
                         await application.bot.send_message(
                             chat_id=int(chat_id),
                             text=alert.message,
                             parse_mode=alert.parse_mode,
                         )
-                        delivered = True
                         logger.info(
                             "Alert sent: %s (%s)", alert.title, alert.priority
                         )
                     except Exception as e:
+                        fallidos.append(chat_id)
                         logger.error("Failed to send alert to %s: %s", chat_id, e)
 
-                if delivered:
+                if not fallidos:
                     alert_queue.mark_sent(alert)
-                else:
-                    alert_queue.requeue(alert)
-                    alert_queue.mark_failed(alert)
+                    continue
+
+                # Antes bastaba un chat para darlo por entregado y destruirlo:
+                # los demas se quedaban sin el aviso y nadie lo sabia.
+                alert.pending_chats = fallidos
+                alert_queue.mark_failed(alert)
+                if alert_queue.requeue(alert):
                     await asyncio.sleep(5)
+                else:
+                    logger.error(
+                        "Cola: aviso «%s» descartado tras %d intentos, queda en "
+                        "data/alert_queue_dead.json",
+                        alert.title,
+                        alert.attempts,
+                    )
         except Exception as e:
             logger.error("Alert queue poller error: %s", e)
 

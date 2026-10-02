@@ -476,9 +476,12 @@ def alerts_stats_api():
         stats = alert_queue.get_stats()
         return {
             "size": stats.get("size", 0),
+            "en_vuelo": stats.get("en_vuelo", 0),
+            "descartados": stats.get("descartados", 0),
             "total_enqueued": stats.get("total_enqueued", 0),
             "total_sent": stats.get("total_sent", 0),
             "total_failed": stats.get("total_failed", 0),
+            "total_dead": stats.get("total_dead", 0),
             "last_alert": stats.get("last_alert"),
         }
     except Exception as exc:

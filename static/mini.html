@@ -136,6 +136,7 @@
             <div class="row"><span>Pendientes</span><span class="metric">${esc(q.size ?? '—')}</span></div>
             <div class="row"><span>Enviados</span><span>${esc(q.total_sent ?? '—')}</span></div>
             <div class="row"><span>Fallidos</span><span>${esc(q.total_failed ?? '—')}</span></div>
+            ${(q.en_vuelo || q.descartados) ? `<div class="row"><span>⚠️ En vuelo / descartados</span><span>${esc(q.en_vuelo ?? 0)} / ${esc(q.descartados ?? 0)}</span></div>` : ''}
           </div>
           <div class="card">
             <h2>Politica</h2>
