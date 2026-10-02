@@ -5,7 +5,9 @@
 > modelo) no deje a nadie sin saber dónde se quedó. **Se actualiza cada vez que algo avanza.**
 > Si lo que dice aquí contradice al código, manda el código: verifícalo y corrige este archivo.
 
-**Última actualización:** 2026-09-25 14:40. **v1 CERRADA**: desplegada y con una tarea real terminada de principio a fin, verificada por ejecución (16/16). Lo que sigue es v2.
+**Última actualización:** 2026-10-01 23:55. **v1 CERRADA** y en pie (verificado hoy: 253 tests,
+servicios activos, `:8002/mini` 200, Ollama 200). **Hay un arreglo commiteado SIN desplegar**
+(`89c96e2`, cola de alertas): el reinicio lo hace el operador. Lo que sigue es v2.
 **Rama:** `local/concilio` (nunca push a `main`). **Operador:** Elán (responder en español).
 
 ---
@@ -26,18 +28,17 @@ Historial: [`CHANGELOG.md`](./CHANGELOG.md).
 
 ## 2. EN CURSO ahora mismo
 
-### Servicios: corren la v1 + 3.0.1 + 3.0.2 (reiniciados por el operador a las 14:12)
-El aviso de tareas interrumpidas está vivo (en el journal: «sin tareas interrumpidas»), pero **no vio
-la sesión cortada de las 13:05**: es del esquema 1 y `sesiones_interrumpidas()` ignora esas a
-propósito. El aviso empieza a contar desde las sesiones creadas por este código.
+### Servicios: corren la v1 + 3.0.1 + 3.0.2 + el botón de la Mini App (reiniciados 01-oct 22:07)
+**PENDIENTE DE DESPLEGAR: el arreglo de la cola de alertas (`89c96e2`).** Está commiteado y probado,
+pero los servicios siguen con el código de antes. Reiniciar = `sudo systemctl restart
+consensus-telegram consensus-web` (lo corre el operador; no se toca systemd sin su orden).
 `consensus-telegram` (bot) y `consensus-web` son **servicios del sistema** y cargan el código **al
-arrancar**: cualquier cambio posterior no llega al teléfono ni a la web hasta reiniciarlos. El
-operador los reinició a las 09:46 (10 min después de la etiqueta, `1687f4c` 09:36). Verificado:
-ambos activos, arranque limpio en el journal, la web en `:8002` sirve las insignias de la vía
-directa y ningún `.py` cambió después del arranque. Regla: no se toca systemd sin orden del
-operador; reiniciar = `sudo systemctl restart consensus-telegram consensus-web` (lo corre él).
+arrancar**: cualquier cambio posterior no llega al teléfono ni a la web hasta reiniciarlos.
 Comprobar qué código corren: `systemctl show consensus-telegram consensus-web -p ActiveEnterTimestamp`
 contra `git log -1 --format=%ci`.
+El aviso de tareas interrumpidas está vivo (en el journal: «sin tareas interrumpidas»), pero **no vio
+la sesión cortada de las 13:05** del 25-sep: es del esquema 1 y `sesiones_interrumpidas()` ignora
+esas a propósito. El aviso empieza a contar desde las sesiones creadas por este código.
 
 | qué | estado | cómo retomarlo si se cortó |
 |---|---|---|
@@ -155,3 +156,46 @@ El Sentinel usaba el token viejo de SismoBio_Bot (401). Se rotó `deploy/.env` a
 directos del día venían del Sentinel de root, que ya está enmascarado. No hay
 resúmenes mientras dure el rebuild. Detalle en
 `/home/deamon/workspaces/estado/TELEGRAM_2026-09-27.md`.
+
+## 2026-10-01 (noche) — revisión del proyecto y arreglo de la cola de alertas
+
+**Lo que se verificó** (evidencia directa, no lectura): 253 tests pasan en 5,2 s con cero saltados
+(`.venv/bin/python -m pytest tests/ -q -rs`), ambas units activas desde las 22:07 (el bot tardó
+3,5 min en terminar de arrancar: «Bot iniciado — polling» a las 22:10:37), `:8002/mini` responde 200, Ollama responde 200 en `/api/tags` sin modelos en VRAM,
+el bot no reporta tareas interrumpidas y el botón de la Mini App apunta a la URL viva del túnel.
+
+**Lo que se arregló**
+
+| commit | qué | desplegado |
+|---|---|---|
+| `199fcd7` | versionar `registrar_boton_mini_app`, que corría desde el 27-sep sin commitear (los servicios de hoy ya lo cargaron, pero HEAD seguía en el 25-sep y `git show v1.0-estable` no reproducía producción) | **sí**, ya corría |
+| `89c96e2` | la cola de alertas perdía avisos: `pop_batch()` los borraba del archivo antes de enviarlos. Añade marca de **en vuelo** + recuperación al arrancar, **tope de 5 reintentos** con `alert_queue_dead.json` (antes un aviso irrecibible tapaba la cola FIFO para siempre) y **entrega parcial** que ya no se da por entregada. Validado por mutación 4/4 | **NO** — hace falta reiniciar los servicios |
+| — | permisos: `telegram_bot.py` (666) y `agents/{coder,optimizer}.py` (777) → 755. Código del camino vivo reescribible por cualquier otro uid. Git no lo ve (el bit de ejecución no cambió) | sí (es en disco) |
+
+El arreglo de la cola es **compatible en los dos sentidos** mientras no se reinicie: un aviso recién
+encolado se sigue escribiendo con el esquema de antes (`_a_dict` omite los campos nuevos cuando no
+dicen nada), porque el bot vivo tiene el módulo viejo en memoria y el Sentinel importa
+`alert_queue.py` **por ruta absoluta** desde sus propios procesos
+(`workspaces/sentinel_omega/infrastructure/api/telegram.py:34`).
+
+**Lo que queda abierto (medido, sin arreglar)**
+
+1. **El botón Mini App depende de un túnel efímero y de edición a mano.** Esta noche el túnel rotó de
+   `motion-warrior-lighting-tab` (22:07:01) a `metals-june-kiss-mate` (22:07:05) y hubo que editar
+   `.env` (22:07:10) y reiniciar el bot (22:10:37) para que el botón apuntara bien: dos URLs en
+   3,5 min. `TELEGRAM_WEBAPP_URL` se lee **al importar** y el botón sólo se re-registra **al
+   arrancar**, así que la próxima rotación lo deja muerto sin aviso. Arreglo de fondo: túnel con
+   nombre (hostname estable) o leer la URL del túnel al registrar.
+2. **Los contadores de la cola se pisan entre procesos.** `total_sent` 2163 vs `total_enqueued` 92 no
+   es antigüedad (ambas claves nacieron en `f4abb65`): `_save_stats()` escribe el dict completo de su
+   propia copia en memoria, así que cada escritura del bot revierte los `total_enqueued` que sumó el
+   Sentinel y al revés. Lo que sí es fiable es el tamaño de los archivos (`size`, `en_vuelo`,
+   `descartados`), que se cuenta leyendo. Arreglo: releer stats dentro del lock antes de sumar.
+3. **`source="sentinel"` está fijo** en `queue_alert()` para toda la API pública: la cola no puede
+   decir quién produjo un aviso, y todo lo del Sentinel llega además con prioridad MEDIUM fija
+   (`infrastructure/api/telegram.py:191`), perdiendo su severidad real.
+4. **La rama local va 73 commits por delante de `origin/local/concilio`**: la única copia de la v1 y
+   de todo esto es este disco.
+5. **11 MB de copias viejas en el árbol del servicio**: `data/shared_memory.db.pre_cuarentena_*` (×2)
+   y `telegram_bot.py.bak.*` (×4). No están en git; conviene moverlas fuera del directorio que lee
+   el bot.

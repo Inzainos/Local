@@ -1,3 +1,31 @@
+## [3.0.3] - 2026-10-01 — un aviso de la cola ya no se pierde en silencio
+
+El mismo hueco que cerró la 3.0.2 para las tareas del concilio seguía abierto, idéntico, en la
+cola de alertas: `pop_batch()` borraba el aviso del archivo **antes** de enviarlo, así que entre
+ese borrado y el `send_message` el aviso sólo existía en memoria del proceso. Un corte ahí —y aquí
+los reinicios de Windows cortan procesos a mitad, pasó el 25-sep 13:16— se llevaba hasta 5 avisos
+del Sentinel sin dejar rastro ni en un archivo ni en el log. No hubo incidente que lo delatara:
+salió revisando el código del poller.
+
+- **En vuelo** (`alert_queue.py`): lo que sale de la cola queda en `data/alert_queue_inflight.json`
+  hasta que se confirma. `recover_inflight()` lo devuelve a la **cabeza** de la cola al arrancar,
+  con un WARNING que dice cuántos eran. Asume un solo consumidor, que es lo que garantiza systemd.
+- **Tope de 5 reintentos**: un aviso que Telegram rechaza siempre (HTML inválido, mensaje largo, un
+  chat que bloqueó al bot) se reinsertaba al **frente** cada 5 s para siempre, y la cola es FIFO:
+  tapaba indefinidamente todo lo que venía detrás. Al agotarlos pasa a `alert_queue_dead.json` —se
+  guarda, no se borra— y `descartados` sale en `/queue`, en la Mini App y en `/api/alerts/stats`.
+  Un fallo que no es del aviso (sin `TELEGRAM_CHAT_ID`) no gasta intentos: si no, una configuración
+  a medias descartaría la cola entera en cinco vueltas.
+- **Entrega parcial** (`telegram_bot.py`): bastaba que **un** chat aceptara para marcar el aviso
+  entregado y destruirlo; los demás se quedaban sin él y nadie lo sabía. El reintento va ahora sólo
+  a los chats que faltan, sin duplicárselo a quien ya lo recibió.
+- **Compatible en los dos sentidos** mientras no se reinicien los servicios: el bot vivo tiene el
+  módulo viejo en memoria y el Sentinel importa `alert_queue.py` por ruta absoluta desde sus propios
+  procesos, así que un aviso recién encolado se sigue escribiendo con el esquema de antes (`_a_dict`
+  omite los campos nuevos cuando no dicen nada) y la hidratación ignora las claves que no conoce.
+- 13 tests nuevos (240 → 253, cero saltados); los 4 arreglos sobreviven a mutación, cada uno lo
+  detecta su prueba. Sin desplegar: los servicios cargan el código al arrancar.
+
 ## [3.0.2] - 2026-09-25 — una tarea interrumpida ya no se pierde en silencio
 
 El 25-sep a las 13:16 un reinicio de Windows cortó una tarea del concilio a los 10 minutos,
