@@ -112,9 +112,13 @@ exige decidir desde dónde (el código de la última ronda está en el `.concili
 - **Módulo de RAM**: el operador podría cambiar el de 4 GiB por uno de 8 (host 11,7 → 16 GiB,
   canal doble completo). Es lo único que haría caber `deepseek-r1:14b` o retener dos modelos.
 
-**Pendientes de Sentinel Omega** (otro repo: `/home/deamon/workspaces`), de sesiones anteriores:
-bitácora del día, por qué alfa1 reconoce el 100 % de los eventos (5 de 9 bots saturados en ~1,0),
-`tbl_trends_vivo` con 0 filas.
+**Pendientes de Sentinel Omega** (otro repo: `/home/deamon/workspaces`): su set point es la
+bitácora del día, hoy `estado/BITACORA_2026-10-08.md`. Dos cosas de esta lista **ya no son
+ciertas** (verificado el 8-oct): `tbl_trends_vivo` tiene **107 filas** y la última es de hoy, y
+lo de alfa1 quedó medido por la compuerta de habilidad — su AUC es 0,490 contra una tasa base de
+0,899, así que la compuerta lo **niega**. Lo que sí sigue abierto allá: los rasgos `marea_*` no
+llegan a la firma (2 tests rojos) **aunque el rebuild ya corrió**, y `peso_por_merito` sigue
+inerte por 36 ventanas de 50.
 
 ---
 
