@@ -116,9 +116,11 @@ exige decidir desde dónde (el código de la última ronda está en el `.concili
 bitácora del día, hoy `estado/BITACORA_2026-10-08.md`. Dos cosas de esta lista **ya no son
 ciertas** (verificado el 8-oct): `tbl_trends_vivo` tiene **107 filas** y la última es de hoy, y
 lo de alfa1 quedó medido por la compuerta de habilidad — su AUC es 0,490 contra una tasa base de
-0,899, así que la compuerta lo **niega**. Lo que sí sigue abierto allá: los rasgos `marea_*` no
-llegan a la firma (2 tests rojos) **aunque el rebuild ya corrió**, y `peso_por_merito` sigue
-inerte por 36 ventanas de 50.
+0,899, así que la compuerta lo **niega**. Lo que sí sigue abierto allá: `peso_por_merito` inerte por 36
+ventanas de 50, y el reloj de la máquina ~5 s por detrás, que es lo que tumba la fuente FRP
+(PyJWT rechaza el `iat` del vale sin margen). Lo de los rasgos `marea_*` **no** está abierto:
+lo di por rojo con el venv equivocado --- el del servicio es `workspaces/.venv` y con él la
+suite deja 2 rojos, los dos a propósito.
 
 ---
 
