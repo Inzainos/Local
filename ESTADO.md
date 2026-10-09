@@ -5,10 +5,11 @@
 > modelo) no deje a nadie sin saber dónde se quedó. **Se actualiza cada vez que algo avanza.**
 > Si lo que dice aquí contradice al código, manda el código: verifícalo y corrige este archivo.
 
-**Última actualización:** 2026-10-02 00:25. **v1 CERRADA** y en pie (verificado: 265 tests,
-servicios activos, `:8002/mini` 200, Ollama 200). **Hay TRES arreglos commiteados SIN desplegar**:
-3.0.3 (la cola no pierde avisos), 3.0.4 (el túnel ya no mata al bot) y 3.0.5 (candado entre
-procesos). El reinicio lo hace el operador.
+**Última actualización:** 2026-10-08 18:55. **v1 CERRADA** y en pie (verificado: 274 tests,
+servicios activos desde el 4-oct 12:36, Ollama 200). Las 3.0.3/3.0.4/3.0.5 **ya están
+desplegadas** —el operador reinició el 4-oct— y el 8-oct sirvieron: la cola hizo visibles 16
+avisos del Sentinel que Telegram rechazaba. **Hay un arreglo nuevo SIN desplegar: 3.0.6**
+(reintento sin formato + manejador de errores). El reinicio lo hace el operador.
 Lo que sigue es v2.
 **Rama:** `local/concilio` (nunca push a `main`). **Operador:** Elán (responder en español).
 
@@ -31,11 +32,12 @@ Historial: [`CHANGELOG.md`](./CHANGELOG.md).
 ## 2. EN CURSO ahora mismo
 
 ### Servicios: corren la v1 + 3.0.1 + 3.0.2 + el botón de la Mini App (reiniciados 01-oct 22:07)
-**PENDIENTE DE DESPLEGAR: 3.0.3, 3.0.4 y 3.0.5 (cola, túnel y candado entre procesos).** Están
-commiteados y probados, pero los servicios siguen con el código de antes. Reiniciar = `sudo
-systemctl restart consensus-telegram consensus-web` (lo corre el operador; no se toca systemd sin su
-orden). Mientras no se reinicie, el `pkill` ya está fuera del script del túnel pero el bot vivo
-aún no vigila la URL: si el túnel rota en esa ventana, el botón espera al reinicio.
+**DESPLEGADAS 3.0.3/3.0.4/3.0.5** (reinicio del operador el 4-oct 12:36, `NRestarts=0`).
+**PENDIENTE DE DESPLEGAR: 3.0.6** —el reintento sin formato—, commiteada y probada; hasta que se
+reinicie, un aviso con HTML que Telegram no parsee se sigue descartando tras cinco intentos (el
+defecto que lo causaba está arreglado en Sentinel y ya está vivo, porque allá el despacho es un
+`oneshot`). Reiniciar = `sudo systemctl restart consensus-telegram consensus-web` (lo corre el
+operador; no se toca systemd sin su orden).
 `consensus-telegram` (bot) y `consensus-web` son **servicios del sistema** y cargan el código **al
 arrancar**: cualquier cambio posterior no llega al teléfono ni a la web hasta reiniciarlos.
 Comprobar qué código corren: `systemctl show consensus-telegram consensus-web -p ActiveEnterTimestamp`
@@ -181,6 +183,33 @@ encolado se sigue escribiendo con el esquema de antes (`_a_dict` omite los campo
 dicen nada), porque el bot vivo tiene el módulo viejo en memoria y el Sentinel importa
 `alert_queue.py` **por ruta absoluta** desde sus propios procesos
 (`workspaces/sentinel_omega/infrastructure/api/telegram.py:34`).
+
+## 2026-10-08 (noche) — la cola hizo su trabajo: 16 avisos del Sentinel rechazados
+
+Lo desplegado el 4-oct se puso a prueba solo. Desde las **13:49** del 8-oct el log del bot
+repetía `Can't parse entities: unsupported start tag "50)"` y, tras cinco reintentos,
+`aviso descartado`: **16 mensajes del Sentinel perdidos** hasta las 18:25, digesto horario
+incluido. Sin la 3.0.3 eso no habría sido un descarte visible sino la cola **atascada para
+siempre** en la cabeza, porque antes el reintento era infinito y al frente.
+
+El defecto era de Sentinel —`(<50)` sin escapar, de un texto escrito ese mismo día— y está
+arreglado allá (`workspaces`, `12e16d7`: saneador en la única puerta de salida + escape en el
+origen + 14 tests). Lo de aquí es lo que faltaba de este lado:
+
+- **Reintento sin formato** (`3.0.6`): si Telegram rechaza el marcado, el aviso se reenvía en
+  texto plano antes de darlo por fallido. El formato es prescindible; el aviso no. Solo cuando
+  el error ES de formato: un chat inexistente o un bot bloqueado siguen volviendo a la cola.
+- **`add_error_handler`**: a las 16:43 un `httpcore.ReadError` de un segundo dejó tres trazas
+  anidadas en el journal bajo «No error handlers are registered». Ahora un corte de red es una
+  línea; lo demás conserva su traza.
+
+Verificado de punta a punta: el digesto muerto de las 18:25, saneado, salió por la cola y el
+journal registró `Alert sent` a las **18:40:21**. Quedan 16 avisos en `data/alert_queue_dead.json`
+—los de hoy— por si se quieren releer; no se reenviaron para no inundar el teléfono.
+
+Un dato que conviene saber: la compuerta horaria del digesto de Sentinel se marca **al encolar**,
+no al entregar (`data/estado_digesto.json` decía 18:04 de un digesto que murió). Con esta cola ya
+fiable es lo correcto —esperar la entrega duplicaría—, pero un fallo de entrega consume su hora.
 
 ## 2026-10-02 (madrugada) — cerrados los huecos 1, 2 y 5
 

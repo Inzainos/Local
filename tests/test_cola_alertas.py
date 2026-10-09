@@ -377,6 +377,82 @@ def test_el_reintento_no_repite_el_aviso_a_quien_ya_lo_recibio(bot_module):
     assert tb.alert_queue.get_stats()["en_vuelo"] == 0
 
 
+class BotQueRechazaElFormato:
+    """Telegram rechaza el HTML y acepta el texto plano, como en producción."""
+
+    def __init__(self):
+        self.intentos = []
+
+    async def send_message(self, chat_id, text, parse_mode=None):
+        self.intentos.append(parse_mode)
+        if parse_mode:
+            raise RuntimeError(
+                "Can't parse entities: unsupported start tag \"50)\" at byte offset 1499"
+            )
+
+
+def test_si_telegram_rechaza_el_formato_el_aviso_va_en_texto_plano(bot_module):
+    """El formato es prescindible; el aviso no.
+
+    El 8-oct se perdieron 15 digestos seguidos del Sentinel por un `(<50)` sin
+    escapar: Telegram rechaza el mensaje ENTERO, no lo entrega mal formateado.
+    """
+    tb = bot_module
+    monkey = BotQueRechazaElFormato()
+    tb.alert_queue.push(aviso(parse_mode="HTML", pending_chats=["111"]))
+
+    asyncio.run(_una_vuelta(tb, monkey, hasta=lambda: len(monkey.intentos) >= 2))
+
+    assert monkey.intentos[:2] == ["HTML", None], "reintenta sin formato"
+    assert tb.alert_queue.size() == 0, "el aviso NO vuelve a la cola: ya se entregó"
+    assert tb.alert_queue.get_stats()["descartados"] == 0
+
+
+def test_un_fallo_que_no_es_de_formato_sigue_volviendo_a_la_cola(bot_module):
+    """Un chat inexistente no se arregla quitando el formato."""
+    tb = bot_module
+
+    class BotQueSiempreFalla:
+        def __init__(self):
+            self.intentos = []
+
+        async def send_message(self, chat_id, text, parse_mode=None):
+            self.intentos.append(parse_mode)
+            raise RuntimeError("Bad Request: chat not found")
+
+    bot = BotQueSiempreFalla()
+    tb.alert_queue.push(aviso(parse_mode="HTML", pending_chats=["111"]))
+
+    def devuelto():
+        pendientes = tb.alert_queue.peek()
+        return bool(pendientes) and pendientes[0].attempts == 1
+
+    asyncio.run(_una_vuelta(tb, bot, hasta=devuelto))
+
+    assert bot.intentos == ["HTML"], "no se reintenta sin formato lo que no es formato"
+
+
+@pytest.mark.parametrize("texto,es_formato", [
+    ("Can't parse entities: unsupported start tag \"50)\"", True),
+    ("Bad Request: can't parse message text", True),
+    ("Bad Request: unsupported entity", True),
+    ("Bad Request: chat not found", False),
+    ("Forbidden: bot was blocked by the user", False),
+    ("Timed out", False),
+])
+def test_solo_cuenta_como_fallo_de_formato_lo_que_lo_es(bot_module, texto, es_formato):
+    assert bot_module._es_error_de_formato(RuntimeError(texto)) is es_formato
+
+
+def test_el_corte_de_red_se_resume_y_lo_demas_conserva_su_traza(bot_module):
+    """Sin manejador, PTB volcaba tres trazas por un ReadError de un segundo."""
+    tb = bot_module
+    import httpcore
+
+    assert tb._es_corte_de_red(httpcore.ReadError()) is True
+    assert tb._es_corte_de_red(ValueError("un defecto de verdad")) is False
+
+
 def test_el_poller_recupera_lo_que_quedo_en_vuelo_al_arrancar(bot_module):
     tb = bot_module
     tb.alert_queue.push(aviso())

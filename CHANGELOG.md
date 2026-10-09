@@ -1,3 +1,30 @@
+## [3.0.6] - 2026-10-08 — el formato es prescindible; el aviso no
+
+Las tres versiones anteriores quedaron desplegadas el 4-oct, y el 8-oct el log del bot mostró
+para qué sirven: **16 avisos del Sentinel descartados** entre las 13:49 y las 18:25, cada uno
+tras sus cinco reintentos.
+
+```
+ERROR Failed to send alert …: Can't parse entities: unsupported start tag "50)"
+ERROR Cola: aviso «Direct Alert» descartado tras 5 intentos, queda en data/alert_queue_dead.json
+```
+
+El defecto era de Sentinel —un `(<50)` sin escapar en el digesto, arreglado allá— pero el
+dead-letter de la 3.0.3 hizo visible algo que antes solo habría atascado la cola para siempre:
+**este bot tiraba el aviso por su formato.** Telegram rechaza el mensaje ENTERO cuando no puede
+parsear el HTML; entregarlo sin marcado era posible y nadie lo intentaba.
+
+- **Reintento sin formato** antes de darlo por fallido. Solo cuando el error ES de formato
+  (`_es_error_de_formato`: «parse entities», «unsupported start tag», «parse message text»,
+  «unsupported entity»), porque un chat inexistente o un bot bloqueado no se arreglan quitando
+  el HTML y esos tienen que seguir volviendo a la cola. Entra en el log como WARNING que nombra
+  al culpable: hay texto sin escapar en quien genera el aviso.
+- **`add_error_handler`**: sin manejador, python-telegram-bot registra «No error handlers are
+  registered» y vuelca el traceback completo. El 8-oct a las 16:43 un `httpcore.ReadError` —la
+  red, un segundo— dejó tres trazas anidadas en el journal. Ahora un corte de red es una línea
+  y cualquier otra excepción conserva su traza, que es donde sí hay algo que arreglar.
+- 9 tests nuevos (265 → 274, cero saltados); 2 mutaciones, 2 pruebas caídas.
+
 ## [3.0.5] - 2026-10-02 — la cola, con exclusión de verdad entre el bot y el Sentinel
 
 El `RLock` de la cola es de hilos y entre procesos no significa nada, y la cola la comparten dos

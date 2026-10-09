@@ -1196,6 +1196,53 @@ async def avisar_sesiones_interrumpidas(application: Application):
     logger.info("avisadas %d tareas interrumpidas", len(pendientes))
 
 
+def _es_corte_de_red(exc: BaseException) -> bool:
+    """Un corte de red hablando con la API, no un defecto del bot."""
+    from telegram.error import NetworkError, TimedOut
+
+    if isinstance(exc, (NetworkError, TimedOut)):
+        return True
+    return type(exc).__name__ in ("ReadError", "ConnectError", "ConnectTimeout",
+                                  "ReadTimeout", "RemoteProtocolError")
+
+
+async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Único manejador de errores del bot.
+
+    Sin esto, python-telegram-bot registra «No error handlers are registered»
+    y vuelca el traceback COMPLETO por cada excepción: el 8-oct a las 16:43 un
+    `httpcore.ReadError` --- la red, un segundo --- dejó tres trazas anidadas
+    en el journal. Un corte de red se resume en una línea; cualquier otra cosa
+    conserva su traza, porque ahí sí hay algo que arreglar.
+    """
+    exc = context.error
+    if exc is None:
+        return
+    if _es_corte_de_red(exc):
+        logger.warning("Telegram: corte de red (%s: %s)", type(exc).__name__, exc)
+        return
+    logger.error("Error no atendido en el bot: %s", exc, exc_info=exc)
+
+
+def _es_error_de_formato(exc: Exception) -> bool:
+    """¿Telegram rechazó el mensaje por su marcado, y no por otra cosa?
+
+    Se mira el texto porque python-telegram-bot devuelve `BadRequest` para
+    todo: chat inexistente, mensaje vacío, bot bloqueado. Reintentar sin
+    formato solo tiene sentido cuando el problema ES el formato; en los demás
+    casos el aviso debe volver a la cola como siempre. Los mensajes de la API
+    para esto son «Can't parse entities», «unsupported start tag» y
+    «can't parse message text».
+    """
+    t = str(exc).lower()
+    return (
+        "parse entities" in t
+        or "unsupported start tag" in t
+        or "parse message text" in t
+        or "unsupported entity" in t
+    )
+
+
 async def poll_alert_queue(application: Application):
     # Lo que el proceso anterior saco de la cola y no llego a confirmar vuelve
     # a la cabeza. Es el mismo hueco que el de las sesiones cortadas: si el
@@ -1241,6 +1288,26 @@ async def poll_alert_queue(application: Application):
                             "Alert sent: %s (%s)", alert.title, alert.priority
                         )
                     except Exception as e:
+                        if _es_error_de_formato(e) and alert.parse_mode:
+                            # El formato es lo prescindible; el aviso no. Un
+                            # mensaje con HTML que Telegram no parsea se
+                            # rechaza ENTERO: el 8-oct se perdieron asi 15
+                            # digestos seguidos del Sentinel por un «(<50)»
+                            # sin escapar. Va de nuevo en texto plano, y el
+                            # defecto real queda dicho en el log.
+                            try:
+                                await application.bot.send_message(
+                                    chat_id=int(chat_id), text=alert.message
+                                )
+                                logger.warning(
+                                    "Alert sent SIN FORMATO a %s: Telegram no pudo "
+                                    "parsear el %s del aviso «%s» (%s) — hay texto "
+                                    "sin escapar en quien lo genera",
+                                    chat_id, alert.parse_mode, alert.title, e,
+                                )
+                                continue
+                            except Exception as e2:
+                                e = e2
                         fallidos.append(chat_id)
                         logger.error("Failed to send alert to %s: %s", chat_id, e)
 
@@ -1369,6 +1436,7 @@ def main():
 
     app.add_handler(CallbackQueryHandler(on_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_message))
+    app.add_error_handler(on_error)
 
     async def post_init(application: Application):
         application.create_task(poll_alert_queue(application))
