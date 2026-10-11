@@ -556,11 +556,19 @@ def sentinel_proximos_eventos() -> str:
             lines.append("  · (sin detalle de tipos en este ciclo)")
         if tele:
             lines.append("")
+            # La FRECUENCIA de Schumann no se mide desde el 2026-10-09 (se
+            # retiró la fórmula 7,83+act×0,02); en TBL_PRECURSORES_COSMICOS
+            # viaja NULL. Un `or 0` aquí fabricaba «Schumann 0.00 Hz» ---
+            # regla 7 en la línea que el operador lee. Lo medido es la
+            # ACTIVIDAD; la ausencia se nombra, no se convierte en cero.
+            def _f(k):
+                v = tele[k]
+                return f"{float(v):.2f}" if v is not None else "sin dato"
             lines.append(
-                f"📻 Schumann <code>{float(tele['schumann_hz'] or 0):.2f}</code> Hz · "
-                f"act <code>{float(tele['schumann_activity'] or 0):.2f}</code> · "
-                f"Bz <code>{float(tele['bz_nT'] or 0):.2f}</code> · "
-                f"Kp <code>{float(tele['kp'] or 0):.2f}</code>"
+                f"📻 Schumann: act <code>{_f('schumann_activity')}</code> · "
+                f"Hz <code>sin medir</code> · "
+                f"Bz <code>{_f('bz_nT')}</code> · "
+                f"Kp <code>{_f('kp')}</code>"
             )
         lines.append("")
         lines.append("<i>Esto no es un pronóstico de epicentro. Solo lecturas Sentinel.</i>")
@@ -673,6 +681,12 @@ def status_payload_json() -> Dict[str, Any]:
         },
         "alert_queue": qstats,
         "dashboard_url": CONSENSUS_DASHBOARD_URL,
+        # El dashboard React de Sentinel vive en loopback (127.0.0.1:5173) y
+        # no hay URL pública deliberadamente --- nada expuesto a la LAN. Si
+        # algún día se publica por túnel, SENTINEL_DASHBOARD_URL lo cablea
+        # aquí y la mini app muestra el enlace; sin él, la mini app lo dice
+        # en vez de mostrar un placeholder muerto.
+        "sentinel_dashboard_url": os.environ.get("SENTINEL_DASHBOARD_URL", ""),
         "webapp_url": webapp_url_ok() or "",
         "alert_policy": {
             "hourly_digest": "always",

@@ -514,6 +514,7 @@ def format_centinela_threat(
     bz: float,
     wind: float,
     schumann: Optional[float] = None,
+    schumann_act: Optional[float] = None,
 ) -> Optional[tuple]:
     r = float(risk)
     if r > 1.5:
@@ -526,6 +527,17 @@ def format_centinela_threat(
     TH_BZ_CRACK = -5.0
     TH_WIND_STORM = 600
 
+    # La actividad WPC es lo único medido en vivo desde el retiro del Hz
+    # (2026-10-09): el parte CRÍTICO la reporta con la frecuencia declarada
+    # SIN MEDIR. Sin `schumann_act` (lectura no fresca) no se inventa línea.
+    act_linea = ""
+    if schumann_act is not None:
+        try:
+            act_linea = (f"\nSchumann: actividad {float(schumann_act):.1f} %"
+                         " (frecuencia sin medir)")
+        except (TypeError, ValueError):
+            act_linea = ""
+
     if r >= TH_RISK_CRIT:
         return (
             "CRITICO",
@@ -533,7 +545,8 @@ def format_centinela_threat(
             f"Fantasma: <b>{r:.2f}</b>\n"
             f"Bz: {bz:.1f} nT\n"
             f"Viento: {wind:.0f} km/s"
-            + (f"\nSchumann: {schumann:.2f} Hz" if schumann else ""),
+            + (f"\nSchumann: {schumann:.2f} Hz" if schumann else "")
+            + act_linea,
         )
     if bz <= TH_BZ_CRACK:
         return (

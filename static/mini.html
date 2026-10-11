@@ -54,7 +54,7 @@
   <div class="card links">
     <h2>Enlaces</h2>
     <a id="dash" href="#" target="_blank" rel="noopener">Dashboard Consenso</a>
-    <a href="#" id="sentinel-dash" onclick="return false;">Dashboard Sentinel (placeholder)</a>
+    <a href="#" id="sentinel-dash" onclick="return false;">Dashboard Sentinel (sin URL pública — solo loopback del host)</a>
     <p class="muted">Cuando tengas HTTPS publico, ponlo en TELEGRAM_WEBAPP_URL.</p>
   </div>
   <button type="button" onclick="loadStatus()">Actualizar</button>
@@ -147,6 +147,15 @@
         if (d.dashboard_url) {
           dash.href = d.dashboard_url;
           dash.textContent = 'Dashboard Consenso';
+        }
+        // El dashboard de Sentinel solo se cablea si existe URL pública
+        // (SENTINEL_DASHBOARD_URL en el bot); sin ella, el enlace declara
+        // que vive en loopback en vez de fingir un placeholder.
+        const sdash = document.getElementById('sentinel-dash');
+        if (d.sentinel_dashboard_url) {
+          sdash.href = d.sentinel_dashboard_url;
+          sdash.removeAttribute('onclick');
+          sdash.textContent = 'Dashboard Sentinel';
         }
       } catch (e) {
         err.textContent = 'No se pudo cargar estado: ' + e.message +
