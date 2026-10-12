@@ -332,7 +332,7 @@ def last_concilio_summary() -> str:
     return (
         f"📂 Sesiones: <code>{count}</code>\n"
         f"🧾 Última: <code>{sid}</code> @ {html.escape(updated)}\n"
-        f"📝 Task: {task}\n"
+        f"📝 Task: {html.escape(task)}\n"
         f"🔄 Ronda: <code>{rnd}</code> | Score: {score_txt}"
     )
 
@@ -518,7 +518,7 @@ def sentinel_proximos_eventos() -> str:
         when = html.escape(str(ciclo["created_at"] or "N/A"))
         lines = [
             "📡 <b>Próximos / eventos activos (Sentinel Omega)</b>",
-            f"<i>Ciclo #{ciclo['id']} · {when} UTC · datos reales DB</i>",
+            f"<i>Ciclo #{ciclo['id']} · {html.escape(when)} UTC · datos reales DB</i>",
             "",
             f"🎚 Riesgo: <b>{html.escape(str(ciclo['nivel_riesgo']))}</b>",
             f"👻 Fantasma: <code>{float(ciclo['fantasma'] or 0):.2f}</code>",
