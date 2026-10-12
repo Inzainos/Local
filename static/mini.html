@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Concilio — Mini App</title>
+  <title>Sentinel Omega — Pipeline</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
@@ -15,49 +15,59 @@
       --card: #1e293b;
       --ok: #34d399;
       --warn: #fbbf24;
+      --crit: #f87171;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background: var(--bg); color: var(--fg); padding: 16px; line-height: 1.4;
+      background: var(--bg); color: var(--fg); padding: 16px; line-height: 1.45;
     }
-    h1 { font-size: 1.15rem; margin: 0 0 12px; }
-    .grid { display: grid; gap: 12px; }
+    h1 { font-size: 1.15rem; margin: 0 0 4px; }
+    .sub { color: var(--hint); font-size: .8rem; margin: 0 0 12px; }
+    .grid { display: grid; gap: 10px; }
     .card {
       background: var(--card); border-radius: 12px; padding: 14px;
       border: 1px solid rgba(148,163,184,.25);
     }
-    .card h2 { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em;
+    .card h2 { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em;
       color: var(--hint); margin: 0 0 8px; }
-    .metric { font-size: 1.05rem; font-weight: 600; }
-    .muted { color: var(--hint); font-size: .85rem; }
-    .row { display: flex; justify-content: space-between; gap: 8px; margin: 4px 0; }
+    .metric { font-size: 1.15rem; font-weight: 700; }
+    .muted { color: var(--hint); font-size: .82rem; }
+    .row { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; }
     a.button, button {
       display: inline-block; background: var(--btn); color: var(--btn-fg);
       border: 0; border-radius: 10px; padding: 10px 14px; text-decoration: none;
-      font-weight: 600; cursor: pointer; margin-top: 8px;
+      font-weight: 600; cursor: pointer; margin-top: 8px; width: 100%;
     }
     .pill { display: inline-block; padding: 2px 8px; border-radius: 999px;
-      font-size: .75rem; background: rgba(52,211,153,.15); color: var(--ok); }
+      font-size: .72rem; font-weight: 600; }
+    .pill.ok { background: rgba(52,211,153,.15); color: var(--ok); }
     .pill.warn { background: rgba(251,191,36,.15); color: var(--warn); }
-    .links a { display: block; margin: 6px 0; color: #93c5fd; }
-    #err { color: #f87171; white-space: pre-wrap; }
+    .pill.crit { background: rgba(248,113,113,.15); color: var(--crit); }
+    .walls { display: flex; gap: 4px; margin: 6px 0; }
+    .wall { flex:1; text-align:center; padding:4px 2px; border-radius:6px;
+      font-size:.68rem; font-weight:600; background: rgba(148,163,184,.1);
+      color: var(--hint); }
+    .wall.on { background: rgba(52,211,153,.2); color: var(--ok); }
+    .wall.breach { background: rgba(248,113,113,.2); color: var(--crit); }
+    #err { color: var(--crit); font-size: .8rem; white-space: pre-wrap; }
+    .swarm { display:flex; justify-content:space-between; font-size:.8rem;
+      padding:2px 0; border-bottom:1px dashed rgba(148,163,184,.15); }
+    .swarm:last-child { border-bottom:0; }
   </style>
 </head>
 <body>
-  <h1>Concilio Status</h1>
-  <p class="muted">Reporte seguro (sin secretos). Digest horario siempre; inmediato solo sin precedentes.</p>
+  <h1>🛰️ Sentinel Omega</h1>
+  <p class="sub">Pipeline en tiempo real · datos de producción · read-only</p>
   <div id="err"></div>
   <div class="grid" id="cards">
-    <div class="card"><h2>Cargando…</h2><div class="muted">Consultando /api/mini/status</div></div>
+    <div class="card"><h2>Cargando…</h2><div class="muted">Consultando /api/mini/sentinel</div></div>
   </div>
-  <div class="card links">
-    <h2>Enlaces</h2>
-    <a id="dash" href="#" target="_blank" rel="noopener">Dashboard Consenso</a>
-    <a href="#" id="sentinel-dash" onclick="return false;">Dashboard Sentinel (sin URL pública — solo loopback del host)</a>
-    <p class="muted">Cuando tengas HTTPS publico, ponlo en TELEGRAM_WEBAPP_URL.</p>
+  <div class="card" style="margin-top:10px">
+    <h2>Concilio (secundario)</h2>
+    <div id="concilio-info" class="muted">Cargando…</div>
   </div>
-  <button type="button" onclick="loadStatus()">Actualizar</button>
+  <button type="button" onclick="loadAll()">Actualizar</button>
 
   <script>
     const tg = window.Telegram && window.Telegram.WebApp;
@@ -65,107 +75,140 @@
 
     function esc(s) {
       return String(s ?? '').replace(/[&<>"']/g, c => ({
-        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+        '&':'&','<':'<','>':'>','"':'"',"'":'&#39;'
       })[c]);
     }
+    function fmt(v, d=1) {
+      return v != null ? Number(v).toFixed(d) : '—';
+    }
+    function pill(text, cls) { return `<span class="pill ${cls}">${esc(text)}</span>`; }
 
-    async function loadStatus() {
+    function riskPill(nivel) {
+      const n = String(nivel || '').toUpperCase();
+      if (n === 'CRITICAL') return pill('CRÍTICO', 'crit');
+      if (n === 'HIGH') return pill('ALTO', 'warn');
+      if (n === 'MODERATE') return pill('MODERADO', 'warn');
+      return pill(n || 'BAJO', 'ok');
+    }
+
+    async function loadSentinel() {
+      const res = await fetch('/api/mini/sentinel', { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    }
+
+    async function loadConcilio() {
+      try {
+        const res = await fetch('/api/mini/status', { cache: 'no-store' });
+        if (!res.ok) return null;
+        return res.json();
+      } catch { return null; }
+    }
+
+    function buildCards(d) {
+      const c = d.ciclo || {};
+      const t = d.telemetria || {};
+      const m = d.muro || {};
+      const mem = d.memoria || {};
+      const s = d.sismos || {};
+      const j = d.juez || {};
+      const cw = d.clima_espacial || {};
+
+      const riesgo = riskPill(c.riesgo);
+      const consenso = c.consenso
+        ? pill(c.consenso.toUpperCase(), c.consenso.toLowerCase() === 'alert' ? 'crit' : c.consenso.toLowerCase() === 'watch' ? 'warn' : 'ok')
+        : pill('—', 'ok');
+
+      const wallNames = ['geofísico','atmosférico','oceánico','solar','financiero'];
+      const wallKeys = [m.geofisico, m.atmosferico, m.oceanico, m.solar, m.financiero];
+      const wallsHtml = wallNames.map((n, i) =>
+        `<div class="wall ${wallKeys[i] ? (m.breach ? 'breach' : 'on') : ''}">${n}</div>`
+      ).join('');
+
+      const swarms = (s.enjambres || []).map(e =>
+        `<div class="swarm"><span>Nodo ${esc(e.nodo)}</span><span>${esc(e.count)} · M${fmt(e.max_mag,1)}</span></div>`
+      ).join('') || '<div class="muted">Sin enjambres activos</div>';
+
+      const schumann = t.schumann_act != null
+        ? `${fmt(t.schumann_act,1)}% <span class="muted">(Hz sin medir)</span>`
+        : '<span class="muted">sin lectura</span>';
+
+      return `
+        <div class="card">
+          <h2>Estado del ciclo #${esc(c.id || '—')}</h2>
+          <div class="row"><span>Riesgo</span>${riesgo}</div>
+          <div class="row"><span>Fantasma</span><span class="metric">${fmt(c.fantasma,1)}</span></div>
+          <div class="row"><span>Consenso</span>${consenso}</div>
+          <div class="row"><span>Precursores</span><span class="metric">${esc(c.precursores ?? 0)}</span></div>
+          <div class="row"><span>Muro</span><span>${esc(c.muro || '0/5')}</span></div>
+          <div class="muted" style="margin-top:4px">${esc(c.cuando || '')} UTC</div>
+        </div>
+
+        <div class="card">
+          <h2>Telemetría</h2>
+          <div class="row"><span>Bz</span><span class="metric">${fmt(t.bz,1)} <span class="muted">nT</span></span></div>
+          <div class="row"><span>Kp</span><span class="metric">${fmt(t.kp,1)}</span></div>
+          <div class="row"><span>Viento solar</span><span class="metric">${fmt(t.viento,0)} <span class="muted">km/s</span></span></div>
+          <div class="row"><span>Schumann</span><span>${schumann}</span></div>
+        </div>
+
+        <div class="card">
+          <h2>Muro de 5 barreras</h2>
+          <div class="walls">${wallsHtml}</div>
+          ${m.breach ? pill('BREACH', 'crit') : pill('SIN BREACH', 'ok')}
+          ${m.label ? `<div class="muted">${esc(m.label)}</div>` : ''}
+        </div>
+
+        <div class="card">
+          <h2>Sismicidad</h2>
+          <div class="row"><span>M4.5+ (24h)</span><span class="metric">${esc(s.m45_24h ?? 0)}</span></div>
+          <div style="margin-top:6px"><span class="muted">Enjambres activos (72h):</span></div>
+          ${swarms}
+        </div>
+
+        <div class="card">
+          <h2>Clima espacial (actual)</h2>
+          <div class="row"><span>Kp máximo</span><span class="metric">${fmt(cw.kp_max,1)}</span></div>
+          <div class="row"><span>Bz mínimo</span><span class="metric">${fmt(cw.bz_min,1)} <span class="muted">nT</span></span></div>
+          <div class="row"><span>Viento máximo</span><span class="metric">${fmt(cw.viento_max,0)} <span class="muted">km/s</span></span></div>
+          ${cw.kp_max >= 5 ? pill('TORMENTA GEOMAGNÉTICA', 'crit') : cw.kp_max >= 4 ? pill('INQUIETUD', 'warn') : pill('CALMA', 'ok')}
+        </div>
+
+        <div class="card">
+          <h2>Memoria del sistema</h2>
+          <div class="row"><span>Firmas</span><span class="metric">${esc(mem.firmas ?? '—')}</span></div>
+          <div class="row"><span>Consolidadas</span><span>${esc(mem.consolidadas ?? '—')}</span></div>
+          <div class="row"><span>Exigibles</span><span>${esc(mem.exigibles ?? '—')}</span></div>
+          <div class="row"><span>Juez: ventanas vivas</span><span>${esc(j.ventanas_vivas ?? '—')}</span></div>
+        </div>`;
+    }
+
+    function buildConcilio(d) {
+      if (!d) return '<span class="muted">Sin datos del Concilio</span>';
+      const c = d.concilio || {};
+      const q = d.alert_queue || {};
+      return `
+        <div class="row"><span>Sesiones</span><span>${esc(c.sessions_count ?? 0)}</span></div>
+        <div class="row"><span>Cola pendiente</span><span>${esc(q.size ?? 0)}</span></div>
+        <div class="row"><span>Umbral</span><span>${esc(c.threshold ?? 85)}</span></div>`;
+    }
+
+    async function loadAll() {
       const cards = document.getElementById('cards');
+      const concilioEl = document.getElementById('concilio-info');
       const err = document.getElementById('err');
       err.textContent = '';
       try {
-        let d;
-        try {
-          const res = await fetch('/api/mini/status', { cache: 'no-store' });
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          d = await res.json();
-        } catch (e1) {
-          const [h, a] = await Promise.all([
-            fetch('/api/concilio/health', { cache: 'no-store' }),
-            fetch('/api/alerts/stats', { cache: 'no-store' })
-          ]);
-          if (!h.ok) throw e1;
-          const health = await h.json();
-          const alerts = a.ok ? await a.json() : {};
-          d = {
-            concilio: {
-              threshold: health.consensus_threshold ?? 85,
-              sequential: (health.concilio||{}).sequential,
-              worker_model: (health.concilio||{}).worker_model,
-              arbiter_model: (health.concilio||{}).arbiter_model,
-              sessions_count: health.sessions_count,
-              last_session: null
-            },
-            ollama: { loaded: (health.concilio||{}).loaded_now || [], unloaded_note: 'via /api/concilio/health' },
-            alert_queue: alerts,
-            dashboard_url: 'http://127.0.0.1:8000'
-          };
-        }
-        const c = d.concilio || {};
-        const o = d.ollama || {};
-        const q = d.alert_queue || {};
-        const last = c.last_session || {};
-        const loaded = (o.loaded || []);
-        const unloadPill = loaded.length
-          ? '<span class="pill warn">modelos cargados</span>'
-          : '<span class="pill">unloaded / idle</span>';
-        cards.innerHTML = `
-          <div class="card">
-            <h2>Concilio</h2>
-            <div class="row"><span>Umbral</span><span class="metric">${esc(c.threshold ?? 85)}</span></div>
-            <div class="row"><span>Secuencial</span><span>${c.sequential ? 'si' : 'no'}</span></div>
-            <div class="row"><span>Worker</span><span>${esc(c.worker_model)}</span></div>
-            <div class="row"><span>Arbitro</span><span>${esc(c.arbiter_model)}</span></div>
-            <div class="row"><span>Sesiones</span><span class="metric">${esc(c.sessions_count ?? 0)}</span></div>
-          </div>
-          <div class="card">
-            <h2>Ultima sesion .concilio</h2>
-            <div class="muted">${esc(last.session_id || '—')}</div>
-            <div>${esc(last.task || '(sin task)')}</div>
-            <div class="row"><span>Ronda</span><span>${esc(last.round ?? '—')}</span></div>
-            <div class="row"><span>Score</span><span>${last.score != null ? esc(last.score) + '/100' : '—'}</span></div>
-          </div>
-          <div class="card">
-            <h2>Ollama</h2>
-            <div>${unloadPill}</div>
-            <div class="muted">${esc(o.unloaded_note || '')}</div>
-            <div class="muted">${loaded.length ? esc(loaded.join(', ')) : 'ninguno en VRAM'}</div>
-          </div>
-          <div class="card">
-            <h2>Cola alertas</h2>
-            <div class="row"><span>Pendientes</span><span class="metric">${esc(q.size ?? '—')}</span></div>
-            <div class="row"><span>Enviados</span><span>${esc(q.total_sent ?? '—')}</span></div>
-            <div class="row"><span>Fallidos</span><span>${esc(q.total_failed ?? '—')}</span></div>
-            ${(q.en_vuelo || q.descartados) ? `<div class="row"><span>⚠️ En vuelo / descartados</span><span>${esc(q.en_vuelo ?? 0)} / ${esc(q.descartados ?? 0)}</span></div>` : ''}
-          </div>
-          <div class="card">
-            <h2>Politica</h2>
-            <div>Digest horario: <b>siempre</b></div>
-            <div>Inmediato: <b>solo sin precedentes</b></div>
-          </div>`;
-        const dash = document.getElementById('dash');
-        if (d.dashboard_url) {
-          dash.href = d.dashboard_url;
-          dash.textContent = 'Dashboard Consenso';
-        }
-        // El dashboard de Sentinel solo se cablea si existe URL pública
-        // (SENTINEL_DASHBOARD_URL en el bot); sin ella, el enlace declara
-        // que vive en loopback en vez de fingir un placeholder.
-        const sdash = document.getElementById('sentinel-dash');
-        if (d.sentinel_dashboard_url) {
-          sdash.href = d.sentinel_dashboard_url;
-          sdash.removeAttribute('onclick');
-          sdash.textContent = 'Dashboard Sentinel';
-        }
+        const [sentinel, concilio] = await Promise.all([loadSentinel(), loadConcilio()]);
+        if (!sentinel.ok) throw new Error(sentinel.error || 'DB ilegible');
+        cards.innerHTML = buildCards(sentinel);
+        concilioEl.innerHTML = buildConcilio(concilio);
       } catch (e) {
-        err.textContent = 'No se pudo cargar estado: ' + e.message +
-          '\nSirve via web_ui (python main.py --web) o uvicorn web_ui:app';
-        cards.innerHTML = '<div class="card"><h2>Offline</h2><div class="muted">Placeholders de estado</div>' +
-          '<div class="row"><span>Umbral</span><span class="metric">85</span></div>' +
-          '<div class="row"><span>Secuencial</span><span>si</span></div></div>';
+        err.textContent = 'Error: ' + e.message;
+        cards.innerHTML = '<div class="card"><h2>Offline</h2><div class="muted">No se pudo consultar la DB de Sentinel</div></div>';
       }
     }
-    loadStatus();
+    loadAll();
   </script>
 </body>
 </html>

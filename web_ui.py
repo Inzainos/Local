@@ -355,14 +355,11 @@ def health():
 
 
 
-# ─── Telegram Mini App (static) ────────────────────────────────
-# reuse STATIC_DIR defined at module load
-_STATIC_DIR = STATIC_DIR
-
+# ─── Telegram Mini App: SENTINEL PIPELINE (el foco del operador) ────────────
 
 @app.get("/mini", response_class=HTMLResponse)
 def mini_app_page():
-    """Telegram Mini App shell — status cards + dashboard placeholders."""
+    """Mini App — pipeline de Sentinel Omega (foco) + Concilio (secundario)."""
     mini = _STATIC_DIR / "mini.html"
     if not mini.is_file():
         return HTMLResponse(
@@ -372,11 +369,150 @@ def mini_app_page():
     return HTMLResponse(mini.read_text(encoding="utf-8"))
 
 
+@app.get("/api/mini/sentinel")
+def mini_sentinel():
+    """Pipeline de Sentinel Omega en tiempo real — lo que el operador mira.
+
+    Lee la DB de producción (read-only). Sin secretos. Los datos que faltan
+    llegan como null, no como 0 (regla 2 del proyecto).
+    """
+    import sqlite3
+    db = Path("/home/deamon/workspaces/sentinel_omega/data/SENTINEL_OMEGA_PRO.db")
+    if not db.exists():
+        return {"ok": False, "error": "DB no encontrada"}
+    try:
+        conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=5.0)
+        conn.row_factory = sqlite3.Row
+
+        # 1. Ciclo actual
+        ciclo = conn.execute(
+            "SELECT id, nivel_riesgo, fantasma, precursors_count, "
+            "muro_walls_active, muro_breach, geo_signal, geo_confidence, "
+            "created_at FROM TBL_CICLOS ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+
+        # 2. Telemetría (último precursor)
+        tele = conn.execute(
+            "SELECT bz_nT, viento_km_s, kp, lod_ms, "
+            "schumann_hz, schumann_activity, fantasma, nivel_riesgo "
+            "FROM TBL_PRECURSORES_COSMICOS ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+
+        # 3. Muro
+        muro = conn.execute(
+            "SELECT walls_active, total_walls, muro_breach, risk_label, "
+            "wall_geofisico, wall_atmosferico, wall_oceanico, "
+            "wall_solar, wall_financiero "
+            "FROM TBL_MURO_EVENTOS ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+
+        # 4. Firmas: memoria viva
+        firmas = conn.execute(
+            "SELECT COUNT(*) total, SUM(estado='consolidada') consolidadas, "
+            "SUM(COALESCE(exigible,0)=1) exigibles FROM TBL_FIRMAS"
+        ).fetchone()
+
+        # 5. Enjambres activos (sismos M2.5+ en últimas 72h, por nodo)
+        enjambres = conn.execute(
+            "SELECT id_nodo, COUNT(*) n, MAX(sismo_max_mag) max_mag "
+            "FROM tbl_historico_sismico_raw "
+            "WHERE timestamp_blk >= datetime('now','-72 hours') "
+            "AND sismo_max_mag >= 2.5 "
+            "GROUP BY id_nodo HAVING n >= 5 ORDER BY n DESC LIMIT 5"
+        ).fetchall()
+
+        # 6. Sismos M4.5+ en últimas 24h
+        m45 = conn.execute(
+            "SELECT COUNT(*) FROM tbl_historico_sismico_raw "
+            "WHERE timestamp_blk >= datetime('now','-24 hours') "
+            "AND sismo_max_mag >= 4.5"
+        ).fetchone()
+
+        # 7. Juez: asertividad viva
+        juez = conn.execute(
+            "SELECT COUNT(*) ventanas FROM viva_real "
+            "WHERE COALESCE(en_vivo,1)=1 AND resultado != 'PENDIENTE'"
+        ).fetchone()
+
+        # 8. Clima espacial: Kp actual
+        clima = conn.execute(
+            "SELECT kp_max, bz_min, viento_solar_max FROM tbl_clima_espacial_raw "
+            "ORDER BY timestamp_blk DESC LIMIT 1"
+        ).fetchone()
+
+        conn.close()
+
+        def _v(r, k):
+            if r is None:
+                return None
+            return r[k]
+
+        return {
+            "ok": True,
+            "ciclo": {
+                "id": _v(ciclo, "id"),
+                "riesgo": _v(ciclo, "nivel_riesgo"),
+                "fantasma": _v(ciclo, "fantasma"),
+                "precursores": _v(ciclo, "precursors_count"),
+                "muro": f"{_v(ciclo, 'muro_walls_active') or 0}/5",
+                "muro_breach": _v(ciclo, "muro_breach"),
+                "consenso": _v(ciclo, "geo_signal"),
+                "consenso_conf": _v(ciclo, "geo_confidence"),
+                "cuando": _v(ciclo, "created_at"),
+            } if ciclo else {},
+            "telemetria": {
+                "bz": _v(tele, "bz_nT"),
+                "kp": _v(tele, "kp"),
+                "viento": _v(tele, "viento_km_s"),
+                "schumann_act": _v(tele, "schumann_activity"),
+                "schumann_hz": _v(tele, "schumann_hz"),
+                "fantasma": _v(tele, "fantasma"),
+                "riesgo": _v(tele, "nivel_riesgo"),
+            } if tele else {},
+            "muro": {
+                "activos": _v(muro, "walls_active"),
+                "total": _v(muro, "total_walls"),
+                "breach": _v(muro, "muro_breach"),
+                "label": _v(muro, "risk_label"),
+                "geofisico": _v(muro, "wall_geofisico"),
+                "atmosferico": _v(muro, "wall_atmosferico"),
+                "oceanico": _v(muro, "wall_oceanico"),
+                "solar": _v(muro, "wall_solar"),
+                "financiero": _v(muro, "wall_financiero"),
+            } if muro else {},
+            "memoria": {
+                "firmas": _v(firmas, "total"),
+                "consolidadas": _v(firmas, "consolidadas"),
+                "exigibles": _v(firmas, "exigibles"),
+            } if firmas else {},
+            "sismos": {
+                "m45_24h": _v(m45, "COUNT(*)") if m45 else 0,
+                "enjambres": [
+                    {"nodo": e["id_nodo"], "count": e["n"], "max_mag": e["max_mag"]}
+                    for e in (enjambres or [])
+                ],
+            },
+            "juez": {
+                "ventanas_vivas": _v(juez, "ventanas") if juez else 0,
+            },
+            "clima_espacial": {
+                "kp_max": _v(clima, "kp_max"),
+                "bz_min": _v(clima, "bz_min"),
+                "viento_max": _v(clima, "viento_solar_max"),
+            } if clima else {},
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:120]}
+
+
+# ─── Telegram Mini App (Concilio — secundario) ─────────────────────────────
+
 @app.get("/api/mini/status")
 def mini_status():
     """Safe JSON for Mini App — no .env secrets."""
     try:
         from telegram_bot import status_payload_json
+
 
         return status_payload_json()
     except Exception as e:
