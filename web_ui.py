@@ -360,7 +360,7 @@ def health():
 @app.get("/mini", response_class=HTMLResponse)
 def mini_app_page():
     """Mini App — pipeline de Sentinel Omega (foco) + Concilio (secundario)."""
-    mini = _STATIC_DIR / "mini.html"
+    mini = STATIC_DIR / "mini.html"
     if not mini.is_file():
         return HTMLResponse(
             "<h1>mini.html missing</h1><p>Create static/mini.html</p>",
