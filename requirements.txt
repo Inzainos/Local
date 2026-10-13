@@ -6,3 +6,10 @@ uvicorn>=0.28.0
 pydantic>=2.6.0
 python-telegram-bot>=21.0
 python-dotenv>=1.0.0
+
+# Declaradas el 2026-10-13 (migración a python 3.14): vivían instaladas a
+# mano en el venv 3.13 y la migración las delató — la misma familia del
+# h5py de Sentinel. Sin estas tres, la suite no pasa en un venv limpio.
+requests      # telegram_bot / web
+pytest        # la suite corre con el intérprete del entorno (AGENTS.md)
+pyflakes      # guardián de test_turnos: sin ella el guardian pasa en vacío
