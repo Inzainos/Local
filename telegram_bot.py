@@ -56,7 +56,24 @@ TELEGRAM_WEBAPP_URL = os.environ.get("TELEGRAM_WEBAPP_URL", "").strip()
 # El tunel rapido de Cloudflare publica una URL distinta cada vez que arranca y
 # la escribe en este log (scripts/run_cloudflared_mini.sh, que lo trunca).
 MINI_APP_TUNEL_LOG = Path(__file__).resolve().parent / "logs" / "cloudflared-mini.log"
-# Valor VIVO de la URL. Arranca con lo que diga el .env y lo actualiza
+
+# Reenvío SIN FORMATO: quitar las etiquetas de verdad (2026-10-17).
+# Medido: 36 avisos reenviados en una semana con los <b></b> crudos en el
+# chat, porque el reenvío mandaba el MISMO texto HTML sin parse_mode.
+_TAGS_HTML_RE = re.compile(
+    r"</?(?:b|strong|i|em|u|ins|s|strike|del|a|code|pre|span|tg-spoiler"
+    r"|tg-emoji|blockquote)(?:\s[^<>]*)?>",
+    re.IGNORECASE,
+)
+
+
+def _html_a_plano(texto: str) -> str:
+    """HTML de Telegram → texto plano legible: etiquetas fuera, entidades de vuelta."""
+    if not texto:
+        return texto
+    return html.unescape(_TAGS_HTML_RE.sub("", texto))
+
+# Valor VIVO de la URL. Arranca con lo que dice el .env y lo actualiza
 # vigilar_url_mini_app() cuando el tunel cambia, sin reiniciar el bot.
 _webapp_url_actual: Optional[str] = TELEGRAM_WEBAPP_URL
 CONSENSUS_DASHBOARD_URL = os.environ.get(
@@ -1307,11 +1324,14 @@ async def poll_alert_queue(application: Application):
                             # mensaje con HTML que Telegram no parsea se
                             # rechaza ENTERO: el 8-oct se perdieron asi 15
                             # digestos seguidos del Sentinel por un «(<50)»
-                            # sin escapar. Va de nuevo en texto plano, y el
-                            # defecto real queda dicho en el log.
+                            # sin escapar. Va de nuevo en texto plano DE
+                            # VERDAD — antes mandaba el mismo HTML sin
+                            # parse_mode y los <b></b> se veían crudos en
+                            # el chat (36 veces medido, 10→17 oct).
                             try:
                                 await application.bot.send_message(
-                                    chat_id=int(chat_id), text=alert.message
+                                    chat_id=int(chat_id),
+                                    text=_html_a_plano(alert.message),
                                 )
                                 logger.warning(
                                     "Alert sent SIN FORMATO a %s: Telegram no pudo "
