@@ -5,11 +5,11 @@
 > modelo) no deje a nadie sin saber dónde se quedó. **Se actualiza cada vez que algo avanza.**
 > Si lo que dice aquí contradice al código, manda el código: verifícalo y corrige este archivo.
 
-**Última actualización:** 2026-10-08 18:55. **v1 CERRADA** y en pie (verificado: 274 tests,
-servicios activos desde el 4-oct 12:36, Ollama 200). Las 3.0.3/3.0.4/3.0.5 **ya están
-desplegadas** —el operador reinició el 4-oct— y el 8-oct sirvieron: la cola hizo visibles 16
-avisos del Sentinel que Telegram rechazaba. **Hay un arreglo nuevo SIN desplegar: 3.0.6**
-(reintento sin formato + manejador de errores). El reinicio lo hace el operador.
+**Última actualización:** 2026-10-19 22:35. **v1 CERRADA** y en pie (verificado: 279 tests,
+Ollama 200, MiniApp 200, cola viva). **Migración a user units HECHA hoy 19-oct**: las units
+de `/etc/systemd/system` están **enmascaradas a /dev/null**; las activas son
+`~/.config/systemd/user/consensus-{telegram,web}.service` (Linger=yes). Reiniciar =
+`systemctl --user restart consensus-telegram consensus-web` — **sin sudo**.
 Lo que sigue es v2.
 **Rama:** `local/concilio` (nunca push a `main`). **Operador:** Elán (responder en español).
 
@@ -31,16 +31,11 @@ Historial: [`CHANGELOG.md`](./CHANGELOG.md).
 
 ## 2. EN CURSO ahora mismo
 
-### Servicios: corren la v1 + 3.0.1 + 3.0.2 + el botón de la Mini App (reiniciados 01-oct 22:07)
-**DESPLEGADAS 3.0.3/3.0.4/3.0.5** (reinicio del operador el 4-oct 12:36, `NRestarts=0`).
-**PENDIENTE DE DESPLEGAR: 3.0.6** —el reintento sin formato—, commiteada y probada; hasta que se
-reinicie, un aviso con HTML que Telegram no parsee se sigue descartando tras cinco intentos (el
-defecto que lo causaba está arreglado en Sentinel y ya está vivo, porque allá el despacho es un
-`oneshot`). Reiniciar = `sudo systemctl restart consensus-telegram consensus-web` (lo corre el
-operador; no se toca systemd sin su orden).
+### Servicios: corren la v1 + 3.0.1–3.0.6 + miniapp pipeline Sentinel (reiniciados 18-oct 00:29)
+**DESPLEGADAS 3.0.3–3.0.6** (reinicio del operador el 18-oct 00:29, `NRestarts=0`).
 `consensus-telegram` (bot) y `consensus-web` son **servicios del sistema** y cargan el código **al
 arrancar**: cualquier cambio posterior no llega al teléfono ni a la web hasta reiniciarlos.
-Comprobar qué código corren: `systemctl show consensus-telegram consensus-web -p ActiveEnterTimestamp`
+Comprobar qué código corren: `systemctl --user show consensus-telegram consensus-web -p ActiveEnterTimestamp`
 contra `git log -1 --format=%ci`.
 El aviso de tareas interrumpidas está vivo (en el journal: «sin tareas interrumpidas»), pero **no vio
 la sesión cortada de las 13:05** del 25-sep: es del esquema 1 y `sesiones_interrumpidas()` ignora
@@ -80,14 +75,17 @@ Detalle y porqués: `CHANGELOG.md` y los mensajes de commit (cada uno explica su
 
 **La v1 está cerrada.** Queda medido, de punta a punta y en producción: la vía directa rechaza lo
 que no funciona, el concilio lo arregla, el verificador lo confirma ejecutándolo y la sesión se
-cierra. Lo primero de la v2 sigue siendo el **segundo intento con otro modelo**: codegemma falla
-con esta redacción las dos veces, y eso son 8 minutos de concilio que qwen podría ahorrar.
+cierra. El primer item de v2 **HECHO**: «segundo intento con otro modelo» — codegemma repetía su
+fallo (15/16 dos veces en `es_matricula`), qwen con los casos fallidos la ARREGLA (16/16, 6 s).
+Medido en `bench/segundo_intento.py` y implementado en `config.yaml:modelo_segundo_intento` +
+`orchestrator._coder_respaldo`. Cuando no arregla (token_vivo), la tarea escala igual que hoy;
+el mejor-intento ya conserva el mejor de ambos.
 
 **Para cerrar la v1** — HECHO:
 1. ~~2.ª pasada de aceptación con cero consensos falsos~~ — hecha.
 1b. ~~Mejor intento verificado~~ — construido (`51c0ba4`); falta verlo en vivo con `es_matricula`.
 2. ~~CHANGELOG 3.0.0~~ — hecho. 3. ~~Etiqueta `v1.0-estable`~~ — hecha.
-4. ~~Desplegar~~ — hecho el 25-sep 09:46.
+4. ~~Desplegar~~ — hecho el 25-sep 09:46, re-desplegado 18-oct 00:29 con 3.0.6.
 
 **Hueco del 25-sep 13:16 (reinicio de Windows), AVISO YA HECHO en 3.0.2 (`226bbba`):** el bot avisa al
 arrancar de las tareas que quedaron a medias, y sólo las marca cerradas si el aviso salió. Lo que
@@ -95,8 +93,8 @@ sigue sin existir es **reanudar**: la tarea hay que volver a mandarla a mano. Re
 exige decidir desde dónde (el código de la última ronda está en el `.concilio`) y no está medido.
 
 **v2** (acordado con el operador que queda fuera de la v1). Orden recomendado tras medir: primero
-«segundo intento con otro modelo» (codegemma repitió el mismo código en sus dos intentos de
-`es_matricula`), luego la opción C, luego rediseñar el concilio para código (empeoró 15/16 → 0/16).
+«segundo intento con otro modelo» — **HECHO 18-oct** —, luego la opción C, luego rediseñar el
+concilio para código (empeoró 15/16 → 0/16).
 - **Aprender de los propios errores** (idea del operador): casos fallidos como pruebas de
   regresión permanentes, marcador de acierto por modelo y tipo de tarea (como el Juez de
   Sentinel), soluciones verificadas como ejemplos, y feedback del operador donde no hay nada que
@@ -161,7 +159,21 @@ suite deja 2 rojos, los dos a propósito.
 - **`grep -E "-> ..."`**: un patrón que empieza por `-` se lee como opción; usar `-e`.
 - Revertir la caché de Ollama: `C:\Users\elanz\AppData\Local\Temp\ollama_revertir.ps1`.
 
-## 2026-09-27 (noche) — Telegram del Sentinel (T)
+## 2026-10-18 (mañana) — optimización Concilio: 2º intento con otro modelo + set point
+
+**Medición A/B** (`bench/segundo_intento.py`): 9 tareas (7 batería + 2 redacciones vivo).
+- `es_matricula`: 1º codegemma 15/16 → 2º codegemma 15/16 (repite) → **2º qwen 16/16 ARREGLA (6 s)**
+- `token_vivo`: 1º 12/16 → 2º codegemma 14/16 → 2º qwen 11/16 (ninguno arregla; escala igual)
+
+**Implementación**:
+- `config.yaml`: `concilio.modelo_segundo_intento: qwen2.5-coder:7b`
+- `orchestrator.py`: `_coder_respaldo()` + uso en intento ≥2; `_run_exclusive` incluye coders directos
+- Tests: +2 nuevos (`test_el_segundo_intento_usa_el_modelo_de_respaldo`, `test_sin_modelo_de_respaldo_repite_el_coder`)
+- Suite completa: **278 tests verdes** (antes 274)
+
+**Fix cola (G)**: `alert_queue.queue_alert(source=)` parámetro opcional → Concilio podrá firmar sus avisos.
+
+**Set point actualizado**: este archivo refleja la realidad post-despliegue 18-oct 00:29.
 
 El Sentinel usaba el token viejo de SismoBio_Bot (401). Se rotó `deploy/.env` a las
 19:42 con el token válido (`600`, respaldos en `~/t_scripts/respaldos/`). Los avisos
@@ -240,9 +252,65 @@ no es peor que antes, pero es una razón más para reiniciar.
 
 **Lo que queda abierto**
 
-1. **`source="sentinel"` está fijo** en `queue_alert()`. Hoy no miente —el Sentinel es el único que
-   encola, verificado en todo el repo— pero lo será en cuanto el Concilio encole algo propio. Lo que
-   sí pierde información ya es la prioridad: todo lo del Sentinel llega como MEDIUM
-   (`infrastructure/api/telegram.py:191`), y eso está en el repo del Sentinel, no en este.
-2. **La rama local va por delante de `origin/local/concilio`**: la única copia de la v1 y de todo
+1. ~~`source="sentinel"` está fijo en `queue_alert()`~~ — **ARREGLADO 18-oct**: parámetro `source`
+   opcional con default `"sentinel"`; el Concilio podrá firmar sus propios avisos.
+2. **La prioridad MEDIUM fija** para avisos del Sentinel: vive en `infrastructure/api/telegram.py:191`
+   (repo Sentinel), se arreglará en fase Telegram con coordinación.
+3. **La rama local va por delante de `origin/local/concilio`**: la única copia de la v1 y de todo
    esto es este disco. Sin hacer: `git push` es hacia fuera y necesita tu OK.
+
+## 2026-10-19 (noche) — auditoría punta a punta tras la migración a user units
+
+**Verificado con evidencia directa:** un solo poller (PID 570, user unit desde 19:28:27,
+0 Conflicts en 30+ min), cola viva (0 pendientes / 0 en vuelo, última entrega 21:50),
+MiniApp local 200, Ollama 200, **279 tests verdes**, `--check` OK (roles OK, inject False).
+
+**Diagnóstico del Conflict de getUpdates (19:28:42→20:08:38, 160 eventos):** era el VIEJO
+bot de sistema (PID 9267) aún vivo durante la migración; paró al detenerlo a las 20:08:59
+y el enmascarado fue a las 20:12. No recurre. `mock_main.py` era un falso positivo: es el
+contenedor `snt_mock_services` del genomic_agent (puerto 8081, mock server, no poller).
+
+**consensus-web NRestarts=40:** crash-loop `address already in use` 19:36→19:38 mientras el
+viejo proceso retenía el 8002; estable desde 19:38:03. Síntoma de migración, no defecto.
+
+**Arreglado durante la auditoría:** los avisos muertos no registraban el MOTIVO (medido:
+los del 14-oct y 2 del 19-oct murieron ciegos). `requeue(..., error=)` ahora deja
+`metadata.ultimo_error` en el aviso muerto; el bot pasa el error de Telegram. Test nuevo
+(27 en la cola). **Pendiente de reinicio para quedar vivo en el bot.**
+
+**Pipeline punta a punta con el código de la v2 (verificado 22:29):** es_ipv4 → intento 1
+codegemma → VERIFICADO por ejecución 22/22 vía relaciones, ~90 s, y el Juez lo registró
+en vivo (ipv4 22/22 → 44/44). Todo el trabajo de la v2 (A/B/C/G + este fix) está
+**SIN COMMITTEAR**: 7 archivos modificados + 4 nuevos, y el bot de producción corre ese
+código desde las 19:28. Commit pendiente del OK del operador.
+
+## 2026-10-19 (noche, 2.ª) — Chat del Concilio en la Mini App
+
+**Qué se añadió** (`web_ui.py` + `static/mini.html` + `tests/test_mini_chat.py`):
+- `POST /api/mini/chat` — modo **Rápida**: `fast_ask` (un modelo, segundos), igual que el
+  `/task` del bot. Se BLOQUEA (409) si hay una tarea en curso: `fast_ask` haría
+  `ensure_exclusive` y desalojaría el modelo de la tarea (ping-pong en Ollama).
+- Modo **Tarea** en el frontend: reusa el `POST /api/task` existente con polling cada 4 s,
+  cronómetro en pantalla y desenlace etiquetado (**[VERIFICADO por ejecucion]** /
+  [SIN VERIFICAR] / [CONSENSO] / [SIN CONSENSO]) + código en bloques `<pre>`.
+- **Clave opcional del túnel** (`MINI_APP_KEY` en .env): con clave definida, `/api/task` y
+  `/api/mini/chat` exigen `X-Mini-Key`; la Mini App la lee del `?k=` de su URL (va en el
+  botón de Telegram). Sin clave, todo como hasta hoy. Documentada en `.env.example`.
+- **Bug hallado y arreglado en el paso**: el `esc()` de `mini.html` tenía el mapa de
+  reemplazo en IDENTIDAD (`'<'` → `'<'`, verificado a nivel de bytes) — solo escapaba el
+  apóstrofe. Cualquier campo de la DB con HTML se inyectaba tal cual, y la Mini App está
+  tras el túnel público. Corregido a `&/</>/"`; el chat renderiza por
+  `textContent`, sin `innerHTML`.
+
+**Verificado punta a punta** (instancia de prueba en :8003, producción :8002 intacta):
+- Modo Rápida en el navegador: pregunta → respuesta real del modelo en ~30 s.
+- Modo Tarea en el navegador: es_ipv4 → job → polling con cronómetro → **[VERIFICADO por
+  ejecucion] 22/22** con el código en `<pre>`. El Juez lo registró en vivo (ipv4 44/44 → 66/66).
+- 6 tests nuevos del endpoint (fast_ask mockeado, 400/409/401, clave en /api/task).
+  Ojo medido: el test del 202 con clave válida dispara un run_consensus REAL en el
+  executor — `_run_task` va a no-op en el test o la suite cuelga.
+- **285 tests verdes.**
+
+**Pendiente del operador:** reiniciar `consensus-web` para que el chat quede vivo en
+producción (con `MINI_APP_KEY` en `.env` si se quiere cerrar el túnel, y la clave en la URL
+del botón), y el COMMIT de todo lo no versionado (sigue abierto).
