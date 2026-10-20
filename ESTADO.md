@@ -314,3 +314,45 @@ código desde las 19:28. Commit pendiente del OK del operador.
 **Pendiente del operador:** reiniciar `consensus-web` para que el chat quede vivo en
 producción (con `MINI_APP_KEY` en `.env` si se quiere cerrar el túnel, y la clave en la URL
 del botón), y el COMMIT de todo lo no versionado (sigue abierto).
+
+## 2026-10-20 — memoria de Sentinel Omega del Concilio regenerada (v2.5.4, verificada)
+
+**El problema:** `sentinel_omega_pack.md` —lo que `fast_ask` inyecta en CADA `/task` del
+bot y en el chat de la MiniApp (lee 8.000 chars del archivo en disco)— describía un
+sistema que ya no existe: 11 agentes con jupiter activo, "correlación Schumann" de beta1,
+"todos los ONNX cargan correctamente", dashboard en 0.0.0.0, canal correo/SMTP, rama git
+muerta, tests "446".
+
+**Regenerado contra código y DB de producción (MCP sqlite-lector, solo lectura):**
+- 8 bots sin jupiter (retirado 18-oct; `TBL_PESOS_BOTS` ya no lo lista). Pesos vigentes
+  al 20-oct: omega 1,11 … padre 0,30.
+- **Compuerta ONNX: aprueba NINGUNO, niega 6** (alfa1 AUC 0,501 inf 0,462 vs base de
+  nodo 0,899; beta1 0,800 negado por la misma razón), alfa2 sin medir (sin backcast).
+  `models_meta.json` reentrenado 18-oct 15:34.
+- **Exigibles: 11.377 de 23.274 (49 %)** por lift>=2,0 (medición del 18-oct 09:05). La
+  cifra "982/23.248 (4,2 %)" que traían los AGENTS era del absoluto `>0,05` JUBILADO el
+  10-08 — corregida en `/home/deamon/AGENTS.md` y `workspaces/AGENTS.md`.
+- **delta: techo WATCH, NUNCA ALERT** — `sentinel_omega/AGENTS.md` decía "Active Vote:
+  emits ALERT", contradiciendo `delta/agent.py:13,187`. Corregido contra el código.
+- Consenso: FAMILIA schumann_cymatics >0,3; Schumann hipótesis CERRADA; loki = resonancia
+  Carrington (ganancia 3,4×); omega no es agente en vivo; port 127.0.0.1; Telegram único.
+- Normativas de operación completas (reglas 0-12) integradas al pack.
+
+**Also:** `sentinel_omega_moe_pack.md` era una copia del mismo contenido rancio y NINGÚN
+código lo referencia (tuberías MoE retiradas) → stub de deprecación. Respaldos de ambos:
+`*.bak_20261020.md`.
+
+**La ruta inject ya estaba sana** (distinto hallazgo): `run_consensus` con inject=true
+REGENERA el pack desde los docs de PRODUCCIÓN en cada auditoría (`memory/memory_pack.py`,
+workspaces primero); el archivo de disco es solo fallback. La ruta viva desactualizada
+era `fast_ask` — la corregida.
+
+**Verificado punta a punta:** `fast_ask("cuántos agentes tiene Sentinel Omega…")` →
+"8 agentes, jupiter retirado el 18 de octubre, señales redistribuidas". Antes habría
+dicho 11 con jupiter activo.
+
+**Pendiente del operador:** `workspaces` (repo Sentinel) tiene 2 fixes míos sin commit
+(`AGENTS.md` exigibles + `sentinel_omega/AGENTS.md` delta) MEZCLADOS con trabajo previo
+sin versionar de otras sesiones (deploy/*.py, CHANGELOG, bitácora) — el commit de allá lo
+decide quien conoce ese trabajo. `workspaces-dev` está 47 días rancio (3-sep): docs y DB
+viejos — no regenerar packs desde él (el generador ya prefiere producción).
