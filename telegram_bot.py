@@ -1308,6 +1308,7 @@ async def poll_alert_queue(application: Application):
                     continue
 
                 fallidos = []
+                ultimo_error = ""
                 for chat_id in destinos:
                     try:
                         await application.bot.send_message(
@@ -1326,8 +1327,8 @@ async def poll_alert_queue(application: Application):
                             # digestos seguidos del Sentinel por un «(<50)»
                             # sin escapar. Va de nuevo en texto plano DE
                             # VERDAD — antes mandaba el mismo HTML sin
-                            # parse_mode y los <b></b> se veían crudos en
-                            # el chat (36 veces medido, 10→17 oct).
+                            # parse_mode y los <b></b> se veían crudos en el
+                            # chat (36 veces medido, 10→17 oct).
                             try:
                                 await application.bot.send_message(
                                     chat_id=int(chat_id),
@@ -1343,6 +1344,7 @@ async def poll_alert_queue(application: Application):
                             except Exception as e2:
                                 e = e2
                         fallidos.append(chat_id)
+                        ultimo_error = f"{type(e).__name__}: {e}"
                         logger.error("Failed to send alert to %s: %s", chat_id, e)
 
                 if not fallidos:
@@ -1353,7 +1355,7 @@ async def poll_alert_queue(application: Application):
                 # los demas se quedaban sin el aviso y nadie lo sabia.
                 alert.pending_chats = fallidos
                 alert_queue.mark_failed(alert)
-                if alert_queue.requeue(alert):
+                if alert_queue.requeue(alert, error=ultimo_error):
                     await asyncio.sleep(5)
                 else:
                     logger.error(

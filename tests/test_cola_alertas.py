@@ -109,6 +109,32 @@ def test_requeue_cuenta_intentos_y_al_tope_descarta(tmp_path):
     assert muertos[0]["id"] == "a1", "se guarda, no se borra"
 
 
+def test_el_aviso_muerto_lleva_el_motivo(tmp_path):
+    """Medido 19-oct: los avisos del 14-oct y 19-oct murieron SIN motivo en el
+    archivo. Sin el error no se puede distinguir red caida de chat bloqueado."""
+    q = cola(tmp_path)
+    q.push(aviso())
+    a = q.pop_batch()[0]
+    for _ in range(MAX_INTENTOS - 1):
+        q.requeue(a, error="BadRequest: chat not found")
+        a = q.pop_batch()[0]
+
+    assert q.requeue(a, error="BadRequest: chat not found") is False
+    muertos = json.loads(Path(q.dead_path).read_text(encoding="utf-8"))
+    assert muertos[0]["metadata"]["ultimo_error"] == "BadRequest: chat not found", (
+        "el aviso muerto tiene que decir POR QUE murio")
+
+    # y sin error no escribe la clave: el esquema de siempre
+    q.push(aviso("otro"))
+    a = q.pop_batch()[0]
+    for _ in range(MAX_INTENTOS - 1):
+        q.requeue(a)
+        a = q.pop_batch()[0]
+    q.requeue(a)
+    muertos = json.loads(Path(q.dead_path).read_text(encoding="utf-8"))
+    assert "ultimo_error" not in muertos[1]["metadata"]
+
+
 def test_el_aviso_descartado_no_bloquea_a_los_de_detras(tmp_path):
     q = cola(tmp_path)
     q.push(aviso("malo"))

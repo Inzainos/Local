@@ -356,7 +356,7 @@ class AlertQueue:
             self._write_json(self.inflight_path, [])
             return [self._hidratar(a) for a in en_vuelo]
 
-    def requeue(self, alert: Alert, contar_intento: bool = True) -> bool:
+    def requeue(self, alert: Alert, contar_intento: bool = True, error: str = "") -> bool:
         """Devuelve el aviso al frente de la cola. False si ya agoto sus intentos.
 
         Al agotarlos el aviso pasa a `alert_queue_dead.json` en vez de volver a
@@ -365,12 +365,19 @@ class AlertQueue:
         `contar_intento=False` para fallos que no son del aviso (p. ej. no hay
         TELEGRAM_CHAT_ID configurado): si contaran, una configuracion a medias
         descartaria la cola entera en cinco vueltas.
+
+        `error` queda en `metadata.ultimo_error` del aviso muerto: medido el
+        19-oct, los avisos del 14-oct y del 19-oct murieron SIN motivo en el
+        archivo y no se pudo distinguir red caida de chat bloqueado.
         """
         with self._exclusivo():
             self._quitar_de_vuelo(alert.id)
             if contar_intento:
                 alert.attempts = int(alert.attempts or 0) + 1
                 if alert.attempts >= MAX_INTENTOS:
+                    if error:
+                        alert.metadata = dict(alert.metadata or {})
+                        alert.metadata["ultimo_error"] = str(error)[:200]
                     muertos = self._read_json(self.dead_path)
                     muertos.append(_a_dict(alert))
                     self._write_json(self.dead_path, muertos)
@@ -432,8 +439,15 @@ def queue_alert(
     priority: AlertPriority = AlertPriority.MEDIUM,
     parse_mode: str = "HTML",
     metadata: Dict = None,
+    source: str = "sentinel",
 ) -> str:
-    """Queue an alert for the Consensus Bot to send."""
+    """Queue an alert for the Consensus Bot to send.
+
+    `source` identifica QUIEN encola. El default es "sentinel" porque hoy es
+    el unico que encola (verificado en todo el repo), pero no es un hecho
+    permanente: cuando el Concilio encole lo suyo debe poder decirlo, y un
+    aviso del Concilio firmado "sentinel" seria un dato falso en el archivo.
+    """
     alert = Alert(
         id=f"{int(time.time()*1000)}-{os.urandom(4).hex()}",
         timestamp=time.time(),
@@ -441,7 +455,7 @@ def queue_alert(
         title=title,
         message=message,
         parse_mode=parse_mode,
-        source="sentinel",
+        source=source,
         metadata=metadata or {},
     )
     return alert_queue.push(alert)
