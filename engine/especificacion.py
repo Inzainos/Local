@@ -489,3 +489,45 @@ def casos_desde_formato(fmt: Formato, maximo: int = 16):
     return [Caso(entrada=f"{fmt.funcion}({v!r})", esperado=repr(ok),
                  porque="generado de la especificación extraída")
             for v, ok in generar_valores(fmt, maximo)]
+
+
+# ─── OPCIÓN C: RELACIONES (sin modelo) ───────────────────────────────────────
+# Se infieren por patrones léxicos en el enunciado. Cada relación genera
+# casos de prueba que el verificador ejecuta. Si TODAS pasan, la tarea
+# queda VERIFICADA sin necesidad de especificación de formato.
+# Medido en bench/relaciones.py: solo es_ipv4 pasa todas sus relaciones
+# con codegemma a temp 0; a_segundos falla Additive por orden de regex.
+
+RELACIONES_POR_PALABRA = [
+    # (palabra_clave_en_enunciado, nombre_relación)
+    ("convierte", "Additive"),         # a_segundos: "convierte duraciones..."
+    ("convierta", "Additive"),         # "convierte" (subjuntivo: que convierta)
+    ("suma", "Additive"),
+    ("combin", "Additive"),
+    ("varias unidades", "Additive"),
+    ("devuelve 0 si", "ZeroOnInvalid"),
+    ("devuelve false si", "ZeroOnInvalid"),
+    ("devuelva true solo si", "ZeroOnInvalid"),
+    ("devuelve true solo si", "ZeroOnInvalid"),
+    ("no es una", "ZeroOnInvalid"),
+    ("no es valida", "ZeroOnInvalid"),
+    ("no es un", "ZeroOnInvalid"),
+    ("palindromo", "Idempotent"),
+    ("ignora", "Idempotent"),
+    ("monoton", "Monotonic"),
+    ("creciente", "Monotonic"),
+    ("decreciente", "Monotonic"),
+]
+
+def extraer_relaciones(enunciado: str) -> List[str]:
+    """Infere relaciones del enunciado por búsqueda léxica (sin modelo).
+    
+    Devuelve lista de nombres de relación (ej: ["Additive", "ZeroOnInvalid"]).
+    Determinista, rápido, sin LLM.
+    """
+    enunciado_lower = enunciado.lower()
+    rels = []
+    for palabra, relacion in RELACIONES_POR_PALABRA:
+        if palabra in enunciado_lower and relacion not in rels:
+            rels.append(relacion)
+    return rels

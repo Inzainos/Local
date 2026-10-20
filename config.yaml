@@ -94,12 +94,19 @@ concilio:
   # Hipotesis SIN medir para la v2: con prompts desordenados (conversacionales,
   # como los que llegan por voz) la segmentacion si podria ayudar.
   segmentador: ""
-  # VIA DIRECTA (v1): una llamada al coder a temperatura 0 y verificacion por
+# VIA DIRECTA (v1): una llamada al coder a temperatura 0 y verificacion por
   # ejecucion; el concilio solo entra si no pasa. Medido el 2026-09-25:
-  # codegemma resolvio 6/7 tareas a la primera en ~30 s; el concilio tardo
+  # codegemma resolvio 6/7 tareas a la primera en ~30 s cada una; el concilio tardo
   # 25-50 min y no cerro ninguna.
   via_directa: true
   intentos_directos: 2          # el segundo recibe los casos que fallo
+  # MODELO DEL SEGUNDO INTENTO de la via directa. Vacio = repetir el coder
+  # (comportamiento v1). Medido el 2026-10-18 (bench/segundo_intento.py):
+  # a temperatura 0 codegemma repite su fallo (es_matricula 15/16 dos veces,
+  # igual que en vivo el 25-sep) y qwen con los casos fallidos la ARREGLA
+  # (16/16, 6 s). En token_vivo ninguno arregla (14/16 vs 11/16) y la tarea
+  # escala igual; el mejor-intento ya conserva el mejor de ambos.
+  modelo_segundo_intento: qwen2.5-coder:7b
   # Si el enunciado no admite verificacion FIABLE (no es un validador de
   # formato): "entregar" el codigo rotulado SIN VERIFICAR, o "concilio". El
   # concilio tampoco puede verificarlo: solo sumaria 25-50 minutos.

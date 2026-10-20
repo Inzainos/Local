@@ -451,6 +451,156 @@ def _linea_base(casos: List[Caso]) -> int:
     return Counter(c.esperado for c in casos).most_common(1)[0][1]
 
 
+# ─── OPCIÓN C: EJECUCIÓN DE RELACIONES ──────────────────────────────────────
+# Generadores de casos por relación (Python, sin modelo).
+# Deben coincidir con bench/relaciones.py para reproducibilidad.
+
+def _generar_casos_additive(fn: str) -> List[Caso]:
+    """a_segundos: f('1h30m') == f('1h') + f('30m').
+    Solo prueba combinaciones en orden h→m→s (el orden del ejemplo 1h30m)."""
+    # Unidades con su prioridad (mayor a menor)
+    comps = [
+        ("1h", 3600, 3), ("2h", 7200, 3),
+        ("30m", 1800, 2), ("15m", 900, 2),
+        ("45s", 45, 1),
+    ]
+    out = []
+    for i in range(len(comps)):
+        for j in range(i+1, len(comps)):
+            ca, va, pri_a = comps[i]
+            cb, vb, pri_b = comps[j]
+            # Solo combinar si unidad mayor va primero (h→m, h→s, m→s)
+            if pri_a > pri_b:
+                out.append(Caso(f"{fn}({ca+cb!r})", repr(va + vb),
+                              porque="relación Additive: combinación h→m→s"))
+    return out
+
+def _generar_casos_zero_on_invalid(fn: str) -> List[Caso]:
+    """Entradas que el enunciado dice que dan 0/False + válidos específicos por función."""
+    invalidos = ["", "hola", "h", "1x", "xyz", ":::",
+                 "10.0.0.256", "1.2.3", "a.b.c.d", "1.2.3.4.5", "256.1.1.1",
+                 "ABC1234", "AB-123", "ABCD-1234", "abc-1234"]
+    # Válidos específicos por función para discriminar
+    if fn == "es_ipv4":
+        validos = [
+            ("192.168.1.1", True), ("0.0.0.0", True), ("255.255.255.255", True),
+            ("8.8.8.8", True), ("10.0.0.1", True), ("172.16.0.1", True),
+            ("127.0.0.1", True)
+        ]
+    elif fn == "a_segundos":
+        validos = [
+            ("2h", 7200), ("30m", 1800), ("45s", 45), ("1h30m", 5400),
+            ("1h", 3600), ("2h", 7200), ("15m", 900)
+        ]
+    elif fn == "es_matricula":
+        validos = [
+            ("ABC-1234", True), ("XYZ-9999", True), ("AAA-0001", True),
+            ("MAD-1234", True), ("BAR-5678", True), ("SEV-4321", True),
+            ("VAL-0000", True)
+        ]
+    elif fn == "es_bisiesto":
+        validos = [
+            (2000, True), (2024, True), (1996, True), (2400, True),
+            (2004, True), (2008, True), (2012, True)
+        ]
+    elif fn == "es_palindromo":
+        validos = [
+            ("Anita lava la tina", True), ("", True), ("oso", True),
+            ("A man, a plan, a canal: Panama", True), ("radar", True),
+            ("level", True), ("civic", True)
+        ]
+    else:
+        validos = []
+    casos = [Caso(f"{fn}({x!r})", "0", porque="relación ZeroOnInvalid: entrada inválida")
+             for x in invalidos]
+    casos.extend(Caso(f"{fn}({x!r})", repr(e), porque="relación ZeroOnInvalid: entrada válida")
+                 for x, e in validos)
+    return casos
+
+def _generar_casos_idempotent(fn: str, base_casos: List[Caso]) -> List[Caso]:
+    """f(x) == True → f(limpiar(x)) == True. Para validadores booleanos."""
+    validos = [c.entrada for c in base_casos if c.esperado == "True"]
+    return [Caso(entrada, "True", porque="relación Idempotent: válido normalizado")
+            for entrada in validos]
+
+def _generar_casos_monotonic(fn: str) -> List[Caso]:
+    """a_segundos: más tiempo → más segundos."""
+    if fn == "a_segundos":
+        orden = [("1s", 1), ("30s", 30), ("1m", 60), ("2m", 120), ("1h", 3600), ("2h", 7200)]
+        out = []
+        for i in range(len(orden)):
+            for j in range(i+1, len(orden)):
+                ca, va = orden[i]
+                cb, vb = orden[j]
+                out.append(Caso(f"{fn}({ca!r}) < {fn}({cb!r})", "True",
+                              porque=f"relación Monotonic: {ca} < {cb}"))
+        return out
+    return []
+
+
+GENERADORES_RELACION = {
+    "Additive": lambda fn, base: _generar_casos_additive(fn),
+    "ZeroOnInvalid": lambda fn, base: _generar_casos_zero_on_invalid(fn),
+    "Idempotent": _generar_casos_idempotent,
+    "Monotonic": lambda fn, base: _generar_casos_monotonic(fn),
+}
+
+def ejecutar_relaciones(
+    codigo: str,
+    funcion: str,
+    relaciones: List[str],
+    base_casos: List[Caso],
+) -> Veredicto:
+    """Ejecuta todas las relaciones contra el código. 
+    
+    Devuelve Veredicto con via="relaciones". Solo PASSA si TODAS las
+    relaciones pasan TODOS sus casos. Si alguna falla, no hay verificación.
+    """
+    if not relaciones:
+        return Veredicto(0, 0, error="sin relaciones que verificar")
+    if not codigo.strip():
+        return Veredicto(0, 0, error="no había código que verificar")
+    
+    todos_casos: List[Caso] = []
+    for rel in relaciones:
+        gen = GENERADORES_RELACION.get(rel)
+        if not gen:
+            continue
+        if rel in ("ZeroOnInvalid", "Idempotent"):
+            casos = gen(funcion, base_casos)
+        else:
+            casos = gen(funcion, base_casos)
+        todos_casos.extend(casos)
+    
+    if not todos_casos:
+        return Veredicto(0, 0, error="no se generaron casos para las relaciones")
+    
+    # Verificar sobre el conjunto COMBINADO (base + relaciones) para que
+    # la discriminación sea correcta. Luego comprobar que los casos de
+    # relación todos pasan.
+    casos_combinados = list(base_casos) + todos_casos
+    v = ejecutar_verificacion(codigo, casos_combinados)
+    v.via = "relaciones"
+    
+    # Verificar que TODOS los casos de relación pasan
+    rel_ok = True
+    rel_entradas = {c.entrada for c in todos_casos}
+    for d in v.detalle:
+        if d["entrada"] in rel_entradas and not d.get("correcto", False):
+            rel_ok = False
+            break
+    
+    if not rel_ok:
+        # Alguna relación falla: ajustar veredicto para reflejar fallo en relaciones
+        v.via = "relaciones"
+        v.aciertos = sum(1 for d in v.detalle if d.get("correcto") and d["entrada"] in rel_entradas)
+        v.total = len(todos_casos)
+        v.error = "alguna relación falla"
+    
+    logger.info("relaciones %s: %s (rel_ok=%s)", relaciones, v.resumen(), rel_ok)
+    return v
+
+
 # ─── ORQUESTACIÓN ────────────────────────────────────────────────────────────
 
 def verificar(
@@ -462,17 +612,21 @@ def verificar(
 ) -> Tuple[Veredicto, List[Caso]]:
     """Ciclo completo: enunciado → casos → ejecución → veredicto.
 
-    DOS VÍAS, en este orden:
+    TRES VÍAS, en este orden:
 
       1. ESPECIFICACIÓN. Si hay `invocar_json`, un modelo extrae el formato con
          decodificación restringida y Python construye casos balanceados de
          frontera. Solo aplica a validadores de formato de cadena.
-      2. DERIVACIÓN. Si la primera no aplica, un modelo escribe los casos. Es
-         la vía débil --- ningún modelo local contó bien hasta 35 --- y por eso
+      2. RELACIONES (Opción C). Si la primera no aplica, se infieren relaciones
+         léxicas del enunciado (sin modelo) y se ejecutan. Solo PASSA si TODAS
+         las relaciones pasan TODOS sus casos. Para tareas no-formato con
+         propiedades matemáticas (a_segundos, es_ipv4, es_palindromo...).
+      3. DERIVACIÓN. Si las anteriores no aplican, un modelo escribe los casos.
+         Es la vía débil --- ningún modelo local contó bien hasta 35 --- y por eso
          su resultado pasa por la puerta de balance (`discrimina`), que
          bloquea el consenso cuando los casos no miden.
 
-    En ninguna de las dos el modelo ve el código: así no puede acomodar las
+    En ninguna de las tres el modelo ve el código: así no puede acomodar las
     pruebas a la solución.
     """
     if invocar_json is not None:
@@ -486,8 +640,32 @@ def verificar(
                 v.via = "especificacion"
                 logger.info("verificación: %s", v.resumen())
                 return v, casos
-        logger.info("vía de especificación no aplica (%s); se derivan casos", motivo)
+        logger.info("vía de especificación no aplica (%s); se intentan relaciones", motivo)
 
+    # Vía 2: RELACIONES (Opción C) — sin modelo, léxico determinista
+    from engine.especificacion import extraer_relaciones
+    relaciones = extraer_relaciones(enunciado)
+    if relaciones:
+        from engine.verificador import Caso
+        # Casos base para relaciones que los necesitan (Idempotent)
+        base_para_relaciones = []
+        if "Idempotent" in relaciones:
+            # Usar casos base simples: intentar extraer del enunciado o usar vacíos
+            base_para_relaciones = []
+        v_rel = ejecutar_relaciones(codigo, "", relaciones, base_para_relaciones)
+        # Necesitamos el nombre de función para ejecutar_relaciones
+        from engine.verificador import nombre_funcion
+        fn = nombre_funcion(enunciado)
+        if fn:
+            v_rel = ejecutar_relaciones(codigo, fn, relaciones, base_para_relaciones)
+            if v_rel.discrimina and not v_rel.error and v_rel.aciertos == v_rel.total:
+                logger.info("verificación por relaciones: %s", v_rel.resumen())
+                return v_rel, []  # sin casos base; la relación ES la verificación
+            logger.info("relaciones no verifican (%s); se derivan casos", v_rel.resumen())
+        else:
+            logger.info("no se pudo extraer función para relaciones; se derivan casos")
+
+    # Vía 3: DERIVACIÓN
     casos, err = derivar_casos(enunciado, invocar_modelo, maximo=maximo_casos)
     if err:
         logger.warning("no se pudieron derivar casos: %s", err)

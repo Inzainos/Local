@@ -183,3 +183,33 @@ def test_el_mejor_intento_no_entra_en_el_contexto_del_coder():
     bb.shared_notes["ultimo_veredicto"] = {"codigo": "def SECRETO_DEL_ULTIMO(): pass"}
     ctx = bb.get_context_for_coder()
     assert "SECRETO_DEL_MEJOR" not in ctx and "SECRETO_DEL_ULTIMO" not in ctx
+
+
+def test_el_segundo_intento_usa_el_modelo_de_respaldo():
+    """Con modelo_segundo_intento configurado, el 2º intento usa ese modelo."""
+    fallo = _veredicto(11, 16, 8, fallos=["validar_token_telegram('0:AHOV_x')"])
+    orq, prompts = _orquestador([fallo, _veredicto(16, 16, 8)])
+    # Simula el atributo que __init__ pondria
+    orq._modelo_segundo_intento = "qwen2.5-coder:7b"
+    # Mock del coder de respaldo
+    modelos_usados = []
+    coder_respaldo = NS(model="qwen2.5-coder:7b", name="Coder respaldo",
+                        generate=lambda prompt: (modelos_usados.append("respaldo"), CODIGO)[1])
+    orq._coder_respaldo = lambda: coder_respaldo
+    bb = _pizarra()
+    assert orq._intentar_via_directa(bb) == "verificado"
+    # Intento 1 va al coder principal (prompts), intento 2 al respaldo (modelos_usados)
+    assert len(prompts) == 1
+    assert modelos_usados == ["respaldo"], "el 2º intento debe usar el coder de respaldo"
+
+
+def test_sin_modelo_de_respaldo_repite_el_coder():
+    """Sin modelo_segundo_intento (v1), el 2º intento repite el coder principal."""
+    fallo = _veredicto(11, 16, 8, fallos=["validar_token_telegram('0:AHOV_x')"])
+    orq, prompts = _orquestador([fallo, _veredicto(16, 16, 8)])
+    # Sin _modelo_segundo_intento -> _coder_respaldo devuelve None
+    orq._modelo_segundo_intento = ""
+    bb = _pizarra()
+    assert orq._intentar_via_directa(bb) == "verificado"
+    # Ambos intentos usan el coder principal -> 2 prompts
+    assert len(prompts) == 2, "ambos intentos usan el coder principal"

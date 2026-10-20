@@ -70,12 +70,15 @@ class ConsensusOrchestrator:
         # y no cerro ninguna. Para tareas claras, el concilio sobra.
         self._via_directa = bool(conc.get("via_directa", True))
         self._intentos_directos = max(1, int(conc.get("intentos_directos", 2)))
+        # Modelo para el 2º+ intento de la via directa. Vacio = repetir el coder.
+        self._modelo_segundo_intento = str(conc.get("modelo_segundo_intento", "") or "").strip()
         # Si el enunciado no permite verificacion FIABLE (no es un validador de
         # formato): "entregar" el codigo rotulado SIN VERIFICAR, o pasar al
         # "concilio". El concilio tampoco puede verificarlo --- su lectura puso
         # 97-99 a codigo roto --- asi que solo anadiria 25-50 minutos.
         self._sin_verificacion = str(conc.get("sin_verificacion_confiable", "entregar"))
         self.__coder_directo = None
+        self.__coder_respaldo = None
         self.lifecycle = ModelLifecycle(ollama_host=self.ollama_host)
 
         r_cfg = self.config["roles"]["researcher"]
@@ -333,6 +336,23 @@ class ConsensusOrchestrator:
                 num_ctx=self.coder.num_ctx, keep_alive="5m", lifecycle=None)
         return self.__coder_directo
 
+    def _coder_respaldo(self):
+        """Coder de respaldo para el 2º+ intento: otro modelo, misma configuracion.
+
+        Se usa cuando `modelo_segundo_intento` esta configurado y no esta vacio.
+        Temperatura 0, misma ventana (8192) para paridad de memoria con codegemma.
+        """
+        if not getattr(self, "_modelo_segundo_intento", ""):
+            return None
+        if self.__coder_respaldo is None or self.__coder_respaldo.model != self._modelo_segundo_intento:
+            self.__coder_respaldo = BaseExpertAgent(
+                name="Coder respaldo", role="Coder", model=self._modelo_segundo_intento,
+                fallback_model=None, temperature=0.0,
+                system_prompt=self.SISTEMA_DIRECTO, ollama_host=self.ollama_host,
+                timeout_seconds=self.timeout, num_predict=1500,
+                num_ctx=8192, keep_alive="5m", lifecycle=None)
+        return self.__coder_respaldo
+
     @staticmethod
     def _registrar_intento(blackboard, aciertos, total, codigo, fallos, origen) -> None:
         """Guarda el candidato con MAS casos de especificacion acertados.
@@ -406,13 +426,19 @@ class ConsensusOrchestrator:
             return "concilio"
         blackboard.consensus_threshold = self.threshold
         coder = self._coder_directo()
+        respaldo = self._coder_respaldo()
         realimentacion, veredicto = "", None
         for intento in range(1, self._intentos_directos + 1):
             prompt = (enunciado + realimentacion
                       + "\n\nDevuelve solo la funcion en un bloque de codigo.")
+            # Intento 1: coder principal. 2º+: coder de respaldo si configurado.
+            if intento == 1 or respaldo is None:
+                coder_actual = coder
+            else:
+                coder_actual = respaldo
             respuesta = self._run_exclusive(
-                coder.model, lambda: coder.generate(prompt=prompt), "DIRECTO",
-                on_stage_start, on_stage_end, coder.name,
+                coder_actual.model, lambda: coder_actual.generate(prompt=prompt), "DIRECTO",
+                on_stage_start, on_stage_end, coder_actual.name,
                 f"via directa: intento {intento} de {self._intentos_directos}")
             blackboard.update_code(respuesta or "", is_refinement=intento > 1)
             veredicto, _ = self.optimizer._verificar_ejecutando(blackboard)
@@ -420,13 +446,13 @@ class ConsensusOrchestrator:
                 break
             blackboard.log_event("DIRECTO", "Orchestrator",
                                  f"intento {intento} [via {veredicto.via}]: {veredicto.resumen()}")
-            fiable = veredicto.via == "especificacion"
+            fiable = veredicto.via in ("especificacion", "relaciones")
             if fiable and not veredicto.error:
                 self._registrar_intento(
                     blackboard, veredicto.aciertos, veredicto.total,
                     extraer_codigo(respuesta or "", funcion),
                     [f["entrada"] for f in (veredicto.detalle or []) if not f.get("correcto")],
-                    f"via directa, intento {intento}")
+                    f"via directa, intento {intento} ({coder_actual.model})")
             # TODOS los casos, no el umbral: cada caso de especificacion es un
             # requisito. Con >= 85 se aprobo un es_matricula que fallaba 1 de 16
             # (acepto '!OV-3074') en la aceptacion de la v1.
@@ -442,6 +468,21 @@ class ConsensusOrchestrator:
                     f"{veredicto.aciertos}/{veredicto.total} casos construidos desde el "
                     f"enunciado, {veredicto.puntuacion_util}% sobre la linea base, "
                     f"intento {intento}.\n\n```python\n{codigo}\n```")
+                # Juez interno: aprende de lo VERIFICADO
+                try:
+                    from engine.juez import on_tarea_verificada, infer_tipo_tarea
+                    on_tarea_verificada(
+                        tarea=funcion,
+                        tipo_tarea=infer_tipo_tarea(enunciado),
+                        modelo=coder_actual.model,
+                        via=veredicto.via,
+                        aciertos=veredicto.aciertos,
+                        total=veredicto.total,
+                        casos_detalle=veredicto.detalle or [],
+                        codigo=codigo,
+                    )
+                except Exception:
+                    pass  # nunca rompe el pipeline
                 return "verificado"
             # Sin verificacion fiable no hay realimentacion fiable: no se reintenta
             # con casos que pueden tener el esperado mal.
@@ -449,7 +490,7 @@ class ConsensusOrchestrator:
                 break
             realimentacion = self._realimentacion_directa(veredicto)
 
-        fiable = veredicto is not None and veredicto.via == "especificacion"
+        fiable = veredicto is not None and veredicto.via in ("especificacion", "relaciones")
         if fiable or self._sin_verificacion != "entregar":
             blackboard.log_event("DIRECTO", "Orchestrator",
                                  "la via directa no paso la verificacion: se pasa al concilio")
@@ -593,8 +634,16 @@ class ConsensusOrchestrator:
         if self.sequential:
             # El num_ctx del rol que va a usar ese modelo: la precarga es
             # la que fija la ventana, no el generate posterior.
+            # Incluye coders directos/respaldo que se crean perezosa.
+            _agentes = (self.researcher, self.coder, self.optimizer)
+            _coder_directo = getattr(self, "_ConsensusOrchestrator__coder_directo", None)
+            _coder_respaldo = getattr(self, "_ConsensusOrchestrator__coder_respaldo", None)
+            if _coder_directo:
+                _agentes += (_coder_directo,)
+            if _coder_respaldo:
+                _agentes += (_coder_respaldo,)
             _ctx = next((getattr(a, "num_ctx", None)
-                         for a in (self.researcher, self.coder, self.optimizer)
+                         for a in _agentes
                          if getattr(a, "model", None) == model), None)
             self.lifecycle.ensure_exclusive(model, settle_seconds=self.settle_seconds,
                                             num_ctx=_ctx)
@@ -1087,6 +1136,26 @@ class ConsensusOrchestrator:
         if consensus_achieved:
             try:
                 blackboard.status = TaskStatus.COMPLETED
+            except Exception:
+                pass
+            # Juez interno: concilio verificado
+            try:
+                from engine.juez import on_tarea_verificada, infer_tipo_tarea
+                from engine.verificador import extraer_codigo, nombre_funcion
+                fn = nombre_funcion(blackboard.user_prompt)
+                if fn:
+                    codigo = extraer_codigo(final_answer, fn)
+                    if codigo:
+                        on_tarea_verificada(
+                            tarea=fn,
+                            tipo_tarea=infer_tipo_tarea(blackboard.user_prompt),
+                            modelo=self.optimizer.model,
+                            via="concilio_verificado",
+                            aciertos=blackboard.consensus_score if blackboard.consensus_score <= 100 else 100,
+                            total=100,
+                            casos_detalle=[],
+                            codigo=codigo,
+                        )
             except Exception:
                 pass
 
