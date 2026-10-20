@@ -54,6 +54,20 @@
     .swarm { display:flex; justify-content:space-between; font-size:.8rem;
       padding:2px 0; border-bottom:1px dashed rgba(148,163,184,.15); }
     .swarm:last-child { border-bottom:0; }
+    #chat-log { max-height: 45vh; overflow-y:auto; display:flex; flex-direction:column;
+      gap:8px; margin-bottom:6px; }
+    .chat-msg { padding:8px 10px; border-radius:10px; font-size:.85rem;
+      white-space:pre-wrap; word-break:break-word; }
+    .chat-msg.user { background: rgba(37,99,235,.25); align-self:flex-end; max-width:85%; }
+    .chat-msg.bot { background: rgba(148,163,184,.12); align-self:flex-start; max-width:95%; }
+    .chat-msg pre { background: rgba(2,6,23,.65); padding:8px; border-radius:8px;
+      overflow-x:auto; font-size:.75rem; white-space:pre; }
+    .chat-row { display:flex; gap:6px; margin-top:8px; }
+    .chat-row select { background:var(--card); color:var(--fg);
+      border:1px solid rgba(148,163,184,.25); border-radius:8px; padding:8px; }
+    .chat-row input { flex:1; background:var(--card); color:var(--fg);
+      border:1px solid rgba(148,163,184,.25); border-radius:8px; padding:8px 10px; font-size:.85rem; }
+    .chat-row button { width:auto; margin-top:0; }
   </style>
 </head>
 <body>
@@ -67,6 +81,19 @@
     <h2>Concilio (secundario)</h2>
     <div id="concilio-info" class="muted">Cargando…</div>
   </div>
+  <div class="card" style="margin-top:10px">
+    <h2>Chat del Concilio</h2>
+    <div id="chat-log"></div>
+    <div id="chat-status" class="muted"></div>
+    <div class="chat-row">
+      <select id="chat-mode" title="Rapida: un modelo, segundos. Tarea: pipeline completo con verificacion por ejecucion.">
+        <option value="rapida">Rapida</option>
+        <option value="tarea">Tarea</option>
+      </select>
+      <input id="chat-prompt" placeholder="Pregunta o encarga una tarea..." />
+      <button type="button" id="chat-send">Enviar</button>
+    </div>
+  </div>
   <button type="button" onclick="loadAll()">Actualizar</button>
 
   <script>
@@ -75,7 +102,7 @@
 
     function esc(s) {
       return String(s ?? '').replace(/[&<>"']/g, c => ({
-        '&':'&','<':'<','>':'>','"':'"',"'":'&#39;'
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
       })[c]);
     }
     function fmt(v, d=1) {
@@ -192,6 +219,106 @@
         <div class="row"><span>Cola pendiente</span><span>${esc(q.size ?? 0)}</span></div>
         <div class="row"><span>Umbral</span><span>${esc(c.threshold ?? 85)}</span></div>`;
     }
+
+    // ─── Chat del Concilio ───────────────────────────────────────────────
+    const MINI_KEY = new URLSearchParams(location.search).get('k') || '';
+    let chatBusy = false;
+
+    function chatHeaders(extra) {
+      const h = Object.assign({'Content-Type': 'application/json'}, extra || {});
+      if (MINI_KEY) h['X-Mini-Key'] = MINI_KEY;
+      return h;
+    }
+
+    function chatAdd(who, text) {
+      const log = document.getElementById('chat-log');
+      const div = document.createElement('div');
+      div.className = 'chat-msg ' + who;
+      // bloques de codigo ```...``` como <pre>; el resto texto plano
+      String(text).split('```').forEach((parte, i) => {
+        if (i % 2 === 0) {
+          const t = document.createElement('span');
+          t.textContent = parte;
+          div.appendChild(t);
+        } else {
+          const pre = document.createElement('pre');
+          pre.textContent = parte.replace(/^python\n/, '');
+          div.appendChild(pre);
+        }
+      });
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    async function chatPollTask(jobId, status) {
+      const t0 = Date.now();
+      for (;;) {
+        await new Promise(r => setTimeout(r, 4000));
+        const res = await fetch('/api/task/' + jobId, { headers: chatHeaders() });
+        const d = await res.json().catch(() => ({}));
+        if (d.status === 'COMPLETED') {
+          const bb = d.result || {};
+          const via = (bb.shared_notes && bb.shared_notes.via) || '';
+          let tag = '[SIN CONSENSO] ';
+          if (via === 'directa_verificada') tag = '[VERIFICADO por ejecucion] ';
+          else if (via === 'directa_sin_verificar') tag = '[SIN VERIFICAR] ';
+          else if (bb.consensus_reached) tag = '[CONSENSO] ';
+          chatAdd('bot', tag + (bb.final_synthesis || '(sin sintesis)'));
+          status.textContent = '';
+          return;
+        }
+        if (d.status === 'FAILED' || d.status === 'TIMED_OUT' || res.status === 502 || res.status === 504) {
+          throw new Error(d.error || ('estado ' + (d.status || res.status)));
+        }
+        status.textContent = 'Concilio trabajando... ' +
+          Math.round((Date.now() - t0) / 1000) + 's';
+      }
+    }
+
+    async function chatSend() {
+      const input = document.getElementById('chat-prompt');
+      const status = document.getElementById('chat-status');
+      const prompt = input.value.trim();
+      const mode = document.getElementById('chat-mode').value;
+      if (!prompt || chatBusy) return;
+      input.value = '';
+      chatBusy = true;
+      chatAdd('user', prompt);
+      try {
+        if (mode === 'rapida') {
+          status.textContent = 'Pensando (rapida)...';
+          const res = await fetch('/api/mini/chat', {
+            method: 'POST', headers: chatHeaders(),
+            body: JSON.stringify({ prompt })
+          });
+          const d = await res.json();
+          if (!res.ok) throw new Error(d.error || ('HTTP ' + res.status));
+          chatAdd('bot', d.reply || '(sin respuesta)');
+          status.textContent = '';
+        } else {
+          status.textContent = 'Tarea enviada al Concilio...';
+          const res = await fetch('/api/task', {
+            method: 'POST', headers: chatHeaders(),
+            body: JSON.stringify({ prompt })
+          });
+          const d = await res.json();
+          if (!res.ok) throw new Error(d.error || ('HTTP ' + res.status));
+          await chatPollTask(d.job_id, status);
+        }
+      } catch (e) {
+        chatAdd('bot', 'ERROR: ' + e.message);
+        status.textContent = '';
+      } finally {
+        chatBusy = false;
+      }
+    }
+
+    document.getElementById('chat-send').addEventListener('click', chatSend);
+    document.getElementById('chat-prompt').addEventListener('keydown', e => {
+      if (e.key === 'Enter') chatSend();
+    });
+    chatAdd('bot', 'Rapida = un modelo, segundos. Tarea = pipeline completo '
+      + '(coder, verificador por ejecucion, Juez). Una tarea a la vez.');
 
     async function loadAll() {
       const cards = document.getElementById('cards');

@@ -322,7 +322,9 @@ def _run_task(job_id: str, prompt: str) -> None:
 
 
 @app.post("/api/task")
-async def execute_task_endpoint(req: QueryRequest):
+async def execute_task_endpoint(request: Request, req: QueryRequest):
+    if not _mini_autorizado(request):
+        return JSONResponse(status_code=401, content={"error": "clave no valida"})
     prompt = req.prompt.strip()
     if not prompt:
         return JSONResponse(status_code=400, content={"error": "La tarea no puede estar vacía"})
@@ -352,6 +354,53 @@ def task_status(job_id: str):
 @app.get("/api/health")
 def health():
     return {"status": "ok", "ollama_host": orchestrator.ollama_host}
+
+
+# ─── CHAT DEL CONCILIO EN LA MINI APP ────────────────────────────────────────
+# Dos modos, igual que el bot de Telegram: rapido (fast_ask, un modelo,
+# segundos) y tarea (run_consensus completo, via /api/task). La rapida se
+# bloquea si hay una tarea en curso: fast_ask haria ensure_exclusive y
+# desalojaria el modelo que la tarea esta usando (ping-pong en Ollama).
+
+# Clave opcional para el tunel publico: si se define MINI_APP_KEY, /api/task
+# y /api/mini/chat exigen el header X-Mini-Key. La Mini App la toma del
+# parametro ?k= de SU URL (el boton de Telegram la lleva), asi el tunel no
+# queda abierto a cualquiera con el enlace. Sin clave definida, todo funciona
+# como hasta hoy (local sin tunnel, o decision explicita del operador).
+MINI_APP_KEY = os.environ.get("MINI_APP_KEY", "")
+
+
+def _mini_autorizado(request: Request) -> bool:
+    if not MINI_APP_KEY:
+        return True
+    return request.headers.get("X-Mini-Key", "") == MINI_APP_KEY
+
+
+def _hay_tarea_en_curso() -> bool:
+    return any(job["status"] in ("QUEUED", "RUNNING") for job in task_jobs.values())
+
+
+@app.post("/api/mini/chat")
+def mini_chat(request: Request, req: QueryRequest):
+    """Consulta rapida al Concilio (fast_ask): un modelo, segundos.
+
+    Es la via LIGERA de siempre (/task del bot): va FUERA del pipeline de
+    consenso, con el pack thin de Sentinel y sin memoria de sesiones.
+    """
+    if not _mini_autorizado(request):
+        return JSONResponse(status_code=401, content={"error": "clave no valida"})
+    prompt = req.prompt.strip()
+    if not prompt:
+        return JSONResponse(status_code=400, content={"error": "La consulta no puede estar vacia"})
+    if _hay_tarea_en_curso():
+        return JSONResponse(status_code=409, content={
+            "error": "Hay una tarea del Concilio en curso; espera a que termine "
+                     "para consultar. (fast_ask desalojaria su modelo en Ollama)"})
+    try:
+        reply = orchestrator.fast_ask(prompt)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse(status_code=502, content={"error": f"fast_ask fallo: {exc}"})
+    return {"reply": reply, "mode": "rapida"}
 
 
 
