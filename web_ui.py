@@ -418,6 +418,35 @@ def mini_app_page():
     return HTMLResponse(mini.read_text(encoding="utf-8"))
 
 
+MINIAPP_ESTADO_JSON = Path(
+    "/home/deamon/workspaces/estado/miniapp_estado.json"
+)
+
+
+@app.get("/api/mini/estado")
+def mini_estado():
+    """Estado completo de Sentinel para la MiniApp (2026-10-20).
+
+    El JSON lo REFRESCA el launcher de Sentinel cada ciclo (≤5 min) con SU
+    propio código — formato de nodos, countdown de lags y ganancia del Juez
+    viven UNA sola vez; este endpoint solo lo sirve. `edad_s` delata la
+    frescura (regla 7/8: ausencia visible, no disfrazada).
+    """
+    import time as _t
+    if not MINIAPP_ESTADO_JSON.is_file():
+        return {"ok": False, "error": "snapshot ausente (launcher sin correr)"}
+    try:
+        data = json.loads(MINIAPP_ESTADO_JSON.read_text(encoding="utf-8"))
+    except Exception as e:
+        return {"ok": False, "error": f"snapshot ilegible: {e}"}
+    data["ok"] = True
+    try:
+        data["edad_s"] = round(_t.time() - float(data.get("ts", 0)), 0)
+    except (TypeError, ValueError):
+        data["edad_s"] = None
+    return data
+
+
 @app.get("/api/mini/sentinel")
 def mini_sentinel():
     """Pipeline de Sentinel Omega en tiempo real — lo que el operador mira.

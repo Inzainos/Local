@@ -1,341 +1,379 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Sentinel Omega — Pipeline</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <style>
-    :root {
-      --bg: var(--tg-theme-bg-color, #0f172a);
-      --fg: var(--tg-theme-text-color, #e2e8f0);
-      --hint: var(--tg-theme-hint-color, #94a3b8);
-      --btn: var(--tg-theme-button-color, #2563eb);
-      --btn-fg: var(--tg-theme-button-text-color, #fff);
-      --card: #1e293b;
-      --ok: #34d399;
-      --warn: #fbbf24;
-      --crit: #f87171;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background: var(--bg); color: var(--fg); padding: 16px; line-height: 1.45;
-    }
-    h1 { font-size: 1.15rem; margin: 0 0 4px; }
-    .sub { color: var(--hint); font-size: .8rem; margin: 0 0 12px; }
-    .grid { display: grid; gap: 10px; }
-    .card {
-      background: var(--card); border-radius: 12px; padding: 14px;
-      border: 1px solid rgba(148,163,184,.25);
-    }
-    .card h2 { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em;
-      color: var(--hint); margin: 0 0 8px; }
-    .metric { font-size: 1.15rem; font-weight: 700; }
-    .muted { color: var(--hint); font-size: .82rem; }
-    .row { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; }
-    a.button, button {
-      display: inline-block; background: var(--btn); color: var(--btn-fg);
-      border: 0; border-radius: 10px; padding: 10px 14px; text-decoration: none;
-      font-weight: 600; cursor: pointer; margin-top: 8px; width: 100%;
-    }
-    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px;
-      font-size: .72rem; font-weight: 600; }
-    .pill.ok { background: rgba(52,211,153,.15); color: var(--ok); }
-    .pill.warn { background: rgba(251,191,36,.15); color: var(--warn); }
-    .pill.crit { background: rgba(248,113,113,.15); color: var(--crit); }
-    .walls { display: flex; gap: 4px; margin: 6px 0; }
-    .wall { flex:1; text-align:center; padding:4px 2px; border-radius:6px;
-      font-size:.68rem; font-weight:600; background: rgba(148,163,184,.1);
-      color: var(--hint); }
-    .wall.on { background: rgba(52,211,153,.2); color: var(--ok); }
-    .wall.breach { background: rgba(248,113,113,.2); color: var(--crit); }
-    #err { color: var(--crit); font-size: .8rem; white-space: pre-wrap; }
-    .swarm { display:flex; justify-content:space-between; font-size:.8rem;
-      padding:2px 0; border-bottom:1px dashed rgba(148,163,184,.15); }
-    .swarm:last-child { border-bottom:0; }
-    #chat-log { max-height: 45vh; overflow-y:auto; display:flex; flex-direction:column;
-      gap:8px; margin-bottom:6px; }
-    .chat-msg { padding:8px 10px; border-radius:10px; font-size:.85rem;
-      white-space:pre-wrap; word-break:break-word; }
-    .chat-msg.user { background: rgba(37,99,235,.25); align-self:flex-end; max-width:85%; }
-    .chat-msg.bot { background: rgba(148,163,184,.12); align-self:flex-start; max-width:95%; }
-    .chat-msg pre { background: rgba(2,6,23,.65); padding:8px; border-radius:8px;
-      overflow-x:auto; font-size:.75rem; white-space:pre; }
-    .chat-row { display:flex; gap:6px; margin-top:8px; }
-    .chat-row select { background:var(--card); color:var(--fg);
-      border:1px solid rgba(148,163,184,.25); border-radius:8px; padding:8px; }
-    .chat-row input { flex:1; background:var(--card); color:var(--fg);
-      border:1px solid rgba(148,163,184,.25); border-radius:8px; padding:8px 10px; font-size:.85rem; }
-    .chat-row button { width:auto; margin-top:0; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sentinel Omega — MiniApp</title>
+<link rel="icon" href="data:,">
+<style>
+  /* Sistema de diseño del repo llevado al móvil (2026-10-20):
+     saturado = riesgo y NADA más; tabular-nums; ausente ≠ cero. */
+  :root{
+    --bg:#0d1117; --surface:#161b26; --line:#262d3d; --text:#e6e9f0;
+    --muted:#8b93a7; --faint:#5b6373; --calma:#3fb27f; --aten:#d9a441;
+    --aviso:#e07b39; --crit:#d64545; --serie:#4f8fd6;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  body{margin:0;padding:0 0 84px;background:var(--bg);color:var(--text);
+       font:15px/1.45 system-ui,-apple-system,'Segoe UI',sans-serif}
+  .wrap{max-width:640px;margin:0 auto;padding:12px 12px 0}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+        padding:14px 16px;margin:10px 0}
+  h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
+     margin:0 0 10px;font-weight:700}
+  .tnum{font-variant-numeric:tabular-nums}
+  .ausente{color:var(--faint)}
+  .muted{color:var(--muted)} .faint{color:var(--faint)}
+  .hero-num{font-size:44px;font-weight:800;line-height:1;letter-spacing:-.02em}
+  .hero-lab{font-size:12px;color:var(--muted);margin-top:4px}
+  .pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;
+        font-weight:700;letter-spacing:.04em}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .trow{display:flex;justify-content:space-between;align-items:baseline;
+        padding:7px 2px;border-bottom:1px solid var(--line);font-size:14px}
+  .trow:last-child{border-bottom:0}
+  .trow .v{font-weight:600}
+  .señal{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0}
+  .señal .sitio{font-weight:700;font-size:15px}
+  .señal .ev{display:inline-block;margin-top:2px;font-size:12px;font-weight:700;
+             letter-spacing:.05em;color:var(--muted)}
+  .cd{font-size:20px;font-weight:800;margin-top:6px}
+  .cd small{font-size:12px;color:var(--muted);font-weight:400}
+  canvas{width:100%;height:96px;display:block}
+  .barra{display:flex;height:14px;border-radius:7px;overflow:hidden;margin:8px 0 4px}
+  .barra div{height:100%}
+  .leyenda{display:flex;gap:12px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+  .chat{position:fixed;left:0;right:0;bottom:0;background:var(--surface);
+        border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
+  .chat .inner{max-width:616px;margin:0 auto}
+  #chat-log{max-height:32vh;overflow-y:auto;margin-bottom:8px}
+  .chat-msg{margin:6px 0;padding:9px 12px;border-radius:12px;font-size:14px;white-space:pre-wrap}
+  .chat-msg.user{background:#1f2a3d;margin-left:14%}
+  .chat-msg.bot{background:#1b2130;margin-right:14%}
+  .chat-msg pre{background:#0d1117;border:1px solid var(--line);border-radius:8px;
+                padding:8px;overflow-x:auto;font-size:12.5px}
+  .chat-in{display:flex;gap:8px}
+  #chat-prompt{flex:1;min-height:44px;border-radius:10px;border:1px solid var(--line);
+               background:#0d1117;color:var(--text);padding:10px 12px;font-size:15px}
+  button{min-height:44px;min-width:44px;border:0;border-radius:10px;padding:0 14px;
+         background:var(--serie);color:#fff;font-weight:700;font-size:15px}
+  select{min-height:44px;border-radius:10px;border:1px solid var(--line);
+         background:#0d1117;color:var(--text);font-size:14px;padding:0 8px}
+  #chat-status{font-size:12px;color:var(--muted);min-height:16px;margin-top:4px}
+  .err{color:var(--crit);font-size:13px}
+</style>
 </head>
 <body>
-  <h1>🛰️ Sentinel Omega</h1>
-  <p class="sub">Pipeline en tiempo real · datos de producción · read-only</p>
-  <div id="err"></div>
-  <div class="grid" id="cards">
-    <div class="card"><h2>Cargando…</h2><div class="muted">Consultando /api/mini/sentinel</div></div>
-  </div>
-  <div class="card" style="margin-top:10px">
-    <h2>Concilio (secundario)</h2>
-    <div id="concilio-info" class="muted">Cargando…</div>
-  </div>
-  <div class="card" style="margin-top:10px">
-    <h2>Chat del Concilio</h2>
-    <div id="chat-log"></div>
-    <div id="chat-status" class="muted"></div>
-    <div class="chat-row">
-      <select id="chat-mode" title="Rapida: un modelo, segundos. Tarea: pipeline completo con verificacion por ejecucion.">
-        <option value="rapida">Rapida</option>
-        <option value="tarea">Tarea</option>
-      </select>
-      <input id="chat-prompt" placeholder="Pregunta o encarga una tarea..." />
-      <button type="button" id="chat-send">Enviar</button>
+<div class="wrap">
+  <div id="err" class="err"></div>
+
+  <div class="card" id="hero">
+    <h2>Estado de la Tierra · señal en vivo</h2>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div>
+        <div class="hero-num tnum" id="f-valor">—</div>
+        <div class="hero-lab">Índice Fantasma · <span id="nivel">—</span></div>
+      </div>
+      <div style="text-align:right">
+        <div id="muro" class="tnum" style="font-size:20px;font-weight:700">—</div>
+        <div class="hero-lab">muro / 5</div>
+      </div>
+    </div>
+    <div class="leyenda" style="margin-top:10px">
+      <span><span class="dot" style="background:var(--calma)"></span>verde <12</span>
+      <span><span class="dot" style="background:var(--aten)"></span>amarillo 12–29</span>
+      <span><span class="dot" style="background:var(--aviso)"></span>naranja 29–78</span>
+      <span><span class="dot" style="background:var(--crit)"></span>rojo ≥78</span>
     </div>
   </div>
-  <button type="button" onclick="loadAll()">Actualizar</button>
 
-  <script>
-    const tg = window.Telegram && window.Telegram.WebApp;
-    if (tg) { tg.ready(); tg.expand(); }
+  <div class="card">
+    <h2>Señales vivas · lag restándose</h2>
+    <div id="senales"><span class="ausente">Sin señales de firma activas ahora.</span></div>
+  </div>
 
-    function esc(s) {
-      return String(s ?? '').replace(/[&<>"']/g, c => ({
-        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-      })[c]);
+  <div class="card">
+    <h2>Telemetría</h2>
+    <div class="grid2" id="tel"></div>
+  </div>
+
+  <div class="card">
+    <h2>Fantasma · últimos ciclos</h2>
+    <canvas id="spark" width="600" height="96"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>Cimática</h2>
+    <div class="grid2">
+      <div><div class="hero-num" style="font-size:26px" id="cim-total">—</div>
+           <div class="hero-lab">patrones</div></div>
+      <div id="cim-top" style="font-size:13px"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Sismos recientes · M4.5+</h2>
+    <div id="sismos"><span class="ausente">—</span></div>
+  </div>
+
+  <div class="card">
+    <h2>Auditoría del Juez · resultados (lagging)</h2>
+    <div class="barra" id="barra"></div>
+    <div class="leyenda" id="barra-leyenda"></div>
+    <div class="trow"><span>Asertividad</span><span class="v tnum" id="aud-asert">—</span></div>
+    <div class="trow"><span>…vs bot que nunca alarma</span><span class="v tnum" id="aud-muda">—</span></div>
+    <div class="trow"><span>Ganancia (Molchan)</span><span class="v tnum" id="aud-gan">—</span></div>
+    <div class="faint" style="font-size:12px;margin-top:6px">1× = alertar a ciegas rinde igual. La asertividad nunca se lee sola.</div>
+  </div>
+
+  <div class="card">
+    <h2>Concilio</h2>
+    <div id="concilio" style="font-size:13.5px" class="muted">—</div>
+  </div>
+</div>
+
+<div class="chat">
+  <div class="inner">
+    <div id="chat-log"></div>
+    <div class="chat-in">
+      <select id="chat-mode" title="Rápida: un modelo, segundos. Tarea: pipeline completo con verificación por ejecución (el modelo pesado, para fixeo e implementación).">
+        <option value="rapida">Rápida</option>
+        <option value="tarea">Tarea (pesado)</option>
+      </select>
+      <input id="chat-prompt" placeholder="Pregunta al Concilio cómo está el sistema…">
+      <button id="chat-send">→</button>
+    </div>
+    <div id="chat-status"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]));
+const fmt = (v, d=1) => (v===null||v===undefined) ? '<span class="ausente">—</span>' : Number(v).toFixed(d);
+const nivelColor = n => ({LOW:'var(--calma)',MODERATE:'var(--aten)',HIGH:'var(--aviso)',CRITICAL:'var(--crit)'}[String(n||'').toUpperCase()]||'var(--muted)');
+
+let ESTADO = null;
+const SEÑALES_TICK = []; // {el, rest0, ts0}
+
+function pintaHero(d){
+  const c = d.ciclo || {};
+  const f = c.fantasma;
+  document.getElementById('f-valor').innerHTML = fmt(f);
+  const nv = String(c.nivel_riesgo||'').toUpperCase();
+  document.getElementById('nivel').textContent = nv || 'sin lectura';
+  document.getElementById('f-valor').style.color = nivelColor(nv);
+  document.getElementById('muro').innerHTML = fmt(c.muro_walls_active, 0) + '/5'
+    + (c.muro_breach ? ' 🚨' : '');
+}
+
+function pintaSeñales(d){
+  const box = document.getElementById('senales');
+  SEÑALES_TICK.length = 0;
+  const sen = d.senales || [];
+  if (!sen.length){ box.innerHTML = '<span class="ausente">Sin señales de firma activas ahora.</span>'; return; }
+  box.innerHTML = '';
+  for (const s of sen){
+    const el = document.createElement('div');
+    el.className = 'señal';
+    const lag0 = (s.lag_restante_h === null || s.lag_restante_h === undefined) ? null : Number(s.lag_restante_h);
+    el.innerHTML =
+      '<div class="sitio">' + esc(s.sitio || ('Nodo ' + s.id_nodo)) + '</div>' +
+      '<span class="ev">' + esc(s.evento || '—') + '</span>' +
+      ' <span class="faint" style="font-size:12px">· ' + fmt(s.similitud, 2) + ' · ' + esc(s.recurrencia ?? '—') + '×</span>' +
+      '<div class="cd tnum">' + (lag0 === null ? '<span class="ausente">sin lag medido</span>' : '') + '</div>';
+    box.appendChild(el);
+    if (lag0 !== null) SEÑALES_TICK.push({el: el.querySelector('.cd'), rest0: lag0, ts0: Number(d.ts)*1000});
+  }
+  tickCountdowns();
+}
+
+function tickCountdowns(){
+  const ahora = Date.now();
+  for (const t of SEÑALES_TICK){
+    const rest = t.rest0 - (ahora - t.ts0) / 3600000;
+    if (rest > 0){
+      const d = rest / 24;
+      t.el.innerHTML = (rest < 24 ? '<small>faltan</small> ' : '<small>lag</small> ') +
+        '~' + Math.round(rest) + ' h' + (d >= 1 ? ' <small>(' + d.toFixed(1) + ' d)</small>' : '');
+      t.el.style.color = rest < 24 ? 'var(--aviso)' : rest < 72 ? 'var(--aten)' : 'var(--calma)';
+    } else {
+      t.el.innerHTML = 'ventana vencida hace ' + Math.round(-rest) + ' h';
+      t.el.style.color = 'var(--faint)';
     }
-    function fmt(v, d=1) {
-      return v != null ? Number(v).toFixed(d) : '—';
+  }
+}
+setInterval(tickCountdowns, 1000);
+
+function pintaTel(d){
+  const t = d.telemetria || {};
+  const celda = (lab, val, uni) =>
+    '<div><div style="font-size:12px;color:var(--muted)">' + lab + '</div>' +
+    '<div class="v tnum" style="font-size:17px">' + val + ' <span class="faint" style="font-size:12px">' + uni + '</span></div></div>';
+  document.getElementById('tel').innerHTML =
+    celda('Bz', fmt(t.bz_nT), 'nT') +
+    celda('Viento', fmt(t.viento_km_s, 0), 'km/s') +
+    celda('Kp', fmt(t.kp), '') +
+    celda('Presión', fmt(t.presion_hpa, 0), 'hPa') +
+    celda('GOES', d.goes_clase ? esc(d.goes_clase) : '<span class="ausente">—</span>', 'clase') +
+    celda('Térmico', d.termico ? d.termico.zonas + ' zona(s)' : '<span class="ausente">—</span>', '') +
+    celda('Cimática', d.tono ? esc(d.tono.tono) : '<span class="ausente">—</span>', 'régimen');
+}
+
+function pintaSpark(d){
+  const serie = d.serie_fantasma || [];
+  const cv = document.getElementById('spark');
+  if (serie.length < 2){ cv.getContext('2d').clearRect(0,0,cv.width,cv.height); return; }
+  const ctx = cv.getContext('2d');
+  const W = cv.width = cv.clientWidth * (window.devicePixelRatio||1);
+  const H = cv.height = 96 * (window.devicePixelRatio||1);
+  ctx.clearRect(0, 0, W, H);
+  const vals = serie.map(p => Number(p.fantasma)).filter(v => v !== null && !isNaN(v));
+  const max = Math.max(30, ...vals) * 1.08;
+  const x = i => i * W / (serie.length - 1);
+  const y = v => H - (v / max) * H;
+  // umbrales recalibrados 12 / 29
+  ctx.lineWidth = 1; ctx.setLineDash([4,5]); ctx.font = '10px system-ui';
+  for (const [um, col] of [[12,'#d9a441'],[29,'#e07b39']]){
+    ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(0, y(um)); ctx.lineTo(W, y(um)); ctx.stroke();
+    ctx.fillStyle = col; ctx.fillText(String(um), 6, y(um) - 4);
+  }
+  ctx.setLineDash([]);
+  // área + línea
+  ctx.beginPath();
+  serie.forEach((p, i) => { const v = Number(p.fantasma); if (!isNaN(v)) ctx.lineTo(x(i), y(v)); });
+  ctx.strokeStyle = '#4f8fd6'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath();
+  ctx.fillStyle = 'rgba(79,143,214,.12)'; ctx.fill();
+}
+
+function pintaCimatica(d){
+  document.getElementById('cim-total').textContent =
+    d.cimatica_total === null ? '—' : Number(d.cimatica_total).toLocaleString('es-MX');
+  const top = d.cimatica_top || [];
+  document.getElementById('cim-top').innerHTML = top.slice(0, 4).map(p =>
+    '<div class="trow" style="padding:4px 0"><span class="muted">' +
+    esc(p.event_class || p.ambito || '—') + '</span><span class="v tnum">' +
+    esc(p.frecuencia) + '</span></div>').join('') || '<span class="ausente">—</span>';
+}
+
+function pintaSismos(d){
+  const s = d.sismos_recientes || [];
+  document.getElementById('sismos').innerHTML = s.map(q =>
+    '<div class="trow"><span class="v tnum">M' + fmt(q.mag, 1) + '</span><span class="muted" style="text-align:right">' +
+    esc(q.lugar || '—') + '</span></div>').join('') || '<span class="ausente">—</span>';
+}
+
+function pintaAuditoria(d){
+  const a = d.auditoria || {};
+  const A = a.aciertos||0, F = a.fallos||0, P = a.falsos_positivos||0;
+  const tot = Math.max(A + F + P, 1);
+  const col = (n, c) => n ? '<div style="width:' + (n/tot*100) + '%;background:' + c + '"></div>' : '';
+  document.getElementById('barra').innerHTML =
+    col(A, 'var(--calma)') + col(P, 'var(--aten)') + col(F, 'var(--crit)');
+  document.getElementById('barra-leyenda').innerHTML =
+    '<span><span class="dot" style="background:var(--calma)"></span>' + A.toLocaleString('es-MX') + ' aciertos</span>' +
+    '<span><span class="dot" style="background:var(--aten)"></span>' + P.toLocaleString('es-MX') + ' falsas alarmas</span>' +
+    '<span><span class="dot" style="background:var(--crit)"></span>' + F.toLocaleString('es-MX') + ' fallos</span>';
+  document.getElementById('aud-asert').innerHTML = fmt(a.asertividad != null ? a.asertividad*100 : null) + '%';
+  document.getElementById('aud-muda').innerHTML = fmt(a.asertividad_muda != null ? a.asertividad_muda*100 : null) + '%';
+  const g = a.ganancia;
+  document.getElementById('aud-gan').innerHTML =
+    g == null ? '<span class="ausente">—</span>' : g.toFixed(2) + '×';
+  document.getElementById('aud-gan').style.color =
+    g == null ? '' : g > 1.5 ? 'var(--calma)' : g > 1 ? 'var(--aten)' : 'var(--crit)';
+}
+
+// ── Chat del Concilio (plomería probada de la mini anterior) ───────────
+const MINI_KEY = new URLSearchParams(location.search).get('k') || '';
+let chatBusy = false;
+function chatHeaders(extra){
+  const h = Object.assign({'Content-Type':'application/json'}, extra||{});
+  if (MINI_KEY) h['X-Mini-Key'] = MINI_KEY;
+  return h;
+}
+function chatAdd(who, text){
+  const log = document.getElementById('chat-log');
+  const div = document.createElement('div');
+  div.className = 'chat-msg ' + who;
+  String(text).split('```').forEach((parte, i) => {
+    if (i % 2 === 0){ const t = document.createElement('span'); t.textContent = parte; div.appendChild(t); }
+    else { const pre = document.createElement('pre'); pre.textContent = parte.replace(/^python\n/,''); div.appendChild(pre); }
+  });
+  log.appendChild(div); log.scrollTop = log.scrollHeight;
+}
+async function chatPollTask(jobId, status){
+  for(;;){
+    await new Promise(r => setTimeout(r, 4000));
+    const res = await fetch('/api/task/' + jobId, {headers: chatHeaders()});
+    const d = await res.json().catch(() => ({}));
+    if (d.status === 'COMPLETED'){
+      const bb = d.result || {};
+      chatAdd('bot', bb.exito ? (bb.resultado || '(sin resultado)') : ('(sin verificar) ' + (bb.resultado||'')));
+      status.textContent = ''; return;
     }
-    function pill(text, cls) { return `<span class="pill ${cls}">${esc(text)}</span>`; }
-
-    function riskPill(nivel) {
-      const n = String(nivel || '').toUpperCase();
-      if (n === 'CRITICAL') return pill('CRÍTICO', 'crit');
-      if (n === 'HIGH') return pill('ALTO', 'warn');
-      if (n === 'MODERATE') return pill('MODERADO', 'warn');
-      return pill(n || 'BAJO', 'ok');
+    if (d.status === 'FAILED'){ chatAdd('bot', 'La tarea falló: ' + (d.error||'')); status.textContent=''; return; }
+    status.textContent = 'Tarea: ' + (d.status === 'RUNNING' ? 'ejecutando…' : 'en cola…');
+  }
+}
+async function chatSend(){
+  const input = document.getElementById('chat-prompt');
+  const status = document.getElementById('chat-status');
+  const prompt = input.value.trim();
+  const mode = document.getElementById('chat-mode').value;
+  if (!prompt || chatBusy) return;
+  input.value = ''; chatBusy = true; chatAdd('user', prompt);
+  try{
+    if (mode === 'rapida'){
+      status.textContent = 'Pensando (rápida)…';
+      const res = await fetch('/api/mini/chat', {method:'POST', headers: chatHeaders(), body: JSON.stringify({prompt})});
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || ('HTTP ' + res.status));
+      chatAdd('bot', d.reply || '(sin respuesta)'); status.textContent = '';
+    } else {
+      status.textContent = 'Tarea enviada al Concilio…';
+      const res = await fetch('/api/task', {method:'POST', headers: chatHeaders(), body: JSON.stringify({prompt})});
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || ('HTTP ' + res.status));
+      await chatPollTask(d.job_id, status);
     }
+  } catch(e){ chatAdd('bot', 'ERROR: ' + e.message); status.textContent = ''; }
+  finally{ chatBusy = false; }
+}
+document.getElementById('chat-send').addEventListener('click', chatSend);
+document.getElementById('chat-prompt').addEventListener('keydown', e => { if (e.key === 'Enter') chatSend(); });
 
-    async function loadSentinel() {
-      const res = await fetch('/api/mini/sentinel', { cache: 'no-store' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      return res.json();
-    }
-
-    async function loadConcilio() {
-      try {
-        const res = await fetch('/api/mini/status', { cache: 'no-store' });
-        if (!res.ok) return null;
-        return res.json();
-      } catch { return null; }
-    }
-
-    function buildCards(d) {
-      const c = d.ciclo || {};
-      const t = d.telemetria || {};
-      const m = d.muro || {};
-      const mem = d.memoria || {};
-      const s = d.sismos || {};
-      const j = d.juez || {};
-      const cw = d.clima_espacial || {};
-
-      const riesgo = riskPill(c.riesgo);
-      const consenso = c.consenso
-        ? pill(c.consenso.toUpperCase(), c.consenso.toLowerCase() === 'alert' ? 'crit' : c.consenso.toLowerCase() === 'watch' ? 'warn' : 'ok')
-        : pill('—', 'ok');
-
-      const wallNames = ['geofísico','atmosférico','oceánico','solar','financiero'];
-      const wallKeys = [m.geofisico, m.atmosferico, m.oceanico, m.solar, m.financiero];
-      const wallsHtml = wallNames.map((n, i) =>
-        `<div class="wall ${wallKeys[i] ? (m.breach ? 'breach' : 'on') : ''}">${n}</div>`
-      ).join('');
-
-      const swarms = (s.enjambres || []).map(e =>
-        `<div class="swarm"><span>Nodo ${esc(e.nodo)}</span><span>${esc(e.count)} · M${fmt(e.max_mag,1)}</span></div>`
-      ).join('') || '<div class="muted">Sin enjambres activos</div>';
-
-      const schumann = t.schumann_act != null
-        ? `${fmt(t.schumann_act,1)}% <span class="muted">(Hz sin medir)</span>`
-        : '<span class="muted">sin lectura</span>';
-
-      return `
-        <div class="card">
-          <h2>Estado del ciclo #${esc(c.id || '—')}</h2>
-          <div class="row"><span>Riesgo</span>${riesgo}</div>
-          <div class="row"><span>Fantasma</span><span class="metric">${fmt(c.fantasma,1)}</span></div>
-          <div class="row"><span>Consenso</span>${consenso}</div>
-          <div class="row"><span>Precursores</span><span class="metric">${esc(c.precursores ?? 0)}</span></div>
-          <div class="row"><span>Muro</span><span>${esc(c.muro || '0/5')}</span></div>
-          <div class="muted" style="margin-top:4px">${esc(c.cuando || '')} UTC</div>
-        </div>
-
-        <div class="card">
-          <h2>Telemetría</h2>
-          <div class="row"><span>Bz</span><span class="metric">${fmt(t.bz,1)} <span class="muted">nT</span></span></div>
-          <div class="row"><span>Kp</span><span class="metric">${fmt(t.kp,1)}</span></div>
-          <div class="row"><span>Viento solar</span><span class="metric">${fmt(t.viento,0)} <span class="muted">km/s</span></span></div>
-          <div class="row"><span>Schumann</span><span>${schumann}</span></div>
-        </div>
-
-        <div class="card">
-          <h2>Muro de 5 barreras</h2>
-          <div class="walls">${wallsHtml}</div>
-          ${m.breach ? pill('BREACH', 'crit') : pill('SIN BREACH', 'ok')}
-          ${m.label ? `<div class="muted">${esc(m.label)}</div>` : ''}
-        </div>
-
-        <div class="card">
-          <h2>Sismicidad</h2>
-          <div class="row"><span>M4.5+ (24h)</span><span class="metric">${esc(s.m45_24h ?? 0)}</span></div>
-          <div style="margin-top:6px"><span class="muted">Enjambres activos (72h):</span></div>
-          ${swarms}
-        </div>
-
-        <div class="card">
-          <h2>Clima espacial (actual)</h2>
-          <div class="row"><span>Kp máximo</span><span class="metric">${fmt(cw.kp_max,1)}</span></div>
-          <div class="row"><span>Bz mínimo</span><span class="metric">${fmt(cw.bz_min,1)} <span class="muted">nT</span></span></div>
-          <div class="row"><span>Viento máximo</span><span class="metric">${fmt(cw.viento_max,0)} <span class="muted">km/s</span></span></div>
-          ${cw.kp_max >= 5 ? pill('TORMENTA GEOMAGNÉTICA', 'crit') : cw.kp_max >= 4 ? pill('INQUIETUD', 'warn') : pill('CALMA', 'ok')}
-        </div>
-
-        <div class="card">
-          <h2>Memoria del sistema</h2>
-          <div class="row"><span>Firmas</span><span class="metric">${esc(mem.firmas ?? '—')}</span></div>
-          <div class="row"><span>Consolidadas</span><span>${esc(mem.consolidadas ?? '—')}</span></div>
-          <div class="row"><span>Exigibles</span><span>${esc(mem.exigibles ?? '—')}</span></div>
-          <div class="row"><span>Juez: ventanas vivas</span><span>${esc(j.ventanas_vivas ?? '—')}</span></div>
-        </div>`;
-    }
-
-    function buildConcilio(d) {
-      if (!d) return '<span class="muted">Sin datos del Concilio</span>';
-      const c = d.concilio || {};
-      const q = d.alert_queue || {};
-      return `
-        <div class="row"><span>Sesiones</span><span>${esc(c.sessions_count ?? 0)}</span></div>
-        <div class="row"><span>Cola pendiente</span><span>${esc(q.size ?? 0)}</span></div>
-        <div class="row"><span>Umbral</span><span>${esc(c.threshold ?? 85)}</span></div>`;
-    }
-
-    // ─── Chat del Concilio ───────────────────────────────────────────────
-    const MINI_KEY = new URLSearchParams(location.search).get('k') || '';
-    let chatBusy = false;
-
-    function chatHeaders(extra) {
-      const h = Object.assign({'Content-Type': 'application/json'}, extra || {});
-      if (MINI_KEY) h['X-Mini-Key'] = MINI_KEY;
-      return h;
-    }
-
-    function chatAdd(who, text) {
-      const log = document.getElementById('chat-log');
-      const div = document.createElement('div');
-      div.className = 'chat-msg ' + who;
-      // bloques de codigo ```...``` como <pre>; el resto texto plano
-      String(text).split('```').forEach((parte, i) => {
-        if (i % 2 === 0) {
-          const t = document.createElement('span');
-          t.textContent = parte;
-          div.appendChild(t);
-        } else {
-          const pre = document.createElement('pre');
-          pre.textContent = parte.replace(/^python\n/, '');
-          div.appendChild(pre);
-        }
-      });
-      log.appendChild(div);
-      log.scrollTop = log.scrollHeight;
-    }
-
-    async function chatPollTask(jobId, status) {
-      const t0 = Date.now();
-      for (;;) {
-        await new Promise(r => setTimeout(r, 4000));
-        const res = await fetch('/api/task/' + jobId, { headers: chatHeaders() });
-        const d = await res.json().catch(() => ({}));
-        if (d.status === 'COMPLETED') {
-          const bb = d.result || {};
-          const via = (bb.shared_notes && bb.shared_notes.via) || '';
-          let tag = '[SIN CONSENSO] ';
-          if (via === 'directa_verificada') tag = '[VERIFICADO por ejecucion] ';
-          else if (via === 'directa_sin_verificar') tag = '[SIN VERIFICAR] ';
-          else if (bb.consensus_reached) tag = '[CONSENSO] ';
-          chatAdd('bot', tag + (bb.final_synthesis || '(sin sintesis)'));
-          status.textContent = '';
-          return;
-        }
-        if (d.status === 'FAILED' || d.status === 'TIMED_OUT' || res.status === 502 || res.status === 504) {
-          throw new Error(d.error || ('estado ' + (d.status || res.status)));
-        }
-        status.textContent = 'Concilio trabajando... ' +
-          Math.round((Date.now() - t0) / 1000) + 's';
-      }
-    }
-
-    async function chatSend() {
-      const input = document.getElementById('chat-prompt');
-      const status = document.getElementById('chat-status');
-      const prompt = input.value.trim();
-      const mode = document.getElementById('chat-mode').value;
-      if (!prompt || chatBusy) return;
-      input.value = '';
-      chatBusy = true;
-      chatAdd('user', prompt);
-      try {
-        if (mode === 'rapida') {
-          status.textContent = 'Pensando (rapida)...';
-          const res = await fetch('/api/mini/chat', {
-            method: 'POST', headers: chatHeaders(),
-            body: JSON.stringify({ prompt })
-          });
-          const d = await res.json();
-          if (!res.ok) throw new Error(d.error || ('HTTP ' + res.status));
-          chatAdd('bot', d.reply || '(sin respuesta)');
-          status.textContent = '';
-        } else {
-          status.textContent = 'Tarea enviada al Concilio...';
-          const res = await fetch('/api/task', {
-            method: 'POST', headers: chatHeaders(),
-            body: JSON.stringify({ prompt })
-          });
-          const d = await res.json();
-          if (!res.ok) throw new Error(d.error || ('HTTP ' + res.status));
-          await chatPollTask(d.job_id, status);
-        }
-      } catch (e) {
-        chatAdd('bot', 'ERROR: ' + e.message);
-        status.textContent = '';
-      } finally {
-        chatBusy = false;
-      }
-    }
-
-    document.getElementById('chat-send').addEventListener('click', chatSend);
-    document.getElementById('chat-prompt').addEventListener('keydown', e => {
-      if (e.key === 'Enter') chatSend();
-    });
-    chatAdd('bot', 'Rapida = un modelo, segundos. Tarea = pipeline completo '
-      + '(coder, verificador por ejecucion, Juez). Una tarea a la vez.');
-
-    async function loadAll() {
-      const cards = document.getElementById('cards');
-      const concilioEl = document.getElementById('concilio-info');
-      const err = document.getElementById('err');
-      err.textContent = '';
-      try {
-        const [sentinel, concilio] = await Promise.all([loadSentinel(), loadConcilio()]);
-        if (!sentinel.ok) throw new Error(sentinel.error || 'DB ilegible');
-        cards.innerHTML = buildCards(sentinel);
-        concilioEl.innerHTML = buildConcilio(concilio);
-      } catch (e) {
-        err.textContent = 'Error: ' + e.message;
-        cards.innerHTML = '<div class="card"><h2>Offline</h2><div class="muted">No se pudo consultar la DB de Sentinel</div></div>';
-      }
-    }
-    loadAll();
-  </script>
+// ── Carga principal ──────────────────────────────────────────────────────
+async function loadEstado(){
+  const err = document.getElementById('err'); err.textContent = '';
+  try{
+    const res = await fetch('/api/mini/estado', {cache: 'no-store'});
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error || 'snapshot no disponible');
+    ESTADO = d;
+    pintaHero(d); pintaSeñales(d); pintaTel(d); pintaSpark(d);
+    pintaCimatica(d); pintaSismos(d); pintaAuditoria(d);
+  } catch(e){ err.textContent = 'Sentinel: ' + e.message; }
+}
+async function loadConcilio(){
+  try{
+    const res = await fetch('/api/mini/status', {cache:'no-store'});
+    const d = await res.json();
+    const c = d.concilio || d, q = d.alert_queue || {};
+    document.getElementById('concilio').innerHTML =
+      'Sesiones: <b class="tnum">' + esc(c.sessions_count ?? '—') + '</b>' +
+      ' · cola: <b class="tnum">' + esc(q.size ?? '—') + '</b>' +
+      ' · enviadas: <b class="tnum">' + esc(q.total_sent ?? '—') + '</b>';
+  } catch(e){
+    document.getElementById('concilio').innerHTML = '<span class="ausente">—</span>';
+  }
+}
+chatAdd('bot', 'Rápida = un modelo, segundos — para saber cómo está el sistema. ' +
+  'Tarea (pesado) = pipeline completo con verificación por ejecución — para fixeo e implementación. Una tarea a la vez.');
+loadEstado(); loadConcilio();
+setInterval(loadEstado, 60000);
+setInterval(loadConcilio, 60000);
+</script>
 </body>
 </html>
