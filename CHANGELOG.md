@@ -1,3 +1,58 @@
+## [2026-10-26] — El CORTE: Concilio General (el despacho se va al Experto Sentinel)
+
+Decisión del operador: dos sistemas independientes — este queda como
+**CONCILIO GENERAL** (motor de consenso puro) y la voz de Sentinel la
+despacha el **EXPERTO SENTINEL** (repo nuevo, `sentinel-experto.service`,
+@SismoBio_Bot). Medido el 26-oct: el Concilio acoplado llevaba DOS
+papeles y un token revocado lo tumbó, mudeando a Sentinel dos días.
+
+### Removed — el despachador (vive en el experto)
+- `telegram_bot.py`: fuera el import de `alert_queue`, `queue_cmd`,
+  `poll_alert_queue` (98 líneas) y su scheduling en `post_init`.
+  `alert_queue_block()`/`/status` apuntan al experto sin leer archivos.
+- **`alert_queue.py` PERMANECE** como fuente de sincronización del
+  experto (parchear aquí, sincronizar allá — regla en su AGENTS.md).
+- Tests del despachador MOVIDOS a `sentinel_experto/tests/`
+  (12/12 allá: entregas a medias, HTML→plano, cortes de red, en-vuelo).
+  Maquinaria de cola aquí: 15/15. Suite sin ella: 258/258 — la v1
+  completa (279) queda REPARTIDA entre los dos sistemas, no perdida.
+
+### Changed — bot propio
+- `@IngZainos_bot` (id 8016695154) con **pin de identidad** en
+  `post_init`: token ajeno = exit 78 visible (la lección del crash-loop
+  del 26-oct). El token crudo primero probado resultó 401 (revocado) —
+  se usó el vigente del mismo bot, solo el TOKEN (el chat de Titan ni
+  tocado). Sin conflicto de poller: watchdog y Titan solo envían
+  (verificado contra su código: cero `getUpdates`).
+
+## [2026-10-27] — Mini App: el botón se abre de verdad (verifica conectividad)
+
+### Fixed — el botón de Mini App aparecía con URL muerta
+- `telegram_bot.py`: `webapp_url_ok()` solo verificaba que la URL
+  empezara con `https://` sin comprobar que respondiera. Si el túnel
+  trycloudflare había cambiado o caído, el botón se mostraba pero no
+  abría nada.
+- Ahora `webapp_url_ok()` es **async** y verifica prefijo HTTPS Y que la
+  URL contesta HTTP 200 (usa `url_responde()`, ya existente). Si no
+  responde, el botón NO se muestra: mejor sin botón que con uno roto.
+- `main_keyboard()` es ahora `async` y usa `webapp_url_ok()` con `await`
+  en todos sus llamadores (`start`, `status_cmd`, `reporte_cmd`,
+  `on_callback` ×6, `on_message`).
+- `build_status_report()` y `status_payload_json()` usan la versión
+  síncrona `webapp_url_estatica()` (solo forma, sin red).
+- El check de arranque en `main()` se movió a `post_init` (async).
+- Tests de `test_mini_app_url.py` actualizados: `webapp_url_ok()` se
+  testa con `url_responde` mockeado. Suite: 8/8.
+
+### Servicios
+- `consensus-web.service` (web_ui :8002, sirve `/mini`) y
+  `consensus-telegram.service` (el bot) arrancados y activos.
+- `cloudflared` ya publicaba URL en `logs/cloudflared-mini.log`;
+  `vigilar_url_mini_app()` la detectó, verificó conectividad y
+  registró el botón en el chat del operador
+  (`measured-donald-commodities-stating.trycloudflare.com/mini`).
+
+
 ## [3.0.7] - 2026-10-20 — fast_ask ve el presente; la MiniApp, rediseñada
 
 ### El chatbot del sistema (pedido del operador: «el Concilio como chatbot

@@ -8,10 +8,10 @@ import re
 from pathlib import Path
 
 DEFAULT_SOURCES = [
-    "/home/deamon/workspaces-dev/AGENTS.md",
-    "/home/deamon/workspaces-dev/sentinel_omega/CLAUDE.md",
-    "/home/deamon/workspaces-dev/CHANGELOG.md",
-    "/home/deamon/workspaces-dev/sentinel_omega/README.md",
+    "/home/deamon/Sentinel_Omega-dev/AGENTS.md",
+    "/home/deamon/Sentinel_Omega-dev/sentinel_omega/CLAUDE.md",
+    "/home/deamon/Sentinel_Omega-dev/CHANGELOG.md",
+    "/home/deamon/Sentinel_Omega-dev/sentinel_omega/README.md",
 ]
 
 SECRETISH = re.compile(

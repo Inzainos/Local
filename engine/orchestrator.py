@@ -5,6 +5,7 @@ import logging
 import os
 import time
 import re
+from pathlib import Path
 from typing import Optional, Callable, Dict, List, Any
 
 from memory.shared_context import SharedMemory
@@ -22,6 +23,20 @@ from .router import TaskRouter, PipelineType
 
 logger = logging.getLogger("Concilio.Orquestador")
 from .model_lifecycle import ModelLifecycle
+
+# Personalidad del Capitán — cargada desde /home/deamon/Capitan.md
+# Inyectada como system prompt base para TODOS los agentes (uso general local,
+# sin restricciones de miniapp, sin memoria de Sentinel)
+_CAPITAN_PATH = Path("/home/deamon/Capitan.md")
+
+
+def _load_capitan_personality() -> str:
+    """Carga la personalidad del Capitán desde Capitan.md."""
+    try:
+        return _CAPITAN_PATH.read_text(encoding="utf-8").strip()
+    except Exception as e:
+        logger.warning("No se pudo cargar Capitan.md: %s", e)
+        return ""
 
 
 class ConsensusOrchestrator:
@@ -251,7 +266,13 @@ class ConsensusOrchestrator:
 
     @staticmethod
     def _augment_system(base: str) -> str:
-        return f"{build_data_preamble()}\n{(base or '').strip()}"
+        capitan = _load_capitan_personality()
+        parts = []
+        if capitan:
+            parts.append(f"=== PERSONALIDAD DEL CAPITÁN (Deamon-X) ===\n{capitan}\n")
+        parts.append(build_data_preamble())
+        parts.append((base or "").strip())
+        return "\n\n".join(parts)
 
     def _model_installed(self, name: str) -> bool:
         return self._model_exists(name) if hasattr(self, "_model_exists") else False
@@ -1196,7 +1217,7 @@ class ConsensusOrchestrator:
 
         # ── ESTADO VIVO — refrescado por el launcher de Sentinel (≤5 min) ──
         estado_block = ""
-        estado_path = "/home/deamon/workspaces/estado/miniapp_estado.json"
+        estado_path = "/home/deamon/Sentinel_Omega/estado/miniapp_estado.json"
         if os.path.isfile(estado_path):
             try:
                 import json as _json

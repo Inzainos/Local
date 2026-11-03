@@ -35,7 +35,17 @@ from telegram.ext import (
     filters,
 )
 
-from alert_queue import alert_queue
+# La COLA de alertas NO es de este sistema desde el corte del 2026-10-26:
+# la voz de Sentinel la despacha el EXPERTO SENTINEL (otro proceso, otro
+# bot — @SismoBio_Bot). Este bot (@IngZainos_bot) es el CONCILIO GENERAL:
+# comandos, consenso y verificación. Nada de importar alert_queue aquí.
+
+# La identidad que ESTE bot acepta (ver post_init). Rotar el token de
+# @IngZainos_bot exige actualizar este check — mejor un arranque que se
+# niega con el motivo escrito que un crash-loop mudo (la lección del 26-oct).
+BOT_ID_ESPERADO = 8016695154   # @IngZainos_bot (verificado contra getMe)
+BOT_NAME_ESPERADO = "IngZainos_bot"
+
 from engine.orchestrator import ConsensusOrchestrator
 from memory.blackboard import Blackboard
 from memory.shared_context import SharedMemory
@@ -50,7 +60,7 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 CONSENSUS_CONFIG = os.environ.get("CONSENSUS_CONFIG", "config.yaml")
 SENTINEL_ROOT = os.environ.get(
-    "SENTINEL_OMEGA_ROOT", "/home/deamon/workspaces/sentinel_omega"
+    "SENTINEL_OMEGA_ROOT", "/home/deamon/Sentinel_Omega/sentinel_omega"
 )
 TELEGRAM_WEBAPP_URL = os.environ.get("TELEGRAM_WEBAPP_URL", "").strip()
 # El tunel rapido de Cloudflare publica una URL distinta cada vez que arranca y
@@ -171,10 +181,29 @@ def sessions_dir() -> Path:
     return p
 
 
-def webapp_url_ok() -> Optional[str]:
-    """Telegram Mini Apps require a public HTTPS URL."""
+def webapp_url_estatica() -> Optional[str]:
+    """URL configurada en .env si empieza con https://, sin verificar que responda.
+
+    Solo filtro de forma. Para saber si la Mini App de verdad abre, usar
+    `webapp_url_ok()` (async, pega a la URL).
+    """
     url = _webapp_url_actual or ""
     if url.lower().startswith("https://"):
+        return url
+    return None
+
+
+async def webapp_url_ok() -> Optional[str]:
+    """Telegram Mini Apps require a public HTTPS URL que responda de verdad.
+
+    Verifica prefijo HTTPS Y que la URL contesta HTTP 200. Si la URL del .env
+    es de un túnel trycloudflare muerto, el botón NO se muestra (mejor sin
+    botón que con uno roto).
+    """
+    url = webapp_url_estatica() or ""
+    if not url:
+        return None
+    if await url_responde(url):
         return url
     return None
 
@@ -378,35 +407,17 @@ def concilio_health_block() -> str:
 
 
 def alert_queue_block() -> str:
-    try:
-        stats = alert_queue.get_stats()
-    except Exception as e:
-        return f"📬 Cola: error — {html.escape(str(e)[:80])}"
-    lines = [
-        "📬 <b>Cola de alertas</b>",
-        f"Pendientes: <code>{stats.get('size', 0)}</code> | "
-        f"Encolados: <code>{stats.get('total_enqueued', 0)}</code> | "
-        f"Enviados: <code>{stats.get('total_sent', 0)}</code> | "
-        f"Fallidos: <code>{stats.get('total_failed', 0)}</code>",
-    ]
-    # Un aviso descartado o colgado en vuelo no debe quedarse callado: es lo
-    # unico que dice que algo no llego.
-    en_vuelo = stats.get("en_vuelo", 0)
-    descartados = stats.get("descartados", 0)
-    if en_vuelo or descartados:
-        lines.append(
-            f"⚠️ En vuelo: <code>{en_vuelo}</code> | "
-            f"Descartados: <code>{descartados}</code> "
-            f"(<code>data/alert_queue_dead.json</code>)"
-        )
-    la = stats.get("last_alert")
-    if la:
-        lines.append(
-            f"Última: <code>{html.escape(str(la.get('priority', '?')))}</code> "
-            f"{html.escape(str(la.get('title', ''))[:60])} "
-            f"@ {_ts_local(la.get('timestamp'))}"
-        )
-    return "\n".join(lines)
+    """El corte del 2026-10-26: la cola YA NO es de este sistema.
+
+    El despacho de las alertas de Sentinel vive en el EXPERTO SENTINEL
+    (sentinel-experto.service, @SismoBio_Bot). Este bot no la lee, no la
+    sirve, y no debe fingir que la conoce — sólo apuntar a donde vive.
+    """
+    return (
+        "📡 <b>Despacho de Sentinel</b>: el EXPERTO "
+        "(<code>sentinel-experto.service</code>, @SismoBio_Bot) — este bot "
+        "es el CONCILIO GENERAL y no lleva la voz de nadie."
+    )
 
 
 def ollama_unload_note() -> str:
@@ -617,14 +628,17 @@ def build_status_report(full: bool = True) -> str:
                 "📜 <b>Política alertas (Padre)</b>",
                 "• Digest horario: <b>siempre</b>",
                 "• Inmediato: solo eventos <b>sin precedentes</b>",
-                "• Este bot: /task ligero · /concilio heavy · reportes; cola vía <code>alert_queue</code>",
+                "• Este bot: /task ligero · /concilio heavy · reportes — el despacho de alertas es del EXPERTO",
             ]
         )
         dash = html.escape(CONSENSUS_DASHBOARD_URL or "(no set)")
         parts.append(f"🖥 Dashboard: <code>{dash}</code>")
-        wurl = webapp_url_ok()
+        wurl = webapp_url_estatica() or ""
         if wurl:
-            parts.append(f"📱 Mini App: <code>{html.escape(wurl)}</code>")
+            parts.append(
+                f"📱 Mini App: <code>{html.escape(wurl)}</code> "
+                f"(botón se muestra solo si responde)"
+            )
         elif TELEGRAM_WEBAPP_URL:
             parts.append(
                 "📱 Mini App: URL no HTTPS — botón omitido "
@@ -667,12 +681,6 @@ def status_payload_json() -> Dict[str, Any]:
             }
         except Exception:
             last = {"error": "unreadable"}
-    try:
-        qstats = alert_queue.get_stats()
-        qstats = dict(qstats)
-        qstats["file_path"] = Path(str(qstats.get("file_path", ""))).name
-    except Exception as e:
-        qstats = {"error": str(e)[:80]}
     running = ollama_running_models()
     return {
         "ok": True,
@@ -696,7 +704,10 @@ def status_payload_json() -> Dict[str, Any]:
             if not running
             else "models loaded; Concilio unloads between stages",
         },
-        "alert_queue": qstats,
+        "alert_queue": {
+            "nota": ("el despacho de Sentinel vive en el EXPERTO "
+                     "(sentinel-experto.service, @SismoBio_Bot)")
+        },
         "dashboard_url": CONSENSUS_DASHBOARD_URL,
         # El dashboard React de Sentinel vive en loopback (127.0.0.1:5173) y
         # no hay URL pública deliberadamente --- nada expuesto a la LAN. Si
@@ -704,14 +715,14 @@ def status_payload_json() -> Dict[str, Any]:
         # aquí y la mini app muestra el enlace; sin él, la mini app lo dice
         # en vez de mostrar un placeholder muerto.
         "sentinel_dashboard_url": os.environ.get("SENTINEL_DASHBOARD_URL", ""),
-        "webapp_url": webapp_url_ok() or "",
+        "webapp_url": webapp_url_estatica() or "",
         "alert_policy": {
             "hourly_digest": "always",
             "immediate": "unprecedented_only",
         },
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
-def main_keyboard() -> InlineKeyboardMarkup:
+async def main_keyboard() -> InlineKeyboardMarkup:
     rows: List[List[InlineKeyboardButton]] = [
         [InlineKeyboardButton("🧠 Nueva tarea al Concilio", callback_data="new_task")],
         [InlineKeyboardButton("🔍 Auditoría Sentinel Omega", callback_data="audit_sentinel")],
@@ -721,7 +732,7 @@ def main_keyboard() -> InlineKeyboardMarkup:
         ],
         [InlineKeyboardButton("📜 Ver Blackboard activo", callback_data="show_blackboard")],
     ]
-    wurl = webapp_url_ok()
+    wurl = await webapp_url_ok()
     if wurl:
         rows.append(
             [InlineKeyboardButton("📱 Mini App", web_app=WebAppInfo(url=wurl))]
@@ -783,7 +794,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Telegram: /task = ligero (fast_ask); /concilio = Concilio completo (heavy).\n"
         "Alertas: digest horario siempre; inmediato solo sin precedentes.\n\n"
         "¿Qué deseas hacer?",
-        reply_markup=main_keyboard(),
+        reply_markup=await main_keyboard(),
         parse_mode=ParseMode,
     )
 
@@ -847,7 +858,7 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     await update.message.reply_text(
         build_status_report(full=False),
-        reply_markup=main_keyboard(),
+        reply_markup=await main_keyboard(),
         parse_mode=ParseMode,
     )
 
@@ -857,17 +868,14 @@ async def reporte_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     await update.message.reply_text(
         build_status_report(full=True),
-        reply_markup=main_keyboard(),
+        reply_markup=await main_keyboard(),
         parse_mode=ParseMode,
     )
 
 
-async def queue_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_authorized(update):
-        return
-    await update.message.reply_text(
-        alert_queue_block(), reply_markup=main_keyboard(), parse_mode=ParseMode
-    )
+# /queue SE RETIRÓ con el despachador (corte 2026-10-26): la cola vive en
+# el EXPERTO SENTINEL y este bot ya no la lee. `alert_queue_block()` apunta
+# a donde vive el despacho.
 
 
 async def blackboard_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -931,14 +939,14 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data in ("sentinel_status", "show_report", "show_status"):
         await query.edit_message_text(
             build_status_report(full=True),
-            reply_markup=main_keyboard(),
+            reply_markup=await main_keyboard(),
             parse_mode=ParseMode,
         )
 
     elif data == "show_queue":
         await query.edit_message_text(
             alert_queue_block(),
-            reply_markup=main_keyboard(),
+            reply_markup=await main_keyboard(),
             parse_mode=ParseMode,
         )
 
@@ -947,12 +955,12 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             bb = shared_memory.active_blackboard
             await query.edit_message_text(
                 format_blackboard(bb) + "\n\n" + format_timeline(bb),
-                reply_markup=main_keyboard(),
+                reply_markup=await main_keyboard(),
                 parse_mode=ParseMode,
             )
         else:
             await query.edit_message_text(
-                "No hay blackboard activa.", reply_markup=main_keyboard()
+                "No hay blackboard activa.", reply_markup=await main_keyboard()
             )
 
     elif data == "help":
@@ -966,14 +974,14 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/blackboard — Ver pizarra\n"
             "/cancel — Cancelar\n\n"
             "Digest horario siempre; inmediato solo sin precedentes.",
-            reply_markup=main_keyboard(),
+            reply_markup=await main_keyboard(),
             parse_mode=ParseMode,
         )
 
     elif data == "back_main":
         await query.edit_message_text(
             "🧠 <b>Menú principal</b>",
-            reply_markup=main_keyboard(),
+            reply_markup=await main_keyboard(),
             parse_mode=ParseMode,
         )
 
@@ -994,7 +1002,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(
             "Usa /task &lt;prompt&gt;, /reporte o el menú /start",
-            reply_markup=main_keyboard(),
+            reply_markup=await main_keyboard(),
             parse_mode=ParseMode,
         )
 
@@ -1047,13 +1055,13 @@ async def run_consensus_task(update: Update, prompt: str, edit: bool = False):
 
         if len(body) > 4000:
             body = body[:3990] + "…"
-        await status_msg.edit_text(body, reply_markup=main_keyboard(), parse_mode=ParseMode)
+        await status_msg.edit_text(body, reply_markup=await main_keyboard(), parse_mode=ParseMode)
     except Exception as e:
         active_jobs.pop(chat_id, None)
         logger.exception("Fast telegram task failed")
         await status_msg.edit_text(
             f"❌ Error: {html.escape(str(e))}",
-            reply_markup=main_keyboard(),
+            reply_markup=await main_keyboard(),
             parse_mode=ParseMode,
         )
 
@@ -1098,14 +1106,14 @@ async def run_full_concilio_task(update: Update, prompt: str, edit: bool = False
         active_jobs.pop(chat_id, None)
         text = format_blackboard(bb) + "\n\n" + format_timeline(bb)
         await status_msg.edit_text(
-            text, reply_markup=main_keyboard(), parse_mode=ParseMode
+            text, reply_markup=await main_keyboard(), parse_mode=ParseMode
         )
     except Exception as e:
         active_jobs.pop(chat_id, None)
         logger.exception("Consensus task failed")
         await status_msg.edit_text(
             f"❌ Error: {html.escape(str(e))}",
-            reply_markup=main_keyboard(),
+            reply_markup=await main_keyboard(),
             parse_mode=ParseMode,
         )
 
@@ -1148,14 +1156,14 @@ async def run_audit(update: Update, focus: str, edit: bool = False):
         active_jobs.pop(chat_id, None)
         text = format_blackboard(bb) + "\n\n" + format_timeline(bb)
         await status_msg.edit_text(
-            text, reply_markup=main_keyboard(), parse_mode=ParseMode
+            text, reply_markup=await main_keyboard(), parse_mode=ParseMode
         )
     except Exception as e:
         active_jobs.pop(chat_id, None)
         logger.exception("Audit failed")
         await status_msg.edit_text(
             f"❌ Error en auditoría: {html.escape(str(e))}",
-            reply_markup=main_keyboard(),
+            reply_markup=await main_keyboard(),
             parse_mode=ParseMode,
         )
 
@@ -1274,104 +1282,6 @@ def _es_error_de_formato(exc: Exception) -> bool:
     )
 
 
-async def poll_alert_queue(application: Application):
-    # Lo que el proceso anterior saco de la cola y no llego a confirmar vuelve
-    # a la cabeza. Es el mismo hueco que el de las sesiones cortadas: si el
-    # proceso muere entre sacar y enviar, el aviso no esta en ningun archivo.
-    recuperados = alert_queue.recover_inflight()
-    if recuperados:
-        logger.warning(
-            "Cola: %d aviso(s) quedaron en vuelo en el arranque anterior, "
-            "devueltos a la cola",
-            len(recuperados),
-        )
-    logger.info("🔄 Alert queue poller started")
-    while True:
-        try:
-            alerts = alert_queue.pop_batch(max_count=5)
-            for alert in alerts:
-                chat_ids = (
-                    [c.strip() for c in TELEGRAM_CHAT_ID.split(",") if c.strip()]
-                    if TELEGRAM_CHAT_ID
-                    else []
-                )
-                # Un reintento solo va a los chats que faltan: repetirselo a
-                # quien ya lo recibio seria duplicarle el aviso.
-                destinos = alert.pending_chats or chat_ids
-                if not destinos:
-                    logger.warning("TELEGRAM_CHAT_ID vacío — el aviso vuelve a la cola")
-                    # Sin chats configurados el fallo no es del aviso: no
-                    # gasta intentos (si no, la cola entera se descartaria).
-                    alert_queue.requeue(alert, contar_intento=False)
-                    alert_queue.mark_failed(alert)
-                    await asyncio.sleep(5)
-                    continue
-
-                fallidos = []
-                ultimo_error = ""
-                for chat_id in destinos:
-                    try:
-                        await application.bot.send_message(
-                            chat_id=int(chat_id),
-                            text=alert.message,
-                            parse_mode=alert.parse_mode,
-                        )
-                        logger.info(
-                            "Alert sent: %s (%s)", alert.title, alert.priority
-                        )
-                    except Exception as e:
-                        if _es_error_de_formato(e) and alert.parse_mode:
-                            # El formato es lo prescindible; el aviso no. Un
-                            # mensaje con HTML que Telegram no parsea se
-                            # rechaza ENTERO: el 8-oct se perdieron asi 15
-                            # digestos seguidos del Sentinel por un «(<50)»
-                            # sin escapar. Va de nuevo en texto plano DE
-                            # VERDAD — antes mandaba el mismo HTML sin
-                            # parse_mode y los <b></b> se veían crudos en el
-                            # chat (36 veces medido, 10→17 oct).
-                            try:
-                                await application.bot.send_message(
-                                    chat_id=int(chat_id),
-                                    text=_html_a_plano(alert.message),
-                                )
-                                logger.warning(
-                                    "Alert sent SIN FORMATO a %s: Telegram no pudo "
-                                    "parsear el %s del aviso «%s» (%s) — hay texto "
-                                    "sin escapar en quien lo genera",
-                                    chat_id, alert.parse_mode, alert.title, e,
-                                )
-                                continue
-                            except Exception as e2:
-                                e = e2
-                        fallidos.append(chat_id)
-                        ultimo_error = f"{type(e).__name__}: {e}"
-                        logger.error("Failed to send alert to %s: %s", chat_id, e)
-
-                if not fallidos:
-                    alert_queue.mark_sent(alert)
-                    continue
-
-                # Antes bastaba un chat para darlo por entregado y destruirlo:
-                # los demas se quedaban sin el aviso y nadie lo sabia.
-                alert.pending_chats = fallidos
-                alert_queue.mark_failed(alert)
-                if alert_queue.requeue(alert, error=ultimo_error):
-                    await asyncio.sleep(5)
-                else:
-                    logger.error(
-                        "Cola: aviso «%s» descartado tras %d intentos, queda en "
-                        "data/alert_queue_dead.json",
-                        alert.title,
-                        alert.attempts,
-                    )
-        except Exception as e:
-            logger.error("Alert queue poller error: %s", e)
-
-        await asyncio.sleep(2)
-
-
-
-
 async def registrar_boton_mini_app(application: Application) -> None:
     """Pone el botón de menú Mini App en cada chat de TELEGRAM_CHAT_ID al arrancar.
 
@@ -1384,7 +1294,7 @@ async def registrar_boton_mini_app(application: Application) -> None:
     from urllib.parse import urlparse
     from telegram import MenuButtonDefault, MenuButtonWebApp
 
-    url = webapp_url_ok()
+    url = await webapp_url_ok()
     chats = [c.strip() for c in os.environ.get("TELEGRAM_CHAT_ID", "").split(",") if c.strip()]
     if not chats:
         logger.info("Mini App: sin TELEGRAM_CHAT_ID, botón no registrado")
@@ -1450,11 +1360,6 @@ def main():
     orchestrator = ConsensusOrchestrator(config_path=CONSENSUS_CONFIG)
     shared_memory = SharedMemory(db_path=orchestrator.db_path)
     logger.info("✅ Orchestrator listo")
-    if TELEGRAM_WEBAPP_URL and not webapp_url_ok():
-        logger.warning(
-            "TELEGRAM_WEBAPP_URL is set but not HTTPS (%s) — Mini App button omitted",
-            TELEGRAM_WEBAPP_URL[:60],
-        )
 
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
@@ -1466,7 +1371,6 @@ def main():
     app.add_handler(CommandHandler("status", status_cmd))
     app.add_handler(CommandHandler("reporte", reporte_cmd))
     app.add_handler(CommandHandler("report", reporte_cmd))
-    app.add_handler(CommandHandler("queue", queue_cmd))
     app.add_handler(CommandHandler("blackboard", blackboard_cmd))
     app.add_handler(CommandHandler("cancel", cancel_cmd))
 
@@ -1475,11 +1379,28 @@ def main():
     app.add_error_handler(on_error)
 
     async def post_init(application: Application):
-        application.create_task(poll_alert_queue(application))
+        # Pin de IDENTIDAD (corte 2026-10-26): este bot es el CONCILIO
+        # GENERAL y sirve a @IngZainos_bot. Un token de OTRO bot aquí es
+        # exactamente lo que crash-loopeó al despachador el 26-oct — se
+        # niega a arrancar con el error por delante (exit 78, unit visible).
+        yo = await application.bot.get_me()
+        if yo.id != BOT_ID_ESPERADO or yo.username != BOT_NAME_ESPERADO:
+            logger.error(
+                "Token de OTRO bot (id=%s @%s): el CONCILIO GENERAL sirve a "
+                "@%s (id %s). Corrige TELEGRAM_BOT_TOKEN en .env.",
+                yo.id, yo.username, BOT_NAME_ESPERADO, BOT_ID_ESPERADO,
+            )
+            raise SystemExit(78)  # EX_CONFIG
+        logger.info("Identidad verificada: @%s (id %s)", yo.username, yo.id)
         application.create_task(registrar_boton_mini_app(application))
         application.create_task(vigilar_url_mini_app(application))
-        logger.info("🔄 Alert queue poller scheduled")
         await avisar_sesiones_interrumpidas(application)
+        if TELEGRAM_WEBAPP_URL and not await webapp_url_ok():
+            logger.warning(
+                "TELEGRAM_WEBAPP_URL is set but not HTTPS or no responde (%s) — "
+                "Mini App button omitted",
+                TELEGRAM_WEBAPP_URL[:60],
+            )
 
     app.post_init = post_init
 

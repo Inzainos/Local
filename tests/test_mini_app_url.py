@@ -53,14 +53,24 @@ def test_sin_log_o_sin_url_no_inventa_nada(tmp_path):
 
 
 def test_webapp_url_ok_devuelve_el_valor_vivo_no_el_del_entorno(monkeypatch):
-    monkeypatch.setattr(tb, "_webapp_url_actual", "https://viva.example/mini")
-    assert tb.webapp_url_ok() == "https://viva.example/mini"
+    async def _ir():
+        async def responde(url, timeout=6.0):
+            return url == "https://viva.example/mini"
+        monkeypatch.setattr(tb, "url_responde", responde)
 
-    monkeypatch.setattr(tb, "_webapp_url_actual", "http://sin-tls.example/mini")
-    assert tb.webapp_url_ok() is None, "Telegram exige HTTPS"
+        monkeypatch.setattr(tb, "_webapp_url_actual", "https://viva.example/mini")
+        assert await tb.webapp_url_ok() == "https://viva.example/mini"
 
-    monkeypatch.setattr(tb, "_webapp_url_actual", None)
-    assert tb.webapp_url_ok() is None
+        monkeypatch.setattr(tb, "_webapp_url_actual", "http://sin-tls.example/mini")
+        assert await tb.webapp_url_ok() is None, "Telegram exige HTTPS"
+
+        monkeypatch.setattr(tb, "_webapp_url_actual", "https://muerta.example/mini")
+        assert await tb.webapp_url_ok() is None, "URL sin respuesta"
+
+        monkeypatch.setattr(tb, "_webapp_url_actual", None)
+        assert await tb.webapp_url_ok() is None
+
+    asyncio.run(_ir())
 
 
 # --- la vigilancia -------------------------------------------------------

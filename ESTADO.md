@@ -5,8 +5,7 @@
 > modelo) no deje a nadie sin saber dónde se quedó. **Se actualiza cada vez que algo avanza.**
 > Si lo que dice aquí contradice al código, manda el código: verifícalo y corrige este archivo.
 
-**Última actualización:** 2026-10-19 22:35. **v1 CERRADA** y en pie (verificado: 279 tests,
-Ollama 200, MiniApp 200, cola viva). **Migración a user units HECHA hoy 19-oct**: las units
+**Última actualización:** 2026-11-03 12:00. **v1 CERRADA** y en pie. **v2 en disco, servicios levantados hoy 2026-11-03.** **Migración a user units HECHA 19-oct**: las units
 de `/etc/systemd/system` están **enmascaradas a /dev/null**; las activas son
 `~/.config/systemd/user/consensus-{telegram,web}.service` (Linger=yes). Reiniciar =
 `systemctl --user restart consensus-telegram consensus-web` — **sin sudo**.
@@ -356,3 +355,29 @@ dicho 11 con jupiter activo.
 sin versionar de otras sesiones (deploy/*.py, CHANGELOG, bitácora) — el commit de allá lo
 decide quien conoce ese trabajo. `workspaces-dev` está 47 días rancio (3-sep): docs y DB
 viejos — no regenerar packs desde él (el generador ya prefiere producción).
+
+## 2026-11-03 — re-activación y set point actual
+
+**Verificación punta a punta 2026-11-03 11:58**
+- `systemctl --user start consensus-telegram.service` → active running, identidad verificada @IngZainos_bot id 8016695154, “sin tareas interrumpidas”.
+- `systemctl --user start consensus-web.service` → active running, puerto 8002.
+- Ollama 200, MiniApp 200, cola viva.
+- Tests: 285 tests verdes en `0c83b2f` — última rama local `local/concilio`.
+- Dashboard Sentinel Omega React levantado: API :8787, web :5173, 17/17 rutas sin errores de consola. `SintesisTab` migrado a `/api/estado-vivo` con datos reales.
+
+**Qué se entrega ahora**
+- v1 estable en producción.
+- v2 en disco: MiniApp reconstruida dark + countdowns + cimática, fast_ask con enrutado por intención, memoria de Sentinel regenerada v2.5.4.
+- Segundo intento con modelo de respaldo, verificación por relaciones y Juez interno ya en código.
+
+**Qué queda abierto**
+1. **Commit y versionado de v2**: los cambios de MiniApp/fast_ask y `sentinel_omega_pack.md` regenerado están en `local/concilio` pero no están etiquetados ni publicados. Necesita `git commit` y `git push` autorizado por el operador.
+2. **Set point de ESTADO.md sincronizado con Sentinel**: el reporte Sentinel del 2026-11-03 muestra Fantasma 8.1, nivel AMARILLO, ganancia Molchan 0.79× sin habilidad. El pack de memoria del Concilio describe 8 bots, jupiter retirado, ONNX negados — coherente, pero el archivo `ESTADO.md` del Sentinel `workspaces` tiene fixes sin commit.
+3. **Telegram @SismoBio_Bot**: el despachador `sentinel-experto` sigue requiriendo token válido. El token actual en `deploy/.env` está vacío / rotado; sin él, Sentinel Omega no puede enviar alertas por Telegram. Es el único bloqueo de voz saliente del ecosistema.
+4. **Watchdog / Sello Omega**: la nota de vendoring de Sello Omega en `watchdog/src/watchdog/crypto/fractal_seal.py` está documentada, pero falta evidencia de que el `kat_runner.py` mencionado en AUDIT_v3.md exista en el repo Sentinel. Verificar existencia.
+5. **Barrido de hermanos en dashboard**: se corrigieron Sintesis/Mapas/Reportes, pero quedan componentes heredados con contratos Panel/Metrica antiguos en tabs legacy. No crítico, pero puede generar warnings.
+
+**Próximo paso recomendado**
+- Decidir si se hace commit de `local/concilio` con los cambios de MiniApp/fast_ask y se etiqueta `v2.0-rc1`.
+- Proporcionar `TELEGRAM_BOT_TOKEN` actual para @SismoBio_Bot y actualizar `workspaces/deploy/.env` + `consensus-expert-agent/.env` si corresponde.
+- Alinear `ESTADO.md` de Sentinel `workspaces` con los fixes de `AGENTS.md` exigibles/delta pendientes.

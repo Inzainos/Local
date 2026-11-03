@@ -66,20 +66,13 @@ HTML_TEMPLATE = """
 
 
     <nav class="max-w-7xl w-full mx-auto px-6 pt-4">
-        <button id="sentinel-tab" onclick="toggleSentinelPanel()" class="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-sm font-medium">Sentinel Omega</button>
-    </nav>
-    <section id="sentinel-panel" class="hidden max-w-7xl w-full mx-auto px-6 pt-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-md">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-semibold text-white"><i class="fa-solid fa-shield-halved text-emerald-400 mr-2"></i>Comunicación segura con Sentinel Omega</h2>
-                <span id="sentinel-mode" class="text-xs px-2 py-1 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">Solo lectura</span>
-            </div>
-            <div id="sentinel-health" class="text-sm text-slate-300">Consultando estado de Sentinel...</div>
-            <textarea id="sentinel-message" rows="3" class="mt-4 w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm text-slate-100" placeholder="Solicita un diagnóstico o una propuesta de fix..."></textarea>
-            <button onclick="sendSentinelMessage()" class="mt-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2 rounded-lg">Solicitar recomendación</button>
-            <pre id="sentinel-response" class="mt-4 whitespace-pre-wrap text-sm text-slate-300"></pre>
+        <div class="flex items-center space-x-3">
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-950 text-blue-400 border border-blue-800">
+                <span class="w-2 h-2 mr-2 bg-blue-400 rounded-full animate-pulse"></span> Agente Local — Uso General
+            </span>
+            <span class="text-xs text-slate-400">Personalidad: Capitán (Deamon-X)</span>
         </div>
-    </section>
+    </nav>
 
     <!-- Main Content Grid -->
     <main class="flex-1 max-w-7xl w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -285,24 +278,6 @@ HTML_TEMPLATE = """
             }
         }
 
-        async function toggleSentinelPanel() {
-            const panel = document.getElementById('sentinel-panel');
-            panel.classList.toggle('hidden');
-            if (!panel.classList.contains('hidden')) {
-                const response = await fetch('/api/sentinel/health');
-                const data = await response.json();
-                document.getElementById('sentinel-health').textContent = `Estado: ${data.status} | Base de datos: ${data.database.exists ? 'disponible' : 'ausente'} | Logs: ${data.logs.latest_mtime ? 'detectados' : 'ausentes'}`;
-            }
-        }
-
-        async function sendSentinelMessage() {
-            const message = document.getElementById('sentinel-message').value.trim();
-            if (!message) return;
-            const response = document.getElementById('sentinel-response');
-            response.textContent = 'Generando recomendación segura...';
-            response.textContent = 'Modo solo lectura: la solicitud queda pendiente de análisis y aprobación humana.\\n\\n' + message;
-        }
-
     </script>
 </body>
 </html>
@@ -418,172 +393,11 @@ def mini_app_page():
     return HTMLResponse(mini.read_text(encoding="utf-8"))
 
 
-MINIAPP_ESTADO_JSON = Path(
-    "/home/deamon/workspaces/estado/miniapp_estado.json"
-)
-
-
-@app.get("/api/mini/estado")
-def mini_estado():
-    """Estado completo de Sentinel para la MiniApp (2026-10-20).
-
-    El JSON lo REFRESCA el launcher de Sentinel cada ciclo (≤5 min) con SU
-    propio código — formato de nodos, countdown de lags y ganancia del Juez
-    viven UNA sola vez; este endpoint solo lo sirve. `edad_s` delata la
-    frescura (regla 7/8: ausencia visible, no disfrazada).
-    """
-    import time as _t
-    if not MINIAPP_ESTADO_JSON.is_file():
-        return {"ok": False, "error": "snapshot ausente (launcher sin correr)"}
-    try:
-        data = json.loads(MINIAPP_ESTADO_JSON.read_text(encoding="utf-8"))
-    except Exception as e:
-        return {"ok": False, "error": f"snapshot ilegible: {e}"}
-    data["ok"] = True
-    try:
-        data["edad_s"] = round(_t.time() - float(data.get("ts", 0)), 0)
-    except (TypeError, ValueError):
-        data["edad_s"] = None
-    return data
-
-
-@app.get("/api/mini/sentinel")
-def mini_sentinel():
-    """Pipeline de Sentinel Omega en tiempo real — lo que el operador mira.
-
-    Lee la DB de producción (read-only). Sin secretos. Los datos que faltan
-    llegan como null, no como 0 (regla 2 del proyecto).
-    """
-    import sqlite3
-    db = Path("/home/deamon/workspaces/sentinel_omega/data/SENTINEL_OMEGA_PRO.db")
-    if not db.exists():
-        return {"ok": False, "error": "DB no encontrada"}
-    try:
-        conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=5.0)
-        conn.row_factory = sqlite3.Row
-
-        # 1. Ciclo actual
-        ciclo = conn.execute(
-            "SELECT id, nivel_riesgo, fantasma, precursors_count, "
-            "muro_walls_active, muro_breach, geo_signal, geo_confidence, "
-            "created_at FROM TBL_CICLOS ORDER BY id DESC LIMIT 1"
-        ).fetchone()
-
-        # 2. Telemetría (último precursor)
-        tele = conn.execute(
-            "SELECT bz_nT, viento_km_s, kp, lod_ms, "
-            "schumann_hz, schumann_activity, fantasma, nivel_riesgo "
-            "FROM TBL_PRECURSORES_COSMICOS ORDER BY id DESC LIMIT 1"
-        ).fetchone()
-
-        # 3. Muro
-        muro = conn.execute(
-            "SELECT walls_active, total_walls, muro_breach, risk_label, "
-            "wall_geofisico, wall_atmosferico, wall_oceanico, "
-            "wall_solar, wall_financiero "
-            "FROM TBL_MURO_EVENTOS ORDER BY id DESC LIMIT 1"
-        ).fetchone()
-
-        # 4. Firmas: memoria viva
-        firmas = conn.execute(
-            "SELECT COUNT(*) total, SUM(estado='consolidada') consolidadas, "
-            "SUM(COALESCE(exigible,0)=1) exigibles FROM TBL_FIRMAS"
-        ).fetchone()
-
-        # 5. Enjambres activos (sismos M2.5+ en últimas 72h, por nodo)
-        enjambres = conn.execute(
-            "SELECT id_nodo, COUNT(*) n, MAX(sismo_max_mag) max_mag "
-            "FROM tbl_historico_sismico_raw "
-            "WHERE timestamp_blk >= datetime('now','-72 hours') "
-            "AND sismo_max_mag >= 2.5 "
-            "GROUP BY id_nodo HAVING n >= 5 ORDER BY n DESC LIMIT 5"
-        ).fetchall()
-
-        # 6. Sismos M4.5+ en últimas 24h
-        m45 = conn.execute(
-            "SELECT COUNT(*) FROM tbl_historico_sismico_raw "
-            "WHERE timestamp_blk >= datetime('now','-24 hours') "
-            "AND sismo_max_mag >= 4.5"
-        ).fetchone()
-
-        # 7. Juez: asertividad viva
-        juez = conn.execute(
-            "SELECT COUNT(*) ventanas FROM viva_real "
-            "WHERE COALESCE(en_vivo,1)=1 AND resultado != 'PENDIENTE'"
-        ).fetchone()
-
-        # 8. Clima espacial: Kp actual
-        clima = conn.execute(
-            "SELECT kp_max, bz_min, viento_solar_max FROM tbl_clima_espacial_raw "
-            "ORDER BY timestamp_blk DESC LIMIT 1"
-        ).fetchone()
-
-        conn.close()
-
-        def _v(r, k):
-            if r is None:
-                return None
-            return r[k]
-
-        return {
-            "ok": True,
-            "ciclo": {
-                "id": _v(ciclo, "id"),
-                "riesgo": _v(ciclo, "nivel_riesgo"),
-                "fantasma": _v(ciclo, "fantasma"),
-                "precursores": _v(ciclo, "precursors_count"),
-                "muro": f"{_v(ciclo, 'muro_walls_active') or 0}/5",
-                "muro_breach": _v(ciclo, "muro_breach"),
-                "consenso": _v(ciclo, "geo_signal"),
-                "consenso_conf": _v(ciclo, "geo_confidence"),
-                "cuando": _v(ciclo, "created_at"),
-            } if ciclo else {},
-            "telemetria": {
-                "bz": _v(tele, "bz_nT"),
-                "kp": _v(tele, "kp"),
-                "viento": _v(tele, "viento_km_s"),
-                "schumann_act": _v(tele, "schumann_activity"),
-                "schumann_hz": _v(tele, "schumann_hz"),
-                "fantasma": _v(tele, "fantasma"),
-                "riesgo": _v(tele, "nivel_riesgo"),
-            } if tele else {},
-            "muro": {
-                "activos": _v(muro, "walls_active"),
-                "total": _v(muro, "total_walls"),
-                "breach": _v(muro, "muro_breach"),
-                "label": _v(muro, "risk_label"),
-                "geofisico": _v(muro, "wall_geofisico"),
-                "atmosferico": _v(muro, "wall_atmosferico"),
-                "oceanico": _v(muro, "wall_oceanico"),
-                "solar": _v(muro, "wall_solar"),
-                "financiero": _v(muro, "wall_financiero"),
-            } if muro else {},
-            "memoria": {
-                "firmas": _v(firmas, "total"),
-                "consolidadas": _v(firmas, "consolidadas"),
-                "exigibles": _v(firmas, "exigibles"),
-            } if firmas else {},
-            "sismos": {
-                "m45_24h": _v(m45, "COUNT(*)") if m45 else 0,
-                "enjambres": [
-                    {"nodo": e["id_nodo"], "count": e["n"], "max_mag": e["max_mag"]}
-                    for e in (enjambres or [])
-                ],
-            },
-            "juez": {
-                "ventanas_vivas": _v(juez, "ventanas") if juez else 0,
-            },
-            "clima_espacial": {
-                "kp_max": _v(clima, "kp_max"),
-                "bz_min": _v(clima, "bz_min"),
-                "viento_max": _v(clima, "viento_solar_max"),
-            } if clima else {},
-        }
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:120]}
-
-
-# ─── Telegram Mini App (Concilio — secundario) ─────────────────────────────
+# ── Los endpoints de ESTADO de Sentinel se RETIRARON con el corte del
+# 2026-10-26 (/api/mini/estado y /api/mini/sentinel leían el snapshot y
+# la DB de Sentinel): el estado de Sentinel lo sirve el EXPERTO
+# (web.py, :8003, @SismoBio_Bot). El CONCILIO GENERAL es consenso y
+# verificación — su mini es el CHAT y no consume estado de Sentinel.
 
 @app.get("/api/mini/status")
 def mini_status():
@@ -595,7 +409,6 @@ def mini_status():
         return status_payload_json()
     except Exception as e:
         import yaml
-        from alert_queue import alert_queue
 
         cfg_path = Path(__file__).resolve().parent / "config.yaml"
         cfg = {}
@@ -609,11 +422,6 @@ def mini_status():
             (concilio.get("sessions_dir") or "data/sessions")
         )
         sessions = list(sdir.glob("*.concilio")) if sdir.is_dir() else []
-        try:
-            q = alert_queue.get_stats()
-            q["file_path"] = Path(str(q.get("file_path", ""))).name
-        except Exception:
-            q = {"error": "unavailable"}
         return {
             "ok": False,
             "error": str(e)[:120],
@@ -626,7 +434,10 @@ def mini_status():
                 "last_session": None,
             },
             "ollama": {"loaded": [], "unloaded_note": "fallback"},
-            "alert_queue": q,
+            "alert_queue": {
+                "nota": ("el despacho vive en el EXPERTO "
+                         "(sentinel-experto.service, @SismoBio_Bot)")
+            },
             "dashboard_url": os.environ.get(
                 "CONSENSUS_DASHBOARD_URL", "http://127.0.0.1:8000"
             ),
@@ -684,32 +495,18 @@ def concilio_health_api():
 
 @app.get("/api/alerts/stats")
 def alerts_stats_api():
-    """Alert queue counters for miniapp — paths ok, no secrets."""
-    try:
-        from alert_queue import alert_queue
-        stats = alert_queue.get_stats()
-        return {
-            "size": stats.get("size", 0),
-            "en_vuelo": stats.get("en_vuelo", 0),
-            "descartados": stats.get("descartados", 0),
-            "total_enqueued": stats.get("total_enqueued", 0),
-            "total_sent": stats.get("total_sent", 0),
-            "total_failed": stats.get("total_failed", 0),
-            "total_dead": stats.get("total_dead", 0),
-            "last_alert": stats.get("last_alert"),
-        }
-    except Exception as exc:
-        return {"error": str(exc), "size": 0}
+    """Agente de uso general local — sin cola de alertas de Sentinel."""
+    return {
+        "nota": "Agente local de uso general (Deamon-X / Capitán)",
+        "modo": "uso_general_local",
+        "personalidad": "Capitan (Deamon-X)",
+    }
+
 
 @app.get("/api/sentinel/health")
-def sentinel_health():
-    """Read-only Sentinel status; never starts Sentinel runtime."""
-    root = os.environ.get("SENTINEL_OMEGA_ROOT", "/home/deamon/workspaces/sentinel_omega")
-    database = os.path.join(root, "data", "SENTINEL_OMEGA_PRO.db")
-    logs = [os.path.join(root, "data", name) for name in ("sentinel_omega.log", "scheduler_reportes.log")]
-    return {
-        "status": "ok" if os.path.isfile(database) else "warning",
-        "read_only": True,
-        "database": {"path": database, "exists": os.path.isfile(database)},
-        "logs": {"latest_mtime": max((os.path.getmtime(item) for item in logs if os.path.isfile(item)), default=None)},
-    }
+def sentinel_health_disabled():
+    """Endpoint retirado: el agente es de uso general local, no de Sentinel."""
+    return JSONResponse(
+        status_code=404,
+        content={"error": "Endpoint retirado: agente de uso general local"},
+    )

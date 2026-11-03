@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 
 ALLOWED_ROOTS = [
     Path("/home/deamon/consensus-expert-agent").resolve(),
-    Path("/home/deamon/workspaces").resolve(),
+    Path("/home/deamon/Sentinel_Omega").resolve(),
 ]
 MAX_READ_BYTES = 50_000
 MAX_GREP_RESULTS = 50

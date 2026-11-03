@@ -5,7 +5,7 @@ Este módulo resuelve el problema #1 detectado en la auditoría 2026-08-22:
 el agente consensus NO conocía las reglas duras, la arquitectura, ni el estado
 del proyecto al que dice servir. Ahora cada blackboard se inicializa con un
 resumen canónico del proyecto, leídos desde los archivos reales del repo
-aguas abajo (/home/deamon/workspaces/{-, -dev, -test}/*).
+aguas abajo (/home/deamon/Sentinel_Omega/{-, -dev, -test}/*).
 """
 import pathlib
 from pathlib import Path
@@ -107,7 +107,7 @@ Stack técnico: Python 3.11+, SQLite, pandas, numpy, scipy, ephem (luna), \
 opencv-python (Schumann), onnxruntime (modelos ONNX), eodag>=4.0 (Copernicus), \
 pytrends (Google Trends), streamlit (dashboard), rich (CLI). ~420-428 tests.
 
-Ramas: main (PROD en /home/deamon/workspaces), dev, test, y un backup \
+Ramas: main (PROD en /home/deamon/Sentinel_Omega), dev, test, y un backup \
 pre_rebuild_2026-08-22_122650 (rama dev, commit 400c674). PRs siempre como \
 draft; el cron roy-vigilante.yml solo dispara en main.
 

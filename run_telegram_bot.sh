@@ -13,7 +13,7 @@ fi
 export TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 export TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID:-}"
 export CONSENSUS_CONFIG="${CONSENSUS_CONFIG:-config.yaml}"
-export SENTINEL_OMEGA_ROOT="${SENTINEL_OMEGA_ROOT:-/home/deamon/workspaces/sentinel_omega}"
+export SENTINEL_OMEGA_ROOT="${SENTINEL_OMEGA_ROOT:-/home/deamon/Sentinel_Omega/sentinel_omega}"
 
 if [[ -z "${TELEGRAM_BOT_TOKEN}" ]]; then
   echo "ERROR: TELEGRAM_BOT_TOKEN no configurado (.env o entorno)" >&2

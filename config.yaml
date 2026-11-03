@@ -52,28 +52,17 @@ concilio:
   sequential: true
   unload_between_stages: true
   arbiter_only_gemma: true
-  # false until Sentinel updates finish elsewhere — no architecture corpus per run
+  # Agente de uso general local con personalidad del Capitán (de /home/deamon/Capitan.md)
+  # Sin inyección de arquitectura Sentinel, sin memoria de Sentinel, sin restricciones de miniapp
   inject_sentinel_architecture: false
   sessions_dir: data/sessions
-  # Prefer thin aliases; orchestrator falls back to base tags if missing
-  # LIGHTEST investigador. Era concilio-worker (nemotron-mini, ventana 4.096):
-  # el contexto inyectado ronda 4.800 tokens, así que se desbordaba ANTES de
-  # recibir el enunciado y trabajaba con el material truncado.
-  # concilio-investigador (llama3.2:3b) tiene 131.072 y pesa menos.
-  worker_model: concilio-investigador
-  # CODER: codegemma:7b desde el 2026-09-25, decision del operador tras medir
-  # siete tareas con verdad escrita a mano, una llamada, temperatura 0:
-  #   codegemma:7b      6/7 tareas, 72/73 casos, 222 s
-  #   qwen2.5-coder:7b  5/7 tareas, 60/73 casos,  79 s
-  #   deepseek-r1:8b    se gasto 15 min pensando sin escribir la funcion
-  # En un concilio con verificador la exactitud a la primera pesa mas que la
-  # velocidad: cada fallo cuesta una ronda entera (6-10 min con intercambios).
-  # Su ventana maxima es 8.192; el peor contexto real medido del coder son
-  # ~3.700 tokens. Para codigo grande, qwen (32.768) queda de respaldo.
+  # Modelo base con personalidad del Capitán (Deamon-X)
+  worker_model: capitan-deamon
+  # CODER: codegemma:7b para tareas de código
   coder_model: codegemma:7b
-  arbiter_model: concilio-arbitro # aliases: concilio-heavy, sentinel-concilio-arbitro
+  arbiter_model: concilio-arbitro
   fast_gente_outside: true
-  telegram_preload_sentinel_pack: true
+  telegram_preload_sentinel_pack: false
   verify_with_light: true
   settle_seconds: 1.0
   prefer_custom_models: true
@@ -127,9 +116,9 @@ context_injector:
   include_self: true
   # Prefer DEV first so remaps/audits do not default to live PROD state.
   workspace_roots:
-  - /home/deamon/workspaces-dev
-  - /home/deamon/workspaces-test
-  - /home/deamon/workspaces
+  - /home/deamon/Sentinel_Omega-dev
+  - /home/deamon/Sentinel_Omega-test
+  - /home/deamon/Sentinel_Omega
 
 roles:
   researcher:
