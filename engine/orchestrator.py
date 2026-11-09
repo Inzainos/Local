@@ -20,6 +20,10 @@ from agents.researcher import ResearcherAgent
 from agents.coder import CoderAgent
 from agents.optimizer import OptimizerAgent
 from .router import TaskRouter, PipelineType
+# v2 motor turnos
+from .turnos import MotorTurnos
+from .turnos_ollama import AdaptadorTurnos, elegir_area_y_nivel
+import yaml as _yaml
 
 logger = logging.getLogger("Concilio.Orquestador")
 from .model_lifecycle import ModelLifecycle
@@ -92,6 +96,8 @@ class ConsensusOrchestrator:
         # "concilio". El concilio tampoco puede verificarlo --- su lectura puso
         # 97-99 a codigo roto --- asi que solo anadiria 25-50 minutos.
         self._sin_verificacion = str(conc.get("sin_verificacion_confiable", "entregar"))
+        # v2: usar motor de turnos por niveles cuando la vía directa no verifica
+        self._use_turnos = bool(conc.get("use_turnos", False))
         self.__coder_directo = None
         self.__coder_respaldo = None
         self.lifecycle = ModelLifecycle(ollama_host=self.ollama_host)
@@ -868,6 +874,24 @@ class ConsensusOrchestrator:
                                          "Archivado como hecho (via directa verificada)")
                 return blackboard
 
+        # v2: motor de turnos por niveles como fallback del Concilio secuencial
+        if self._use_turnos and not skip_coding:
+            if on_stage_start:
+                on_stage_start("TURNOS", "MotorTurnos", "Motor de turnos por niveles")
+            try:
+                resultado = self._ejecutar_turnos(
+                    blackboard,
+                    pipeline_type,
+                    on_stage_start,
+                    on_stage_end,
+                )
+                if resultado:
+                    shared_memory.persist_current_state()
+                    return blackboard
+            except Exception as e:
+                logger.warning("Motor turnos falló, se continúa con Concilio secuencial: %s", e)
+                blackboard.log_event("TURNOS", "Orchestrator", f"Fallback a Concilio: {e}")
+
         round_count = 0
         consensus_achieved = False
         infinite_loop = self.max_rounds == 0
@@ -1194,6 +1218,83 @@ class ConsensusOrchestrator:
             )
         return blackboard
 
+    def _ejecutar_turnos(
+        self,
+        blackboard,
+        pipeline_type,
+        on_stage_start,
+        on_stage_end,
+    ):
+        """Ejecuta MotorTurnos por niveles para tareas de código.
+        Autoselección de área/nivel mediante capitán.
+        """
+        import yaml as _yaml
+        from pathlib import Path
+        import time
+
+        perfiles_path = Path("profiles/niveles.yaml")
+        if not perfiles_path.exists():
+            logger.warning("profiles/niveles.yaml no encontrado, se omite motor turnos")
+            return False
+
+        perfiles = _yaml.safe_load(perfiles_path.read_text(encoding="utf-8"))
+        # Seleccionar área según pipeline
+        if pipeline_type in (PipelineType.FULL_CONSENSUS_CODING, PipelineType.CODE_OPTIMIZATION):
+            area = "codigo"
+        else:
+            area = "investigacion"
+
+        # Autoselección nivel con capitán
+        try:
+            decision = elegir_area_y_nivel(
+                enunciado=getattr(blackboard, "user_prompt", "") or "",
+                modelo="llama3.2:3b",
+                ollama_host=self.ollama_host,
+                ventana=2048,
+            )
+            area = decision.area if decision.area in ("codigo", "investigacion") else area
+            nivel_sel = decision.nivel if decision.seguro else "ligero"
+        except Exception as e:
+            logger.warning("elegir_area_y_nivel falló, usando ligero: %s", e)
+            nivel_sel = "ligero"
+
+        adaptador = AdaptadorTurnos(
+            ollama_host=self.ollama_host,
+            lifecycle=self.lifecycle,
+            timeout_seconds=self.config.get("ollama", {}).get("timeout_seconds", 900),
+        )
+
+        motor = MotorTurnos(
+            perfil=perfiles,
+            invocar=adaptador.invocar,
+            cargar_exclusivo=adaptador.cargar,
+        )
+
+        tarea_id = getattr(blackboard, "task_id", "turnos") or "turnos"
+        if on_stage_start:
+            on_stage_start("TURNOS", "MotorTurnos", f"Motor turnos {area}/{nivel_sel}")
+
+        resultado = motor.correr_nivel(
+            tarea_id=tarea_id,
+            enunciado=getattr(blackboard, "user_prompt", "") or "",
+            area=area,
+            nivel=nivel_sel,
+            material="",
+        )
+
+        # Registrar resultado básico
+        blackboard.consensus_score = int(resultado.media)
+        blackboard.log_event(
+            "TURNOS",
+            "Orchestrator",
+            f"Turnos {area}/{nivel_sel} media={resultado.media} umbral={motor.umbral} alcanzado={resultado.alcanzo_umbral} borrador={len(resultado.borrador_final)} chars",
+        )
+        if hasattr(blackboard, "shared_notes"):
+            blackboard.shared_notes["turnos_borrador"] = resultado.borrador_final or ""
+            blackboard.shared_notes["turnos_media"] = resultado.media
+        if on_stage_end:
+            on_stage_end("TURNOS", "MotorTurnos completado")
+        return True
 
     def fast_ask(
         self,

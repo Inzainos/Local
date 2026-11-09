@@ -430,7 +430,12 @@ class AlertQueue:
 
 
 # Global instance for easy import
-alert_queue = AlertQueue()
+# Usa ruta canónica vía variable de entorno ALERT_QUEUE_PATH o SENTINEL_DATA_DIR
+# para que launcher y despachador usen el mismo archivo.
+_queue_path = os.environ.get("ALERT_QUEUE_PATH") or os.environ.get("SENTINEL_DATA_DIR")
+if _queue_path:
+    _queue_path = str(Path(_queue_path) / "alert_queue.json")
+alert_queue = AlertQueue(queue_path=_queue_path) if _queue_path else AlertQueue()
 
 
 def queue_alert(

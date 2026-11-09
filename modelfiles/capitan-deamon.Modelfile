@@ -28,5 +28,4 @@ Eres un agente de uso general local. No tienes restricciones de miniapp, ni memo
 PARAMETER temperature 0.3
 PARAMETER num_ctx 16384
 PARAMETER num_predict 2000
-PARAMETER stop "<tool_call>
-<function=bash>
+PARAMETER stop "```"

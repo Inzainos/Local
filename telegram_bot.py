@@ -56,7 +56,7 @@ _ENV_PATH = Path(__file__).resolve().parent / ".env"
 load_dotenv(dotenv_path=_ENV_PATH)
 load_dotenv()
 
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_WATCHDOG_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 CONSENSUS_CONFIG = os.environ.get("CONSENSUS_CONFIG", "config.yaml")
 SENTINEL_ROOT = os.environ.get(
@@ -1387,7 +1387,7 @@ def main():
         if yo.id != BOT_ID_ESPERADO or yo.username != BOT_NAME_ESPERADO:
             logger.error(
                 "Token de OTRO bot (id=%s @%s): el CONCILIO GENERAL sirve a "
-                "@%s (id %s). Corrige TELEGRAM_BOT_TOKEN en .env.",
+                "@%s (id %s). Corrige TELEGRAM_WATCHDOG_TOKEN en .env.",
                 yo.id, yo.username, BOT_NAME_ESPERADO, BOT_ID_ESPERADO,
             )
             raise SystemExit(78)  # EX_CONFIG
@@ -1415,7 +1415,7 @@ def main():
         # reportamos solo el bot_id.
         logger.error(
             "Telegram rechazo el token del bot %s. Actualiza "
-            "TELEGRAM_BOT_TOKEN en .env y reinicia el servicio.",
+            "TELEGRAM_WATCHDOG_TOKEN en .env y reinicia el servicio.",
             _bot_id_publico(TELEGRAM_BOT_TOKEN),
         )
         raise SystemExit(78)  # EX_CONFIG
